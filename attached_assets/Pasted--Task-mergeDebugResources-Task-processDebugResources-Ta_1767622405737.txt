@@ -1,0 +1,58 @@
+> Task :mergeDebugResources
+> Task :processDebugResources
+> Task :compileDebugJavaWithJavac
+/home/runner/work/UnBelievable-Keyboard/UnBelievable-Keyboard/srcs/juloo.keyboard2/Config.java:93: error: cannot find symbol
+  private Context _context;
+          ^
+  symbol:   class Context
+  location: class Config
+/home/runner/work/UnBelievable-Keyboard/UnBelievable-Keyboard/srcs/juloo.keyboard2/Config.java:95: error: cannot find symbol
+  public void setContext(Context ctx) {
+                         ^
+  symbol:   class Context
+  location: class Config
+/home/runner/work/UnBelievable-Keyboard/UnBelievable-Keyboard/srcs/juloo.keyboard2/Config.java:99: error: cannot find symbol
+  public Context getContext() {
+         ^
+  symbol:   class Context
+  location: class Config
+Note: Some input files use or override a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+Note: Some input files use unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+> Task :compileDebugJavaWithJavac FAILED
+3 errors
+> Task :mergeExtDexDebug
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run_2-1767622360917.json
+[Incubating] Problems report is available at: file:///home/runner/work/UnBelievable-Keyboard/UnBelievable-Keyboard/build/reports/problems/problems-report.html
+FAILURE: Build failed with an exception.
+* What went wrong:
+Execution failed for task ':compileDebugJavaWithJavac'.
+> Compilation failed; see the compiler output below.
+  Note: Recompile with -Xlint:deprecation for details.
+  /home/runner/work/UnBelievable-Keyboard/UnBelievable-Keyboard/srcs/juloo.keyboard2/Config.java:93: error: cannot find symbol
+    private Context _context;
+            ^
+    symbol:   class Context
+    location: class Config
+  /home/runner/work/UnBelievable-Keyboard/UnBelievable-Keyboard/srcs/juloo.keyboard2/Config.java:95: error: cannot find symbol
+32 actionable tasks: 32 executed
+    public void setContext(Context ctx) {
+                           ^
+    symbol:   class Context
+    location: class Config
+  /home/runner/work/UnBelievable-Keyboard/UnBelievable-Keyboard/srcs/juloo.keyboard2/Config.java:99: error: cannot find symbol
+    public Context getContext() {
+           ^
+    symbol:   class Context
+    location: class Config
+  Note: Recompile with -Xlint:unchecked for details.
+  Note: Some input files use or override a deprecated API.
+  Note: Some input files use unchecked or unsafe operations.
+  3 errors
+* Try:
+> Check your code and dependencies to fix the compilation error(s)
+> Run with --scan to get full insights.
+BUILD FAILED in 22s
+Configuration cache entry stored.
+Error: Process completed with exit code 1.

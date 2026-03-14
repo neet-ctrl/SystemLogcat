@@ -1,0 +1,62 @@
+modules = ["nodejs-20"]
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Build Validation"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Frontend Server"
+
+[[workflows.workflow]]
+name = "Build Validation"
+author = "agent"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "export JAVA_HOME=$(readlink -f $(which java) | sed \"s:/bin/java::\") && ./gradlew help"
+
+[[workflows.workflow]]
+name = "Frontend Server"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run dev"
+waitForPort = 5000
+
+[workflows.workflow.metadata]
+outputType = "webview"
+
+[agent]
+expertMode = true
+
+[nix]
+channel = "stable-25_05"
+packages = ["jdk17", "openssh_gssapi"]
+
+[[ports]]
+localPort = 3000
+externalPort = 3000
+
+[[ports]]
+localPort = 3001
+externalPort = 3001
+
+[[ports]]
+localPort = 5000
+externalPort = 80
+
+[[ports]]
+localPort = 5001
+externalPort = 3002

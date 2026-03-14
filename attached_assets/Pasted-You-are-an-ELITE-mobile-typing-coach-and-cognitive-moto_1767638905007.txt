@@ -1,0 +1,99 @@
+You are an ELITE mobile typing coach and cognitive motor-skill trainer.
+Your task is to design a COMPLETE, hardcore, professional-level
+MOBILE QWERTY TYPING MASTER SYSTEM that can turn a beginner or intermediate
+user into an EXTREMELY FAST and ACCURATE mobile typist.
+
+RULES:
+- Focus ONLY on mobile QWERTY keyboards (Android/iOS).
+- NO PC typing concepts unless explicitly adapted for mobile.
+- NO AI-powered autocorrect dependency.
+- Training must be skill-based, muscle-memory-based, and neuroscience-backed.
+- Difficulty must scale from absolute beginner → expert → elite → competitive.
+
+SYSTEM MUST INCLUDE:
+
+1️⃣ FOUNDATION (STARTUP LEVEL)
+- Explain mobile typing mechanics (thumb-only, thumb+index, hybrid styles).
+- Exact thumb placement zones on QWERTY layout.
+- How phone size affects thumb reach.
+- Optimal grip styles (small phone, large phone, tablet).
+- Common beginner mistakes and how to eliminate them.
+- Warm-up finger & thumb exercises (before typing).
+
+2️⃣ FINGER & THUMB PLACEMENT SYSTEM
+- Precise thumb home zones (left thumb, right thumb).
+- When to use one thumb vs two thumbs.
+- Thumb arc movement training (short taps, long reach, diagonal reach).
+- How to hit edge keys (Q, P, Z, M) efficiently.
+- Spacebar, backspace, shift, and punctuation mastery.
+- One-hand typing optimization.
+
+3️⃣ SPEED BUILDING PHASES (LEVEL-WISE)
+Create structured levels:
+- Level 1: Accuracy-first slow drills
+- Level 2: Rhythm typing (flow-based typing)
+- Level 3: Speed bursts (short timed sprints)
+- Level 4: Sustained speed typing (fatigue resistance)
+- Level 5: Extreme speed challenge (real-world chat simulation)
+
+Each level must include:
+- Target WPM
+- Accuracy threshold
+- Time limits
+- Unlock conditions
+
+4️⃣ HARDCORE DRILLS (ADVANCED)
+- Bigram and trigram drills (th, ing, ion, est).
+- Alternating-thumb drills.
+- Error-recovery drills (fix mistakes fast without breaking flow).
+- No-look typing drills (visual deprivation).
+- Random word chaos drills.
+- Sentence complexity drills.
+- Long paragraph endurance typing.
+
+5️⃣ THUMB TECHNIQUES (PRO LEVEL)
+- Micro-movement minimization.
+- Predictive finger movement without AI suggestions.
+- Thumb bounce technique.
+- Glide vs tap strategy comparison.
+- When to intentionally slow down to go faster long-term.
+
+6️⃣ TESTING & METRICS
+- WPM calculation system.
+- Real accuracy (not fake accuracy).
+- Consistency score.
+- Fatigue index.
+- Improvement graph logic.
+- Daily / weekly / monthly assessments.
+
+7️⃣ REAL-WORLD APPLICATION TRAINING
+- WhatsApp / Telegram chat simulation.
+- Coding-like text drills.
+- Exam typing drills.
+- Note-taking speed training.
+- Long message typing without errors.
+
+8️⃣ MENTAL & NEURO TRAINING
+- Focus training for typing.
+- Reducing cognitive load while typing.
+- Muscle memory reinforcement techniques.
+- Habit formation system (21-day, 45-day plans).
+
+9️⃣ ADVANCED TIPS & SECRETS
+- Keyboard height & layout optimization.
+- Sound & haptic feedback usage.
+- Best typing posture while sitting, standing, lying.
+- How elite mobile typists train.
+- How to break speed plateaus.
+
+OUTPUT FORMAT:
+- Step-by-step structured curriculum
+- Clear exercises
+- Progressive difficulty
+- Daily training plans
+- Hardcore tests
+- Zero fluff, zero generic advice
+
+FINAL GOAL:
+Create the most ADVANCED MOBILE QWERTY TYPING MASTER SYSTEM ever,
+capable of producing extremely fast, accurate, and confident mobile typists.

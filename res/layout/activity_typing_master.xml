@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#FAFAFA"
+    android:padding="20dp">
+
+    <TextView
+        android:id="@+id/tv_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Typing Master"
+        android:textSize="24sp"
+        android:textStyle="bold"
+        android:textColor="#333333"
+        android:layout_marginBottom="20dp"
+        android:gravity="center" />
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="@drawable/bg_rounded_card"
+        android:padding="12dp">
+
+        <TextView
+            android:id="@+id/tv_paragraph"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:textSize="20sp"
+            android:lineSpacingExtra="4dp"
+            android:textColor="#444444"
+            android:scrollbars="vertical"
+            android:fadeScrollbars="false" />
+    </FrameLayout>
+
+    <EditText
+        android:id="@+id/et_typing_area"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Start typing here..."
+        android:minLines="3"
+        android:padding="12dp"
+        android:background="@drawable/bg_rounded_card"
+        android:layout_marginTop="20dp"
+        android:textColor="#2196F3"
+        android:textSize="18sp"
+        android:inputType="textMultiLine" />
+
+    <Button
+        android:id="@+id/btn_next"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:text="Next Lesson"
+        android:enabled="false"
+        android:textAllCaps="false"
+        android:textSize="18sp"
+        android:textColor="#FFFFFF"
+        android:backgroundTint="#4CAF50"
+        android:layout_marginTop="16dp" />
+</LinearLayout>

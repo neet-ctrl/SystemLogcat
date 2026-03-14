@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content">
+
+    <!-- Collapsed View: The "float icon" -->
+    <ImageView
+        android:id="@+id/collapse_view"
+        android:layout_width="50dp"
+        android:layout_height="50dp"
+        android:src="@drawable/ic_launcher_foreground"
+        android:background="@drawable/doc_anim_circle"
+        android:visibility="gone"
+        android:contentDescription="Expand Clipboard" />
+
+    <!-- Expanded View: The widget itself -->
+    <LinearLayout
+        android:id="@+id/expanded_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@drawable/bg_rounded_card"
+        android:elevation="8dp"
+        android:padding="12dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="8dp">
+            
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Clipboard History"
+                android:textSize="18sp"
+                android:textColor="#333333"
+                android:textStyle="bold" />
+
+            <ImageView
+                android:id="@+id/iv_collapse"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:src="@drawable/ic_delete"
+                android:padding="6dp"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Collapse" />
+
+            <Button
+                android:id="@+id/btn_close"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:text="✕"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:textColor="#666666"
+                android:textSize="18sp"
+                android:minWidth="40dp"
+                android:layout_marginStart="4dp" />
+        </LinearLayout>
+
+        <ListView
+            android:id="@+id/clip_list"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:divider="@android:color/transparent"
+            android:dividerHeight="8dp" />
+
+        <ImageView
+            android:id="@+id/iv_resize"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_gravity="end|bottom"
+            android:src="@android:drawable/ic_menu_directions"
+            android:padding="8dp"
+            android:background="#44000000"
+            android:tint="#FFFFFF"
+            android:contentDescription="Resize" />
+
+    </LinearLayout>
+</FrameLayout>

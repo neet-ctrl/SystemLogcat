@@ -1,0 +1,175 @@
+
+Navigation Menu
+UnBelievable-Keyboard
+
+Code
+Issues
+Pull requests
+Make Apk CI
+Finalize Unlimited Persistent Clipboard with Metadata and Versioning #5
+Annotations
+1 error
+Build-Apk
+failed 3 minutes ago in 39s
+3s
+1s
+0s
+0s
+6s
+22s
+Run ./gradlew assembleDebug
+Starting a Gradle Daemon (subsequent builds will be faster)
+Calculating task graph as no cached configuration is available for tasks: assembleDebug
+> Task :copyRawQwertyUS
+> Task :copyLayoutDefinitions
+Generating 2,048 bit RSA key pair and self-signed certificate (SHA256withRSA) with a validity of 10,000 days
+
+> Task :initDebugKeystore
+Initializing default debug keystore
+Command line args: [-genkeypair, -dname, cn=d, ou=e, o=b, c=ug, -alias, debug, -keypass, debug0, -keystore, debug.keystore, -keyalg, rsa, -storepass, debug0, -validity, 10000]
+
+> Task :preBuild
+> Task :preDebugBuild
+> Task :mergeDebugNativeDebugMetadata NO-SOURCE
+	for: CN=d, OU=e, O=b, C=ug
+> Task :javaPreCompileDebug
+> Task :processDebugNavigationResources
+> Task :createDebugCompatibleScreenManifests
+> Task :checkDebugAarMetadata
+> Task :processDebugJavaRes NO-SOURCE
+> Task :generateDebugResValues
+> Task :compileDebugNavigationResources
+> Task :generateDebugResources
+> Task :mergeDebugShaders
+> Task :mapDebugSourceSetPaths
+> Task :extractDeepLinksDebug
+> Task :processDebugMainManifest
+> Task :processDebugManifest
+> Task :packageDebugResources
+> Task :mergeDebugJavaResource
+> Task :compileDebugShaders NO-SOURCE
+> Task :generateDebugAssets UP-TO-DATE
+> Task :processDebugManifestForPackage
+> Task :checkDebugDuplicateClasses
+> Task :mergeDebugAssets
+> Task :parseDebugLocalResources
+> Task :compressDebugAssets
+> Task :mergeDebugJniLibFolders
+> Task :mergeLibDexDebug
+> Task :validateSigningDebug
+> Task :writeDebugAppMetadata
+> Task :writeDebugSigningConfigVersions
+> Task :mergeDebugNativeLibs NO-SOURCE
+> Task :stripDebugDebugSymbols NO-SOURCE
+> Task :desugarDebugFileDependencies
+> Task :mergeDebugResources
+> Task :processDebugResources
+/home/runner/work/UnBelievable-Keyboard/UnBelievable-Keyboard/srcs/juloo.keyboard2/ClipboardHistoryService.java:60: error: cannot find symbol
+  OnClipboardHistoryChange _listener = null;
+
+> Task :compileDebugJavaWithJavac
+  ^
+  symbol:   class OnClipboardHistoryChange
+  location: class ClipboardHistoryService
+/home/runner/work/UnBelievable-Keyboard/UnBelievable-Keyboard/srcs/juloo.keyboard2/ClipboardHistoryView.java:16: error: cannot find symbol
+  implements ClipboardHistoryService.OnClipboardHistoryChange
+                                    ^
+  symbol:   class OnClipboardHistoryChange
+  location: class ClipboardHistoryService
+/home/runner/work/UnBelievable-Keyboard/UnBelievable-Keyboard/srcs/juloo.keyboard2/ClipboardHistoryService.java:38: error: cannot find symbol
+      _service.add_current_clip();
+              ^
+  symbol:   method add_current_clip()
+  location: variable _service of type ClipboardHistoryService
+/home/runner/work/UnBelievable-Keyboard/UnBelievable-Keyboard/srcs/juloo.keyboard2/ClipboardHistoryService.java:40: error: cannot find symbol
+      _service.clear_history();
+              ^
+  symbol:   method clear_history()
+  location: variable _service of type ClipboardHistoryService
+/home/runner/work/UnBelievable-Keyboard/UnBelievable-Keyboard/srcs/juloo.keyboard2/ClipboardHistoryService.java:66: error: cannot find symbol
+    _cm.addPrimaryClipChangedListener(this.new SystemListener());
+                                               ^
+  symbol:   class SystemListener
+  location: class ClipboardHistoryService
+/home/runner/work/UnBelievable-Keyboard/UnBelievable-Keyboard/srcs/juloo.keyboard2/ClipboardHistoryService.java:122: error: cannot find symbol
+    save_history_to_prefs(juloo.keyboard2.Config.globalConfig().getContext());
+                                                               ^
+  symbol:   method getContext()
+  location: class Config
+/home/runner/work/UnBelievable-Keyboard/UnBelievable-Keyboard/srcs/juloo.keyboard2/ClipboardHistoryView.java:30: error: cannot find symbol
+      _service.set_on_clipboard_history_change(this);
+              ^
+  symbol:   method set_on_clipboard_history_change(ClipboardHistoryView)
+  location: variable _service of type ClipboardHistoryService
+/home/runner/work/UnBelievable-Keyboard/UnBelievable-Keyboard/srcs/juloo.keyboard2/ClipboardHistoryView.java:52: error: method does not override or implement a method from a supertype
+  @Override
+  ^
+Note: Some input files use or override a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+
+> Task :compileDebugJavaWithJavac FAILED
+Note: Some input files use unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+8 errors
+> Task :mergeExtDexDebug
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run_2-1767620623564.json
+
+[Incubating] Problems report is available at: file:///home/runner/work/UnBelievable-Keyboard/UnBelievable-Keyboard/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':compileDebugJavaWithJavac'.
+> Compilation failed; see the compiler output below.
+  Note: Recompile with -Xlint:deprecation for details.
+  /home/runner/work/UnBelievable-Keyboard/UnBelievable-Keyboard/srcs/juloo.keyboard2/ClipboardHistoryService.java:60: error: cannot find symbol
+32 actionable tasks: 32 executed
+Configuration cache entry stored.
+    OnClipboardHistoryChange _listener = null;
+    ^
+    symbol:   class OnClipboardHistoryChange
+    location: class ClipboardHistoryService
+  /home/runner/work/UnBelievable-Keyboard/UnBelievable-Keyboard/srcs/juloo.keyboard2/ClipboardHistoryView.java:16: error: cannot find symbol
+    implements ClipboardHistoryService.OnClipboardHistoryChange
+                                      ^
+    symbol:   class OnClipboardHistoryChange
+    location: class ClipboardHistoryService
+  /home/runner/work/UnBelievable-Keyboard/UnBelievable-Keyboard/srcs/juloo.keyboard2/ClipboardHistoryService.java:66: error: cannot find symbol
+      _cm.addPrimaryClipChangedListener(this.new SystemListener());
+                                                 ^
+    symbol:   class SystemListener
+    location: class ClipboardHistoryService
+  Note: Recompile with -Xlint:unchecked for details.
+  Note: Some input files use or override a deprecated API.
+  /home/runner/work/UnBelievable-Keyboard/UnBelievable-Keyboard/srcs/juloo.keyboard2/ClipboardHistoryView.java:52: error: method does not override or implement a method from a supertype
+    @Override
+    ^
+  Note: Some input files use unchecked or unsafe operations.
+  /home/runner/work/UnBelievable-Keyboard/UnBelievable-Keyboard/srcs/juloo.keyboard2/ClipboardHistoryService.java:38: error: cannot find symbol
+        _service.add_current_clip();
+                ^
+    symbol:   method add_current_clip()
+    location: variable _service of type ClipboardHistoryService
+  /home/runner/work/UnBelievable-Keyboard/UnBelievable-Keyboard/srcs/juloo.keyboard2/ClipboardHistoryService.java:40: error: cannot find symbol
+        _service.clear_history();
+                ^
+    symbol:   method clear_history()
+    location: variable _service of type ClipboardHistoryService
+  /home/runner/work/UnBelievable-Keyboard/UnBelievable-Keyboard/srcs/juloo.keyboard2/ClipboardHistoryService.java:122: error: cannot find symbol
+      save_history_to_prefs(juloo.keyboard2.Config.globalConfig().getContext());
+                                                                 ^
+    symbol:   method getContext()
+    location: class Config
+  /home/runner/work/UnBelievable-Keyboard/UnBelievable-Keyboard/srcs/juloo.keyboard2/ClipboardHistoryView.java:30: error: cannot find symbol
+        _service.set_on_clipboard_history_change(this);
+                ^
+    symbol:   method set_on_clipboard_history_change(ClipboardHistoryView)
+    location: variable _service of type ClipboardHistoryService
+  8 errors
+
+* Try:
+> Check your code and dependencies to fix the compilation error(s)
+> Run with --scan to get full insights.
+
+BUILD FAILED in 21s
+Error: Process completed with exit code 1.

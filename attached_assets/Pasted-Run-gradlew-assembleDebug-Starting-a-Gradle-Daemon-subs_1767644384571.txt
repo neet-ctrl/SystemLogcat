@@ -1,0 +1,70 @@
+Run ./gradlew assembleDebug
+Starting a Gradle Daemon (subsequent builds will be faster)
+Calculating task graph as no cached configuration is available for tasks: assembleDebug
+> Task :copyRawQwertyUS
+> Task :copyLayoutDefinitions
+
+> Task :initDebugKeystore
+Initializing default debug keystore
+Generating 2,048 bit RSA key pair and self-signed certificate (SHA256withRSA) with a validity of 10,000 days
+	for: CN=d, OU=e, O=b, C=ug
+Command line args: [-genkeypair, -dname, cn=d, ou=e, o=b, c=ug, -alias, debug, -keypass, debug0, -keystore, debug.keystore, -keyalg, rsa, -storepass, debug0, -validity, 10000]
+
+> Task :preBuild
+> Task :preDebugBuild
+> Task :mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :javaPreCompileDebug
+> Task :processDebugNavigationResources
+> Task :createDebugCompatibleScreenManifests
+> Task :compileDebugNavigationResources
+> Task :processDebugJavaRes NO-SOURCE
+> Task :checkDebugAarMetadata
+> Task :mergeDebugShaders
+> Task :generateDebugResValues
+> Task :generateDebugResources
+> Task :mapDebugSourceSetPaths
+> Task :checkDebugDuplicateClasses
+> Task :extractDeepLinksDebug
+> Task :processDebugMainManifest
+> Task :processDebugManifest
+> Task :packageDebugResources
+> Task :mergeDebugJavaResource
+> Task :compileDebugShaders NO-SOURCE
+> Task :generateDebugAssets UP-TO-DATE
+> Task :processDebugManifestForPackage
+> Task :parseDebugLocalResources
+> Task :mergeDebugAssets
+> Task :mergeLibDexDebug
+> Task :desugarDebugFileDependencies
+> Task :mergeDebugJniLibFolders
+> Task :mergeDebugNativeLibs NO-SOURCE
+> Task :stripDebugDebugSymbols NO-SOURCE
+> Task :validateSigningDebug
+> Task :writeDebugAppMetadata
+> Task :writeDebugSigningConfigVersions
+> Task :compressDebugAssets
+> Task :mergeDebugResources
+> Task :processDebugResources FAILED
+> Task :mergeExtDexDebug
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run_2-1767644324186.json
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':processDebugResources'.
+> A failure occurred while executing com.android.build.gradle.internal.res.LinkApplicationAndroidResourcesTask$TaskAction
+   > Android resource linking failed
+     juloo.keyboard2-UnBelievable-Keyboard-16:/layout/clipboard_widget.xml:27: error: resource attr/selectableItemBackgroundBorderless (aka juloo.keyboard2.debug:attr/selectableItemBackgroundBorderless) not found.
+     error: failed linking file resources.
+
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 21s
+31 actionable tasks: 31 executed
+Configuration cache entry stored.
+Error: Process completed with exit code 1.

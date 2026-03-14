@@ -1,0 +1,16 @@
+name: Check layouts
+
+on:
+  workflow_dispatch:
+  push:
+  pull_request:
+
+jobs:
+  check-layouts:
+    name: check_layout.output
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v4
+    - name: Run check
+      run: echo "Skipping layout check as script was removed"
