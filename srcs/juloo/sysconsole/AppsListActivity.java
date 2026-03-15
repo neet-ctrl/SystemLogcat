@@ -280,8 +280,14 @@ public class AppsListActivity extends Activity {
         rebuildList();
     }
 
+    private static final int BATCH_SIZE = 25;
+    private int mRenderOffset    = 0;
+    private int mRenderGeneration = 0;
+
     private void rebuildList() {
         mListContainer.removeAllViews();
+        mRenderOffset = 0;
+        final int gen = ++mRenderGeneration;
 
         if (mFiltered.isEmpty()) {
             LinearLayout empty = mUi.card(16, 20);
@@ -297,13 +303,25 @@ public class AppsListActivity extends Activity {
         }
 
         mListContainer.addView(mUi.label(
-                mFiltered.size() + " apps  •  tap row to expand  •  tap ⊞ All to expand all",
+                mFiltered.size() + " apps  •  tap any row to expand",
                 11f, SecurityUiHelper.CLR_SECONDARY, false));
         mListContainer.addView(mUi.spacer(6));
 
-        for (AppSecurityInfo app : mFiltered) {
-            mListContainer.addView(buildAppCard(app));
-            mListContainer.addView(mUi.spacer(8));
+        renderNextBatch(gen);
+    }
+
+    private void renderNextBatch(int gen) {
+        if (gen != mRenderGeneration) return;
+        int end = Math.min(mRenderOffset + BATCH_SIZE, mFiltered.size());
+        for (int i = mRenderOffset; i < end; i++) {
+            try {
+                mListContainer.addView(buildAppCard(mFiltered.get(i)));
+                mListContainer.addView(mUi.spacer(8));
+            } catch (Exception ignored) {}
+        }
+        mRenderOffset = end;
+        if (mRenderOffset < mFiltered.size()) {
+            mHandler.post(() -> renderNextBatch(gen));
         }
     }
 
@@ -328,21 +346,34 @@ public class AppsListActivity extends Activity {
         card.setBackground(cardBg);
 
         LinearLayout header = buildCardHeader(app, expanded);
-        LinearLayout body   = buildCardBody(app);
-        body.setVisibility(expanded ? View.VISIBLE : View.GONE);
-
         card.addView(header);
-        card.addView(body);
+
+        // Body is created lazily on first expand to keep initial render fast.
+        if (expanded) {
+            LinearLayout body = buildCardBody(app);
+            card.addView(body);
+        }
 
         header.setClickable(true);
         header.setFocusable(true);
         header.setOnClickListener(v -> {
             boolean nowExpanded = !mExpanded.contains(app.packageName);
-            if (nowExpanded) mExpanded.add(app.packageName);
-            else             mExpanded.remove(app.packageName);
-            body.setVisibility(nowExpanded ? View.VISIBLE : View.GONE);
             TextView chevron = (TextView) header.getTag();
-            if (chevron != null) chevron.setText(nowExpanded ? "▲" : "▼");
+            if (nowExpanded) {
+                mExpanded.add(app.packageName);
+                if (card.getChildCount() < 2) {
+                    card.addView(buildCardBody(app));
+                } else {
+                    card.getChildAt(1).setVisibility(View.VISIBLE);
+                }
+                if (chevron != null) chevron.setText("▲");
+            } else {
+                mExpanded.remove(app.packageName);
+                if (card.getChildCount() > 1) {
+                    card.getChildAt(1).setVisibility(View.GONE);
+                }
+                if (chevron != null) chevron.setText("▼");
+            }
         });
 
         return card;
