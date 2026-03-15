@@ -1,5 +1,6 @@
 package juloo.sysconsole;
 
+import android.Manifest;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -63,6 +64,7 @@ public class MainActivity extends Activity {
         Shizuku.addBinderReceivedListenerSticky(mBinderReceived);
         Shizuku.addBinderDeadListener(mBinderDead);
         Shizuku.addRequestPermissionResultListener(mPermResult);
+        requestNotificationPermissionIfNeeded();
         refreshStatus();
         autoRequestIfNeeded();
     }
@@ -267,6 +269,15 @@ public class MainActivity extends Activity {
     }
 
     // ── Permission ────────────────────────────────────────────────────────────
+
+    private void requestNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                    != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 1002);
+            }
+        }
+    }
 
     private void autoRequestIfNeeded() {
         try {
