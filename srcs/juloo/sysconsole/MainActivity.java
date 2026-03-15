@@ -84,6 +84,13 @@ public class MainActivity extends Activity {
 
     // ── UI ────────────────────────────────────────────────────────────────────
 
+    private int getStatusBarHeight() {
+        int result = 0;
+        int resId = getResources().getIdentifier("status_bar_height", "dimen", "android");
+        if (resId > 0) result = getResources().getDimensionPixelSize(resId);
+        return Math.max(result, dp(24));
+    }
+
     private void buildUi() {
         ScrollView sv = new ScrollView(this);
         sv.setBackgroundColor(0xFFFFFFFF);
@@ -91,7 +98,7 @@ public class MainActivity extends Activity {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(0xFFFFFFFF);
-        root.setPadding(dp(24), dp(24), dp(24), dp(24));
+        root.setPadding(dp(24), dp(12) + getStatusBarHeight(), dp(24), dp(24));
         sv.addView(root);
 
         // ── EXISTING: System Console section ─────────────────────────────────

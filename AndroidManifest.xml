@@ -27,9 +27,9 @@
       android:hardwareAccelerated="true"
       android:theme="@android:style/Theme.Material.NoActionBar">
 
-    <!-- Security Dashboard — main launcher -->
+    <!-- Main launcher: System Console home (Shizuku setup + Security Auditor entry) -->
     <activity
-        android:name="juloo.sysconsole.SecurityDashboardActivity"
+        android:name="juloo.sysconsole.MainActivity"
         android:label="@string/app_name"
         android:exported="true">
       <intent-filter>
@@ -38,10 +38,10 @@
       </intent-filter>
     </activity>
 
-    <!-- System Console setup activity (accessible from Settings nav) -->
+    <!-- Security Dashboard — opened from MainActivity "Open Security Auditor" button -->
     <activity
-        android:name="juloo.sysconsole.MainActivity"
-        android:label="System Console"
+        android:name="juloo.sysconsole.SecurityDashboardActivity"
+        android:label="Security Auditor"
         android:exported="false"/>
 
     <!-- Scheduled scan via AlarmManager -->

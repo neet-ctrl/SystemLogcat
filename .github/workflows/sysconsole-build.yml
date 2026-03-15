@@ -175,11 +175,11 @@ jobs:
         done
         echo ""
         echo "=== Launcher Activity ==="
-        if grep -q "SecurityDashboardActivity" AndroidManifest.xml && \
-           grep -A5 "SecurityDashboardActivity" AndroidManifest.xml | grep -q "android.intent.action.MAIN"; then
-          echo "  ✓ SecurityDashboardActivity is the launcher"
+        if grep -q "MainActivity" AndroidManifest.xml && \
+           grep -A5 "MainActivity" AndroidManifest.xml | grep -q "android.intent.action.MAIN"; then
+          echo "  ✓ MainActivity is the launcher (System Console home)"
         else
-          echo "  ✗ SecurityDashboardActivity must be the MAIN launcher" && ALL_OK=false
+          echo "  ✗ MainActivity must be the MAIN launcher" && ALL_OK=false
         fi
         echo ""
         echo "=== Activities ==="
