@@ -141,7 +141,7 @@ public class AppDetailsActivity extends Activity {
 
         android.graphics.drawable.GradientDrawable bg =
                 new android.graphics.drawable.GradientDrawable();
-        bg.setColor(color & 0x22FFFFFF | 0xFF000000);
+        bg.setColor(color & 0x22FFFFFF);
         bg.setCornerRadius(mUi.dp(12));
         bg.setStroke(mUi.dp(1), color);
         banner.setBackground(bg);
