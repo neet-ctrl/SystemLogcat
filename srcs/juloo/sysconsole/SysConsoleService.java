@@ -22,6 +22,8 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.util.SparseArray;
@@ -30,6 +32,7 @@ import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
+import android.widget.ArrayAdapter;
 import android.widget.BaseAdapter;
 import android.widget.Button;
 import android.widget.EditText;
@@ -628,29 +631,94 @@ public class SysConsoleService extends Service {
             try {
                 PackageManager pm = getPackageManager();
                 List<ApplicationInfo> apps = pm.getInstalledApplications(PackageManager.GET_META_DATA);
-                List<String[]> items = new ArrayList<>();
-                items.add(new String[]{"\u2713 All Apps (no filter)", null});
+                List<String[]> allItems = new ArrayList<>();
+                allItems.add(new String[]{"\u2713 All Apps (no filter)", null});
                 for (ApplicationInfo app : apps) {
                     String label = pm.getApplicationLabel(app).toString();
                     boolean isSys = (app.flags & ApplicationInfo.FLAG_SYSTEM) != 0;
-                    items.add(new String[]{isSys ? "[SYS] "+label : label, app.packageName});
+                    allItems.add(new String[]{isSys ? "[SYS] " + label : label, app.packageName});
                 }
-                Collections.sort(items.subList(1, items.size()), (a, b) -> a[0].compareToIgnoreCase(b[0]));
-                String[] names = new String[items.size()];
-                for (int i=0; i<items.size(); i++) names[i] = items.get(i)[0];
+                Collections.sort(allItems.subList(1, allItems.size()),
+                        (a, b) -> a[0].compareToIgnoreCase(b[0]));
+
                 mHandler.post(() -> {
+                    LinearLayout container = new LinearLayout(this);
+                    container.setOrientation(LinearLayout.VERTICAL);
+
+                    EditText searchBox = new EditText(this);
+                    searchBox.setHint("Search apps…");
+                    searchBox.setSingleLine(true);
+                    searchBox.setTextSize(13f);
+                    searchBox.setTextColor(0xFF111827);
+                    searchBox.setHintTextColor(0xFF9CA3AF);
+                    searchBox.setBackgroundColor(0xFFF3F4F6);
+                    searchBox.setPadding(dp(12), dp(10), dp(12), dp(10));
+                    LinearLayout.LayoutParams searchLp = new LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.MATCH_PARENT,
+                            LinearLayout.LayoutParams.WRAP_CONTENT);
+                    searchLp.setMargins(dp(4), dp(4), dp(4), dp(4));
+                    container.addView(searchBox, searchLp);
+
+                    final ListView listView = new ListView(this);
+                    ArrayList<String> initNames = new ArrayList<>();
+                    for (String[] item : allItems) initNames.add(item[0]);
+                    final ArrayAdapter<String> adapter = new ArrayAdapter<>(this,
+                            android.R.layout.simple_list_item_1, initNames);
+                    listView.setAdapter(adapter);
+                    LinearLayout.LayoutParams listLp = new LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.MATCH_PARENT, dp(320));
+                    container.addView(listView, listLp);
+
+                    final AlertDialog[] dialogRef = new AlertDialog[1];
+
+                    listView.setOnItemClickListener((parent, view, pos, id) -> {
+                        String chosen = adapter.getItem(pos);
+                        String pkg = null;
+                        String lbl = "ALL";
+                        for (String[] item : allItems) {
+                            if (item[0].equals(chosen)) { pkg = item[1]; lbl = item[0]; break; }
+                        }
+                        mApkFilterPackage = pkg;
+                        mApkFilterLabel   = (pkg == null) ? "ALL" : lbl;
+                        applyFilter();
+                        toast("App filter: " + (mApkFilterPackage == null ? "All" : mApkFilterLabel)
+                                + " — " + mLogs.size() + " logs");
+                        if (dialogRef[0] != null) dialogRef[0].dismiss();
+                    });
+
+                    searchBox.addTextChangedListener(new TextWatcher() {
+                        public void beforeTextChanged(CharSequence s, int st, int c, int a) {}
+                        public void onTextChanged(CharSequence s, int st, int b, int c) {}
+                        public void afterTextChanged(Editable s) {
+                            String query = s.toString().trim().toLowerCase(Locale.US);
+                            adapter.clear();
+                            for (String[] item : allItems) {
+                                if (query.isEmpty()
+                                        || item[0].toLowerCase(Locale.US).contains(query)
+                                        || (item[1] != null && item[1].toLowerCase(Locale.US).contains(query))) {
+                                    adapter.add(item[0]);
+                                }
+                            }
+                            adapter.notifyDataSetChanged();
+                        }
+                    });
+
                     AlertDialog.Builder b = dialogBuilder();
                     b.setTitle("Filter by App");
-                    b.setItems(names, (d, which) -> {
-                        mApkFilterPackage = items.get(which)[1];
-                        mApkFilterLabel   = (which==0) ? "ALL" : items.get(which)[0];
-                        applyFilter();
-                        toast("App filter: "+(mApkFilterPackage==null?"All":mApkFilterLabel)+" — "+mLogs.size()+" logs");
-                    });
+                    b.setView(container);
                     b.setNegativeButton("Cancel", null);
-                    show(b);
+                    AlertDialog dlg = b.create();
+                    dialogRef[0] = dlg;
+                    if (dlg.getWindow() != null) {
+                        dlg.getWindow().setType(Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+                                ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+                                : WindowManager.LayoutParams.TYPE_SYSTEM_ALERT);
+                        dlg.getWindow().setSoftInputMode(
+                                WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
+                    }
+                    dlg.show();
                 });
-            } catch (Exception e) { mHandler.post(() -> toast("App list error: "+e.getMessage())); }
+            } catch (Exception e) { mHandler.post(() -> toast("App list error: " + e.getMessage())); }
         }).start();
     }
 
