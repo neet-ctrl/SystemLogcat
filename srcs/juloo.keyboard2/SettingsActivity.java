@@ -155,7 +155,7 @@ public class SettingsActivity extends PreferenceActivity
       w.close();
 
       Uri uri = androidx.core.content.FileProvider.getUriForFile(
-          this, "juloo.keyboard2.provider", file);
+          this, getPackageName() + ".provider", file);
       Intent share = new Intent(Intent.ACTION_SEND);
       share.setType("application/json");
       share.putExtra(Intent.EXTRA_STREAM, uri);

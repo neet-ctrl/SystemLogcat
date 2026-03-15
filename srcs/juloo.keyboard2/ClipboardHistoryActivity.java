@@ -170,35 +170,81 @@ public class ClipboardHistoryActivity extends Activity {
                 LinearLayout ll = new LinearLayout(ClipboardHistoryActivity.this);
                 ll.setOrientation(LinearLayout.VERTICAL);
                 ll.setPadding(40, 30, 40, 30);
-                ll.setBackgroundResource(android.R.drawable.list_selector_background);
-                
+
                 TextView title = new TextView(ClipboardHistoryActivity.this);
                 title.setId(android.R.id.text1);
-                title.setTextSize(18);
+                title.setTextSize(16);
                 title.setTextColor(0xFF212121);
                 title.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
-                
+                title.setMaxLines(3);
+                title.setEllipsize(android.text.TextUtils.TruncateAt.END);
+
+                Button expandBtn = new Button(ClipboardHistoryActivity.this);
+                expandBtn.setId(android.R.id.button1);
+                expandBtn.setText("▼ Show Full");
+                expandBtn.setTextSize(11);
+                expandBtn.setTextColor(0xFF1565C0);
+                expandBtn.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+                expandBtn.setPadding(0, 2, 0, 2);
+                LinearLayout.LayoutParams btnParams = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                btnParams.gravity = android.view.Gravity.START;
+                expandBtn.setLayoutParams(btnParams);
+
                 TextView sub = new TextView(ClipboardHistoryActivity.this);
                 sub.setId(android.R.id.text2);
                 sub.setTextSize(13);
                 sub.setTextColor(0xFF757575);
-                sub.setPadding(0, 8, 0, 0);
-                
+                sub.setPadding(0, 6, 0, 0);
+
                 ll.addView(title);
+                ll.addView(expandBtn);
                 ll.addView(sub);
                 v = ll;
             }
+
             ClipboardHistoryService.HistoryEntry ent = filteredItems.get(p);
-            ((TextView)v.findViewById(android.R.id.text1)).setText((p + 1) + ". " + ent.content);
+
+            TextView titleV = (TextView) v.findViewById(android.R.id.text1);
+            Button expandBtn = (Button) v.findViewById(android.R.id.button1);
+            TextView subV = (TextView) v.findViewById(android.R.id.text2);
+
+            titleV.setText((p + 1) + ". " + ent.content);
             String info = "🕒 " + ent.timestamp + (ent.version.isEmpty() ? "" : " | 📦 v" + ent.version) + (ent.description.isEmpty() ? "" : "\n📝 " + ent.description);
-            ((TextView)v.findViewById(android.R.id.text2)).setText(info);
-            
-            // Alternating backgrounds for advanced look
+            subV.setText(info);
+
+            boolean isLong = ent.content.length() > 80;
+            expandBtn.setVisibility(isLong ? View.VISIBLE : View.GONE);
+            expandBtn.setOnClickListener(btnView -> {
+                ScrollView sv = new ScrollView(ClipboardHistoryActivity.this);
+                TextView tv = new TextView(ClipboardHistoryActivity.this);
+                tv.setText(ent.content);
+                tv.setTextSize(15);
+                tv.setTextColor(0xFF212121);
+                tv.setPadding(48, 32, 48, 32);
+                tv.setTextIsSelectable(true);
+                sv.addView(tv);
+                new AlertDialog.Builder(ClipboardHistoryActivity.this)
+                    .setTitle("Full Content")
+                    .setView(sv)
+                    .setPositiveButton("Copy", (d, w) -> {
+                        android.content.ClipboardManager cm = (android.content.ClipboardManager)
+                            getSystemService(android.content.Context.CLIPBOARD_SERVICE);
+                        if (cm != null) {
+                            cm.setPrimaryClip(android.content.ClipData.newPlainText("Clip", ent.content));
+                            Toast.makeText(ClipboardHistoryActivity.this, "Copied!", Toast.LENGTH_SHORT).show();
+                        }
+                    })
+                    .setNegativeButton("Close", null)
+                    .show();
+            });
+
             v.setBackgroundColor(p % 2 == 0 ? 0xFFF5F5F5 : 0xFFFFFFFF);
-            
+
             v.setOnClickListener(view -> showEditDialog(ent));
             v.setOnLongClickListener(view -> {
-                android.content.ClipboardManager cm = (android.content.ClipboardManager)getSystemService(android.content.Context.CLIPBOARD_SERVICE);
+                android.content.ClipboardManager cm = (android.content.ClipboardManager)
+                    getSystemService(android.content.Context.CLIPBOARD_SERVICE);
                 if (cm != null) {
                     cm.setPrimaryClip(android.content.ClipData.newPlainText("Clip", ent.content));
                     Toast.makeText(ClipboardHistoryActivity.this, "Copied to clipboard!", Toast.LENGTH_SHORT).show();
@@ -354,7 +400,7 @@ public class ClipboardHistoryActivity extends Activity {
     }
 
     private void shareFile(java.io.File file, String mimeType) {
-        android.net.Uri uri = androidx.core.content.FileProvider.getUriForFile(this, "juloo.keyboard2.provider", file);
+        android.net.Uri uri = androidx.core.content.FileProvider.getUriForFile(this, getPackageName() + ".provider", file);
         Intent intent = new Intent(Intent.ACTION_SEND);
         intent.setType(mimeType);
         intent.putExtra(Intent.EXTRA_STREAM, uri);
@@ -611,7 +657,7 @@ public class ClipboardHistoryActivity extends Activity {
             writer.write(sb.toString());
             writer.close();
 
-            android.net.Uri uri = androidx.core.content.FileProvider.getUriForFile(this, "juloo.keyboard2.provider", file);
+            android.net.Uri uri = androidx.core.content.FileProvider.getUriForFile(this, getPackageName() + ".provider", file);
             Intent intent = new Intent(Intent.ACTION_SEND);
             intent.setType("text/plain");
             intent.putExtra(Intent.EXTRA_STREAM, uri);
