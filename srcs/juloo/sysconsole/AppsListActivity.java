@@ -1,7 +1,6 @@
 package juloo.sysconsole;
 
 import android.app.Activity;
-import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
@@ -24,7 +23,6 @@ import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.TextView;
-import android.widget.Toast;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -486,7 +484,11 @@ public class AppsListActivity extends Activity {
 
         row.setClickable(true);
         row.setFocusable(true);
-        row.setOnClickListener(v -> showAppOptions(app));
+        row.setOnClickListener(v -> {
+            Intent intent = new Intent(this, AppDetailsActivity.class);
+            intent.putExtra(AppDetailsActivity.EXTRA_PKG, app.packageName);
+            startActivity(intent);
+        });
 
         if (app.icon != null) {
             ImageView iv = new ImageView(this);
@@ -628,102 +630,6 @@ public class AppsListActivity extends Activity {
         row.addView(rightCol, rightLp);
 
         return row;
-    }
-
-    // ── App options dialog (tap any row) ──────────────────────────────────────
-
-    private void showAppOptions(AppSecurityInfo app) {
-        String displayName = (app.appName != null && !app.appName.isEmpty())
-                ? app.appName : app.packageName;
-
-        boolean shizukuReady = ShizukuCommandHelper.isAvailable();
-
-        String[] options;
-        if (app.isSystemApp) {
-            options = new String[]{"View Details", "System apps cannot be uninstalled"};
-        } else if (shizukuReady) {
-            options = new String[]{"View Details", "Uninstall via Shizuku"};
-        } else {
-            options = new String[]{"View Details", "Uninstall (system dialog)"};
-        }
-
-        new AlertDialog.Builder(this)
-            .setTitle(displayName)
-            .setMessage(app.packageName)
-            .setItems(options, (dialog, which) -> {
-                if (which == 0) {
-                    Intent intent = new Intent(this, AppDetailsActivity.class);
-                    intent.putExtra(AppDetailsActivity.EXTRA_PKG, app.packageName);
-                    startActivity(intent);
-                } else {
-                    if (app.isSystemApp) {
-                        Toast.makeText(this,
-                                "System apps cannot be uninstalled this way.",
-                                Toast.LENGTH_SHORT).show();
-                        return;
-                    }
-                    confirmUninstall(app, shizukuReady);
-                }
-            })
-            .setNegativeButton("Cancel", null)
-            .show();
-    }
-
-    private void confirmUninstall(AppSecurityInfo app, boolean useShizuku) {
-        String displayName = (app.appName != null && !app.appName.isEmpty())
-                ? app.appName : app.packageName;
-        new AlertDialog.Builder(this)
-            .setTitle("Uninstall " + displayName + "?")
-            .setMessage("Package: " + app.packageName
-                    + "\n\nThis will permanently remove the app and all its data.")
-            .setPositiveButton("Uninstall", (d, w) -> {
-                if (useShizuku) {
-                    uninstallWithShizuku(app);
-                } else {
-                    uninstallWithSystemDialog(app);
-                }
-            })
-            .setNegativeButton("Cancel", null)
-            .show();
-    }
-
-    private void uninstallWithShizuku(AppSecurityInfo app) {
-        String displayName = (app.appName != null && !app.appName.isEmpty())
-                ? app.appName : app.packageName;
-        Toast.makeText(this, "Uninstalling " + displayName + "…", Toast.LENGTH_SHORT).show();
-        new Thread(() -> {
-            String result = ShizukuCommandHelper.run("pm", "uninstall", "--user", "0", app.packageName);
-            boolean success = result != null && (result.contains("Success") || result.trim().isEmpty());
-            if (!success) {
-                result = ShizukuCommandHelper.run("pm", "uninstall", app.packageName);
-                success = result != null && result.contains("Success");
-            }
-            final boolean done = success;
-            final String  pkg  = app.packageName;
-            mMain.post(() -> {
-                if (done) {
-                    Toast.makeText(this,
-                            displayName + " uninstalled successfully.", Toast.LENGTH_LONG).show();
-                    mAll.removeIf(a -> a.packageName.equals(pkg));
-                    applyFilter();
-                } else {
-                    Toast.makeText(this,
-                            "Uninstall failed. Check Shizuku is running.",
-                            Toast.LENGTH_LONG).show();
-                }
-            });
-        }).start();
-    }
-
-    private void uninstallWithSystemDialog(AppSecurityInfo app) {
-        try {
-            Intent intent = new Intent(Intent.ACTION_DELETE);
-            intent.setData(android.net.Uri.parse("package:" + app.packageName));
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            startActivity(intent);
-        } catch (Exception e) {
-            Toast.makeText(this, "Could not open uninstall dialog.", Toast.LENGTH_SHORT).show();
-        }
     }
 
     private void addPermTag(LinearLayout row, String label, int color) {
