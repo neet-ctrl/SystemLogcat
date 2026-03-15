@@ -1,11 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+          xmlns:tools="http://schemas.android.com/tools">
 
   <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
   <uses-permission android:name="android.permission.READ_LOGS"/>
   <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"/>
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
   <uses-permission android:name="moe.shizuku.manager.permission.API_V23"/>
+
+  <!-- Security Auditor permissions -->
+  <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
+      tools:ignore="ProtectedPermissions"/>
+  <uses-permission android:name="android.permission.GET_TASKS"/>
+  <uses-permission android:name="android.permission.KILL_BACKGROUND_PROCESSES"/>
 
   <queries>
     <package android:name="moe.shizuku.privileged.api" />
@@ -27,6 +34,31 @@
         <category android:name="android.intent.category.LAUNCHER"/>
       </intent-filter>
     </activity>
+
+    <!-- Security Auditor: real-time install monitoring -->
+    <receiver android:name="juloo.sysconsole.AppInstallReceiver"
+        android:exported="false">
+      <intent-filter>
+        <action android:name="android.intent.action.PACKAGE_ADDED"/>
+        <action android:name="android.intent.action.PACKAGE_REMOVED"/>
+        <action android:name="android.intent.action.PACKAGE_REPLACED"/>
+        <data android:scheme="package"/>
+      </intent-filter>
+    </receiver>
+
+    <!-- Security Auditor screens -->
+    <activity android:name="juloo.sysconsole.SecurityDashboardActivity"
+        android:exported="false"/>
+    <activity android:name="juloo.sysconsole.AppsListActivity"
+        android:exported="false"/>
+    <activity android:name="juloo.sysconsole.AppDetailsActivity"
+        android:exported="false"/>
+    <activity android:name="juloo.sysconsole.MonitorActivity"
+        android:exported="false"/>
+    <activity android:name="juloo.sysconsole.AlertsActivity"
+        android:exported="false"/>
+    <activity android:name="juloo.sysconsole.SecuritySettingsActivity"
+        android:exported="false"/>
 
     <!-- Floating overlay service -->
     <service

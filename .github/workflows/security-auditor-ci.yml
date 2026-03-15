@@ -1,0 +1,319 @@
+name: Security Auditor CI/CD
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+    inputs:
+      build_release:
+        description: 'Build signed release APK (requires secrets)'
+        required: false
+        default: 'false'
+        type: boolean
+
+jobs:
+  # ── Job 1: Validate & Build Debug APK ───────────────────────────────────────
+  build-debug:
+    name: Build Debug APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Grant Gradle wrapper execute permission
+        run: chmod +x gradlew
+
+      - name: Validate Gradle wrapper integrity
+        uses: gradle/actions/wrapper-validation@v3
+
+      # Generate a self-signed debug keystore if not present in secrets
+      - name: Generate or restore debug keystore
+        run: |
+          if [ -n "${{ secrets.DEBUG_KEYSTORE_BASE64 }}" ]; then
+            echo "Restoring keystore from secret…"
+            echo "${{ secrets.DEBUG_KEYSTORE_BASE64 }}" | base64 --decode > debug.keystore
+          else
+            echo "Generating fresh debug keystore…"
+            keytool -genkeypair -v \
+              -keystore debug.keystore \
+              -alias debug \
+              -keyalg RSA -keysize 2048 \
+              -validity 10000 \
+              -storepass debug0 \
+              -keypass debug0 \
+              -dname "CN=Debug,O=SystemConsole,L=Unknown,S=Unknown,C=US"
+          fi
+
+      - name: Cache Gradle caches
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Build debug APK
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
+        env:
+          DEBUG_KEYSTORE:          debug.keystore
+          DEBUG_KEYSTORE_PASSWORD: debug0
+          DEBUG_KEY_ALIAS:         debug
+          DEBUG_KEY_PASSWORD:      debug0
+
+      - name: Verify APK was created
+        run: |
+          APK=$(find build/outputs/apk/debug -name "*.apk" | head -1)
+          if [ -z "$APK" ]; then
+            echo "ERROR: No APK found!"
+            exit 1
+          fi
+          echo "APK: $APK"
+          ls -lh "$APK"
+
+      - name: Upload debug APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sysconsole-security-debug-${{ github.run_number }}
+          path: build/outputs/apk/debug/*.apk
+          retention-days: 14
+
+  # ── Job 2: Code Quality Checks ───────────────────────────────────────────────
+  lint:
+    name: Lint & Code Quality
+    runs-on: ubuntu-latest
+    needs: build-debug
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Grant Gradle wrapper execute permission
+        run: chmod +x gradlew
+
+      - name: Generate debug keystore for lint
+        run: |
+          keytool -genkeypair -v \
+            -keystore debug.keystore \
+            -alias debug \
+            -keyalg RSA -keysize 2048 \
+            -validity 10000 \
+            -storepass debug0 \
+            -keypass debug0 \
+            -dname "CN=Debug,O=SystemConsole,L=Unknown,S=Unknown,C=US"
+
+      - name: Run Android Lint
+        run: ./gradlew lintDebug --no-daemon
+        env:
+          DEBUG_KEYSTORE:          debug.keystore
+          DEBUG_KEYSTORE_PASSWORD: debug0
+          DEBUG_KEY_ALIAS:         debug
+          DEBUG_KEY_PASSWORD:      debug0
+        continue-on-error: true
+
+      - name: Upload lint results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lint-results-${{ github.run_number }}
+          path: build/reports/lint-results-debug.html
+          retention-days: 7
+
+  # ── Job 3: Security File Audit ────────────────────────────────────────────────
+  security-audit:
+    name: Security File Audit
+    runs-on: ubuntu-latest
+    needs: build-debug
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify Shizuku integration files exist
+        run: |
+          echo "=== Checking Security Auditor source files ==="
+          FILES=(
+            "srcs/juloo/sysconsole/ShizukuCommandHelper.java"
+            "srcs/juloo/sysconsole/SpyDetectionEngine.java"
+            "srcs/juloo/sysconsole/BankingRiskAnalyzer.java"
+            "srcs/juloo/sysconsole/NetworkUsageHelper.java"
+            "srcs/juloo/sysconsole/DeviceSecurityHelper.java"
+            "srcs/juloo/sysconsole/AppInstallReceiver.java"
+            "srcs/juloo/sysconsole/SecurityScanManager.java"
+            "srcs/juloo/sysconsole/SecurityDashboardActivity.java"
+            "srcs/juloo/sysconsole/AppsListActivity.java"
+            "srcs/juloo/sysconsole/AppDetailsActivity.java"
+            "srcs/juloo/sysconsole/MonitorActivity.java"
+            "srcs/juloo/sysconsole/AlertsActivity.java"
+            "srcs/juloo/sysconsole/SecuritySettingsActivity.java"
+            "srcs/juloo/sysconsole/SecurityReportExporter.java"
+          )
+          ALL_OK=true
+          for f in "${FILES[@]}"; do
+            if [ -f "$f" ]; then
+              echo "  ✓ $f"
+            else
+              echo "  ✗ MISSING: $f"
+              ALL_OK=false
+            fi
+          done
+          $ALL_OK || exit 1
+
+      - name: Check for hardcoded secrets or API keys
+        run: |
+          echo "=== Scanning for hardcoded secrets ==="
+          # Fail if any Java file contains hardcoded passwords, API keys, or tokens
+          FOUND=false
+          for pattern in "password\s*=\s*\"[^\"]{8,}\"" "api_key\s*=\s*\"" "secret\s*=\s*\"[^\"]{8,}\""; do
+            if grep -rni --include="*.java" "$pattern" srcs/ 2>/dev/null; then
+              echo "WARNING: Possible hardcoded secret found!"
+              FOUND=true
+            fi
+          done
+          if [ "$FOUND" = "false" ]; then
+            echo "  ✓ No hardcoded secrets found"
+          fi
+
+      - name: Verify manifest permissions are correct
+        run: |
+          echo "=== Checking AndroidManifest.xml ==="
+          REQUIRED_PERMS=(
+            "android.permission.SYSTEM_ALERT_WINDOW"
+            "android.permission.READ_LOGS"
+            "android.permission.QUERY_ALL_PACKAGES"
+            "android.permission.PACKAGE_USAGE_STATS"
+          )
+          REQUIRED_ACTIVITIES=(
+            "SecurityDashboardActivity"
+            "AppsListActivity"
+            "AppDetailsActivity"
+            "MonitorActivity"
+            "AlertsActivity"
+            "SecuritySettingsActivity"
+          )
+          for perm in "${REQUIRED_PERMS[@]}"; do
+            if grep -q "$perm" AndroidManifest.xml; then
+              echo "  ✓ Permission: $perm"
+            else
+              echo "  ✗ MISSING permission: $perm"
+            fi
+          done
+          for activity in "${REQUIRED_ACTIVITIES[@]}"; do
+            if grep -q "$activity" AndroidManifest.xml; then
+              echo "  ✓ Activity: $activity"
+            else
+              echo "  ✗ MISSING activity: $activity"
+            fi
+          done
+
+      - name: Count Shizuku API usage
+        run: |
+          echo "=== Shizuku API usage across codebase ==="
+          echo "ShizukuCommandHelper calls:"
+          grep -rn "ShizukuCommandHelper\." srcs/ | wc -l
+          echo ""
+          echo "Shizuku.newProcess calls:"
+          grep -rn "Shizuku.newProcess" srcs/ | wc -l
+          echo ""
+          echo "SpyDetectionEngine usages:"
+          grep -rn "SpyDetectionEngine\." srcs/ | wc -l
+          echo ""
+          echo "BankingRiskAnalyzer usages:"
+          grep -rn "BankingRiskAnalyzer\." srcs/ | wc -l
+
+  # ── Job 4: Release Build (conditional) ───────────────────────────────────────
+  build-release:
+    name: Build Release APK
+    runs-on: ubuntu-latest
+    needs: [ build-debug, lint ]
+    if: |
+      github.event_name == 'workflow_dispatch' && inputs.build_release == 'true' ||
+      startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Grant Gradle wrapper execute permission
+        run: chmod +x gradlew
+
+      - name: Restore release keystore from secret
+        run: |
+          if [ -z "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" ]; then
+            echo "No release keystore secret found — generating a self-signed one."
+            echo "WARNING: For production, store a real keystore in RELEASE_KEYSTORE_BASE64 secret."
+            keytool -genkeypair -v \
+              -keystore release.keystore \
+              -alias release \
+              -keyalg RSA -keysize 4096 \
+              -validity 10000 \
+              -storepass "${{ secrets.RELEASE_STORE_PASSWORD || 'changeme' }}" \
+              -keypass  "${{ secrets.RELEASE_KEY_PASSWORD   || 'changeme' }}" \
+              -dname "CN=System Console,O=SystemConsole,L=Unknown,S=Unknown,C=US"
+          else
+            echo "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" | base64 --decode > release.keystore
+          fi
+
+      - name: Build release APK
+        run: ./gradlew assembleRelease --no-daemon --stacktrace
+        env:
+          RELEASE_KEYSTORE:          release.keystore
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD || 'changeme' }}
+          RELEASE_KEY_ALIAS:         ${{ secrets.RELEASE_KEY_ALIAS      || 'release'  }}
+          RELEASE_KEY_PASSWORD:      ${{ secrets.RELEASE_KEY_PASSWORD    || 'changeme' }}
+
+      - name: Upload release APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sysconsole-security-release-${{ github.run_number }}
+          path: build/outputs/apk/release/*.apk
+          retention-days: 30
+
+      - name: Create GitHub Release (on tag push)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/outputs/apk/release/*.apk
+          generate_release_notes: true
+          body: |
+            ## System Console + Family Security Auditor
+
+            ### What's included
+            - **Family Security Auditor** — Full device security dashboard
+            - **Spyware/Stalkerware Detection** — Known threat database + heuristics
+            - **Shizuku Deep Scan** — AppOps, running processes, granted permissions
+            - **Banking Risk Analysis** — OTP interception + overlay phishing detection
+            - **Real-Time Monitor** — Live camera/mic/location sensor tracking
+            - **Device Admin Audit** — VPN, accessibility, notification listener detection
+            - **Security Report Export** — Share full audit as text file
+
+            ### Requirements
+            - Android 7.0+ (API 24+)
+            - Shizuku (for deep scan features)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

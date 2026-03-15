@@ -1,0 +1,683 @@
+package juloo.sysconsole;
+
+import android.app.ActivityManager;
+import android.app.AppOpsManager;
+import android.app.usage.UsageStats;
+import android.app.usage.UsageStatsManager;
+import android.content.Context;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
+import android.content.pm.ServiceInfo;
+import android.os.Build;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Master security scan engine.
+ *
+ * Data sources (in order of depth):
+ *  1. PackageManager          — installed apps, requested permissions, services
+ *  2. AppOpsManager           — recent camera/mic/location usage (own-app access only)
+ *  3. UsageStatsManager       — last used timestamps, foreground/background time
+ *  4. ActivityManager         — running processes list
+ *  5. NetworkUsageHelper      — per-app network bytes (7-day window)
+ *  6. ShizukuCommandHelper    — privileged: all AppOps, full process list, granted
+ *                               permissions, device admin, accessibility, notif listeners
+ *  7. SpyDetectionEngine      — known-threat DB + permission-combo heuristics
+ *  8. BankingRiskAnalyzer     — banking app + OTP-interception + overlay-phishing checks
+ *  9. DeviceSecurityHelper    — elevated-privilege app enumeration
+ */
+public class SecurityScanManager {
+
+    private final Context ctx;
+    private final PackageManager pm;
+
+    private List<AppSecurityInfo>               mCachedApps     = new ArrayList<>();
+    private List<SecurityAlert>                 mCachedAlerts   = new ArrayList<>();
+    private List<DeviceSecurityHelper.ElevatedApp> mElevatedApps = new ArrayList<>();
+    private long                                mLastScanTime   = 0;
+
+    public SecurityScanManager(Context context) {
+        this.ctx = context.getApplicationContext();
+        this.pm  = ctx.getPackageManager();
+    }
+
+    public interface ScanCallback {
+        void onProgress(int current, int total, String phase);
+        void onComplete(List<AppSecurityInfo> apps, List<SecurityAlert> alerts);
+    }
+
+    public void scanAsync(ScanCallback cb) {
+        new Thread(() -> {
+            List<AppSecurityInfo> results = doScan(cb);
+            List<SecurityAlert>   alerts  = buildAlerts(results);
+            mCachedApps   = results;
+            mCachedAlerts = alerts;
+            mLastScanTime = System.currentTimeMillis();
+            if (cb != null) cb.onComplete(results, alerts);
+        }).start();
+    }
+
+    public List<AppSecurityInfo>               getCachedApps()     { return mCachedApps; }
+    public List<SecurityAlert>                 getCachedAlerts()   { return mCachedAlerts; }
+    public List<DeviceSecurityHelper.ElevatedApp> getElevatedApps(){ return mElevatedApps; }
+    public long                                getLastScanTime()   { return mLastScanTime; }
+
+    // ── Main scan pipeline ────────────────────────────────────────────────────
+
+    private List<AppSecurityInfo> doScan(ScanCallback cb) {
+
+        // Phase 1: Package list
+        progress(cb, 0, 100, "Loading installed apps…");
+        List<PackageInfo> pkgs;
+        try {
+            pkgs = pm.getInstalledPackages(
+                    PackageManager.GET_PERMISSIONS | PackageManager.GET_SERVICES);
+        } catch (Exception e) {
+            return new ArrayList<>();
+        }
+
+        // Phase 2: Parallel data collection
+        progress(cb, 10, 100, "Reading usage stats…");
+        Map<String, Long>    lastUsedMap  = getLastUsedMap();
+        Map<String, Long>    bgTimeMap    = getBackgroundTimeMap();
+
+        progress(cb, 25, 100, "Checking running processes…");
+        Map<String, Boolean> runningMap   = getRunningApps();
+        List<String>         processList  = getShizukuProcessList();
+
+        progress(cb, 35, 100, "Reading AppOps data…");
+        Map<String, int[]>   appOpsMap    = getAppOpsData();
+        Map<String, int[]>   shizukuOpsMap = getShizukuAppOpsMap(pkgs);
+
+        progress(cb, 50, 100, "Checking network usage…");
+        Map<String, Long>    netUsageMap  = NetworkUsageHelper.getWeeklyNetworkUsage(ctx);
+
+        // Phase 3: Elevated-privilege apps (async, non-blocking for scan)
+        progress(cb, 55, 100, "Detecting elevated-privilege apps…");
+        mElevatedApps = DeviceSecurityHelper.getElevatedApps(ctx);
+
+        // Phase 4: Per-app analysis
+        progress(cb, 60, 100, "Analyzing apps…");
+        List<AppSecurityInfo> list = new ArrayList<>();
+        int total = pkgs.size();
+        int idx   = 0;
+
+        for (PackageInfo pi : pkgs) {
+            idx++;
+            if (idx % 15 == 0) {
+                progress(cb, 60 + (idx * 35 / total), 100,
+                        "Scanning " + idx + "/" + total + " apps…");
+            }
+
+            AppSecurityInfo info = new AppSecurityInfo();
+            info.packageName = pi.packageName;
+            info.versionName = pi.versionName != null ? pi.versionName : "?";
+            info.versionCode = pi.versionCode;
+            info.installTime = pi.firstInstallTime;
+            info.isSystemApp = (pi.applicationInfo != null)
+                    && ((pi.applicationInfo.flags & ApplicationInfo.FLAG_SYSTEM) != 0);
+
+            try {
+                info.appName = (String) pm.getApplicationLabel(pi.applicationInfo);
+                info.icon    = pm.getApplicationIcon(pi.packageName);
+            } catch (Exception e) {
+                info.appName = pi.packageName;
+            }
+
+            info.lastUsed         = orDefault(lastUsedMap, pi.packageName, 0L);
+            info.backgroundTimeMs = orDefault(bgTimeMap,   pi.packageName, 0L);
+            info.networkBytesTotal= orDefault(netUsageMap, pi.packageName, 0L);
+
+            // Process running state: use both ActivityManager and Shizuku process list
+            info.isRunning = runningMap.containsKey(pi.packageName)
+                    ? runningMap.get(pi.packageName)
+                    : ShizukuCommandHelper.isProcessRunning(processList, pi.packageName);
+
+            // Permission analysis
+            analyzePermissions(info, pi);
+
+            // AppOps — prefer Shizuku (full) over normal (partial)
+            int[] ops = shizukuOpsMap.containsKey(pi.packageName)
+                    ? shizukuOpsMap.get(pi.packageName)
+                    : appOpsMap.get(pi.packageName);
+            if (ops != null) applyAppOps(info, ops);
+
+            // Granted runtime permissions via Shizuku
+            if (ShizukuCommandHelper.isAvailable()) {
+                applyGrantedPermissions(info);
+            }
+
+            // Check if this app is in elevated apps list
+            for (DeviceSecurityHelper.ElevatedApp ea : mElevatedApps) {
+                if (ea.packageName.equals(info.packageName)) {
+                    if (ea.privilege.contains("Device Admin"))  info.isDeviceAdmin         = true;
+                    if (ea.privilege.contains("Accessibility")) info.isAccessibilityService = true;
+                    if (ea.privilege.contains("Notification"))  info.isNotificationListener = true;
+                    if (ea.privilege.contains("VPN"))           info.isVpnService           = true;
+                }
+            }
+
+            // Spy/stalkerware detection
+            SpyDetectionEngine.ThreatResult threat = SpyDetectionEngine.analyze(info);
+            info.threatLevel  = threat.level;
+            info.threatLabel  = threat.label;
+            info.threatReason = threat.reason;
+            info.isSuspectedSpyware = threat.level >= SpyDetectionEngine.THREAT_SUSPECT;
+
+            // Banking analysis
+            info.isBankingApp = BankingRiskAnalyzer.isBankingApp(info);
+
+            // Risk calculation (must be last — uses all fields)
+            calculateRisk(info, list);
+
+            list.add(info);
+        }
+
+        // Second pass: banking cross-app risks (needs full app list)
+        progress(cb, 96, 100, "Analyzing banking risks…");
+        for (AppSecurityInfo info : list) {
+            BankingRiskAnalyzer.BankingRisk br =
+                    BankingRiskAnalyzer.analyze(info, false, false, false);
+            if (br.hasCriticalRisk) {
+                info.isBankingRisk = true;
+                info.riskFactors.addAll(br.riskWarnings);
+                info.riskScore = Math.min(info.riskScore + br.riskBonus, 100);
+                if (info.riskScore >= 50) info.riskLevel = AppSecurityInfo.RISK_HIGH;
+            }
+
+            if (BankingRiskAnalyzer.isOtpInterceptionRisk(info, list)
+                    && !info.riskFactors.contains("Can intercept OTP codes from bank SMS")) {
+                info.riskFactors.add(
+                        "Can intercept OTP codes from bank SMS and upload them remotely");
+                info.isBankingRisk = true;
+                info.riskScore = Math.min(info.riskScore + 25, 100);
+                if (info.riskScore >= 50) info.riskLevel = AppSecurityInfo.RISK_HIGH;
+            }
+
+            if (BankingRiskAnalyzer.isOverlayPhishingRisk(info, list)
+                    && !info.riskFactors.contains("Can overlay banking apps")) {
+                info.riskFactors.add(
+                        "Can show fake login screens over banking apps (overlay phishing)");
+                info.isBankingRisk = true;
+                info.riskScore = Math.min(info.riskScore + 20, 100);
+                if (info.riskScore >= 50) info.riskLevel = AppSecurityInfo.RISK_HIGH;
+            }
+        }
+
+        Collections.sort(list, (a, b) -> {
+            if (a.threatLevel != b.threatLevel) return b.threatLevel - a.threatLevel;
+            return b.riskScore - a.riskScore;
+        });
+
+        progress(cb, 100, 100, "Scan complete");
+        return list;
+    }
+
+    // ── Permission analysis ────────────────────────────────────────────────────
+
+    private void analyzePermissions(AppSecurityInfo info, PackageInfo pi) {
+        if (pi.requestedPermissions == null) return;
+        for (String perm : pi.requestedPermissions) {
+            if (perm == null) continue;
+            switch (perm) {
+                case android.Manifest.permission.CAMERA:
+                    info.hasCamera = true; break;
+                case android.Manifest.permission.RECORD_AUDIO:
+                    info.hasMicrophone = true; break;
+                case android.Manifest.permission.ACCESS_FINE_LOCATION:
+                case android.Manifest.permission.ACCESS_COARSE_LOCATION:
+                    info.hasLocation = true; break;
+                case android.Manifest.permission.READ_CONTACTS:
+                    info.hasContacts = true; break;
+                case android.Manifest.permission.READ_EXTERNAL_STORAGE:
+                case android.Manifest.permission.WRITE_EXTERNAL_STORAGE:
+                    info.hasStorage = true; break;
+                case android.Manifest.permission.READ_SMS:
+                case android.Manifest.permission.SEND_SMS:
+                case android.Manifest.permission.RECEIVE_SMS:
+                    info.hasSms = true; break;
+                case android.Manifest.permission.CALL_PHONE:
+                case android.Manifest.permission.READ_CALL_LOG:
+                    info.hasPhone = true; break;
+                case android.Manifest.permission.READ_CALENDAR:
+                    info.hasCalendar = true; break;
+                case android.Manifest.permission.BODY_SENSORS:
+                    info.hasBodySensors = true; break;
+                case android.Manifest.permission.INTERNET:
+                    info.hasInternet = true; break;
+                case android.Manifest.permission.SYSTEM_ALERT_WINDOW:
+                    info.hasOverlay = true; break;
+                case "android.permission.BIND_VPN_SERVICE":
+                    info.hasVpn = true; break;
+                case "android.permission.BIND_NOTIFICATION_LISTENER_SERVICE":
+                    info.hasNotificationAccess = true; break;
+                case "android.permission.READ_MEDIA_IMAGES":
+                    info.hasReadMediaImages = true; break;
+                case android.Manifest.permission.PROCESS_OUTGOING_CALLS:
+                    info.hasProcessOutgoingCalls = true; break;
+                case android.Manifest.permission.RECEIVE_BOOT_COMPLETED:
+                    info.hasBootReceiver = true; break;
+            }
+        }
+
+        if (pi.services != null) {
+            for (ServiceInfo si : pi.services) {
+                if (si.permission != null && si.permission.contains("ACCESSIBILITY")) {
+                    info.hasAccessibility = true;
+                }
+                if (si.permission != null && si.permission.contains("VPN")) {
+                    info.hasVpn = true;
+                }
+                if (si.permission != null && si.permission.contains("NOTIFICATION_LISTENER")) {
+                    info.hasNotificationAccess = true;
+                }
+            }
+        }
+    }
+
+    private void applyAppOps(AppSecurityInfo info, int[] ops) {
+        if (ops.length > 0 && ops[0] == 1) info.cameraUsedRecently   = true;
+        if (ops.length > 1 && ops[1] == 1) info.micUsedRecently      = true;
+        if (ops.length > 2 && ops[2] == 1) info.locationUsedRecently = true;
+        if (ops.length > 3 && ops[3] == 1) info.clipboardUsedRecently = true;
+    }
+
+    private void applyGrantedPermissions(AppSecurityInfo info) {
+        try {
+            String dump = ShizukuCommandHelper.dumpPackage(info.packageName);
+            if (dump.isEmpty()) return;
+            info.grantedPermissions =
+                    ShizukuCommandHelper.parseGrantedPermissions(dump);
+        } catch (Exception ignored) {}
+    }
+
+    // ── Risk calculation ───────────────────────────────────────────────────────
+
+    private void calculateRisk(AppSecurityInfo info, List<AppSecurityInfo> existingList) {
+        int score = 0;
+        List<String> factors = info.riskFactors;
+
+        // Sensor combos
+        if (info.hasCamera && info.hasInternet) {
+            score += 25;
+            factors.add("Camera + Internet: can upload photos remotely");
+        } else if (info.hasCamera) {
+            score += 10;
+            factors.add("Camera access");
+        }
+        if (info.hasMicrophone && info.hasInternet) {
+            score += 25;
+            factors.add("Microphone + Internet: can record and upload audio");
+        } else if (info.hasMicrophone) {
+            score += 10;
+            factors.add("Microphone access");
+        }
+        if (info.hasLocation && info.hasInternet) {
+            score += 20;
+            factors.add("Location + Internet: can track physical position remotely");
+        } else if (info.hasLocation) {
+            score += 8;
+            factors.add("Location access");
+        }
+
+        // Privilege escalation
+        if (info.hasAccessibility || info.isAccessibilityService) {
+            score += 30;
+            factors.add("Accessibility service: can read screen content and simulate input");
+        }
+        if (info.isDeviceAdmin) {
+            score += 40;
+            factors.add("Device Administrator: can wipe, lock, or control this device remotely");
+        }
+        if (info.isVpnService || info.hasVpn) {
+            score += 25;
+            factors.add("VPN Service: can intercept and inspect all network traffic");
+        }
+        if (info.isNotificationListener || info.hasNotificationAccess) {
+            score += 20;
+            factors.add("Notification listener: reads all notifications from every app");
+        }
+
+        // Overlay + phishing
+        if (info.hasOverlay && !info.isSystemApp) {
+            score += 15;
+            factors.add("Draw-over-apps: can show fake UI on top of other apps");
+        }
+
+        // SMS / call exfiltration
+        if (info.hasSms && !info.isSystemApp) {
+            score += 20;
+            factors.add("SMS access: can read and send text messages");
+        }
+        if (info.hasPhone) {
+            score += 12;
+            factors.add("Phone access: can make calls and read call log");
+        }
+        if (info.hasContacts) {
+            score += 8;
+            factors.add("Contacts access: can read your address book");
+        }
+        if (info.hasProcessOutgoingCalls && !info.isSystemApp) {
+            score += 10;
+            factors.add("Can intercept and redirect outgoing phone calls");
+        }
+
+        // Boot persistence
+        if (info.hasBootReceiver && !info.isSystemApp
+                && (info.hasCamera || info.hasMicrophone || info.hasSms)) {
+            score += 8;
+            factors.add("Starts on device boot — persistent background access");
+        }
+
+        // AppOps evidence (recent actual usage)
+        if (info.cameraUsedRecently && !info.isSystemApp) {
+            score += 12;
+            factors.add("Camera actually used in last 7 days");
+        }
+        if (info.micUsedRecently && !info.isSystemApp) {
+            score += 12;
+            factors.add("Microphone actually used in last 7 days");
+        }
+        if (info.locationUsedRecently && !info.isSystemApp) {
+            score += 6;
+            factors.add("Location actually accessed in last 7 days");
+        }
+        if (info.clipboardUsedRecently && info.hasInternet && !info.isSystemApp) {
+            score += 15;
+            factors.add("Clipboard read + Internet access: can steal copied passwords/tokens");
+        }
+
+        // Threat detection bonus
+        score += SpyDetectionEngine.getThreatScoreBonus(info);
+        if (info.isSuspectedSpyware && !factors.contains("Flagged as suspected spyware")) {
+            factors.add("⚠ Flagged as suspected " + SpyDetectionEngine.threatLevelName(info.threatLevel)
+                    + ": " + info.threatReason);
+        }
+
+        // Network usage spike (> 100 MB in 7 days for non-media apps)
+        if (info.networkBytesTotal > 100L * 1024 * 1024
+                && !info.isSystemApp && !isKnownHighNetworkApp(info.packageName)) {
+            score += 5;
+            factors.add("High network usage: " + info.networkUsageFormatted() + " in 7 days");
+        }
+
+        info.riskScore = Math.min(score, 100);
+        if (info.riskScore >= 50)      info.riskLevel = AppSecurityInfo.RISK_HIGH;
+        else if (info.riskScore >= 20) info.riskLevel = AppSecurityInfo.RISK_MEDIUM;
+        else                           info.riskLevel = AppSecurityInfo.RISK_LOW;
+    }
+
+    // ── Data collection helpers ───────────────────────────────────────────────
+
+    private Map<String, Long> getLastUsedMap() {
+        Map<String, Long> map = new HashMap<>();
+        try {
+            UsageStatsManager usm = (UsageStatsManager)
+                    ctx.getSystemService(Context.USAGE_STATS_SERVICE);
+            if (usm == null) return map;
+            long now   = System.currentTimeMillis();
+            long start = now - 7L * 24 * 3600 * 1000;
+            List<UsageStats> stats = usm.queryUsageStats(
+                    UsageStatsManager.INTERVAL_DAILY, start, now);
+            if (stats == null) return map;
+            for (UsageStats us : stats) {
+                String pkg  = us.getPackageName();
+                long   last = us.getLastTimeUsed();
+                if (!map.containsKey(pkg) || map.get(pkg) < last) map.put(pkg, last);
+            }
+        } catch (Exception ignored) {}
+        return map;
+    }
+
+    private Map<String, Long> getBackgroundTimeMap() {
+        Map<String, Long> map = new HashMap<>();
+        try {
+            UsageStatsManager usm = (UsageStatsManager)
+                    ctx.getSystemService(Context.USAGE_STATS_SERVICE);
+            if (usm == null) return map;
+            long now   = System.currentTimeMillis();
+            long start = now - 24L * 3600 * 1000;
+            List<UsageStats> stats = usm.queryUsageStats(
+                    UsageStatsManager.INTERVAL_DAILY, start, now);
+            if (stats == null) return map;
+            for (UsageStats us : stats) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    long bg = us.getTotalTimeInForeground();
+                    if (bg > 0) map.put(us.getPackageName(), bg);
+                }
+            }
+        } catch (Exception ignored) {}
+        return map;
+    }
+
+    private Map<String, Boolean> getRunningApps() {
+        Map<String, Boolean> map = new HashMap<>();
+        try {
+            ActivityManager am = (ActivityManager)
+                    ctx.getSystemService(Context.ACTIVITY_SERVICE);
+            if (am == null) return map;
+            List<ActivityManager.RunningAppProcessInfo> procs = am.getRunningAppProcesses();
+            if (procs == null) return map;
+            for (ActivityManager.RunningAppProcessInfo info : procs) {
+                if (info.pkgList == null) continue;
+                for (String pkg : info.pkgList) map.put(pkg, true);
+            }
+        } catch (Exception ignored) {}
+        return map;
+    }
+
+    private List<String> getShizukuProcessList() {
+        if (!ShizukuCommandHelper.isAvailable()) return new ArrayList<>();
+        return ShizukuCommandHelper.getAllProcesses();
+    }
+
+    /**
+     * Standard AppOps query — works for our own UID without special permissions.
+     */
+    private Map<String, int[]> getAppOpsData() {
+        Map<String, int[]> map = new HashMap<>();
+        try {
+            AppOpsManager aom = (AppOpsManager)
+                    ctx.getSystemService(Context.APP_OPS_SERVICE);
+            if (aom == null) return map;
+            long weekAgo = System.currentTimeMillis() - 7L * 24 * 3600 * 1000;
+            int[] opsToCheck = {
+                AppOpsManager.OP_CAMERA,
+                AppOpsManager.OP_RECORD_AUDIO,
+                AppOpsManager.OP_FINE_LOCATION
+            };
+            List<PackageInfo> pkgs = pm.getInstalledPackages(0);
+            for (PackageInfo pi : pkgs) {
+                if (pi.applicationInfo == null) continue;
+                int[] results = new int[4];
+                for (int i = 0; i < opsToCheck.length; i++) {
+                    try {
+                        List<AppOpsManager.PackageOps> pkgOps =
+                                aom.getPackagesForOps(new int[]{opsToCheck[i]});
+                        if (pkgOps == null) continue;
+                        for (AppOpsManager.PackageOps po : pkgOps) {
+                            if (!po.getPackageName().equals(pi.packageName)) continue;
+                            for (AppOpsManager.OpEntry oe : po.getOps()) {
+                                long lastAccess = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+                                        ? oe.getLastAccessTime(
+                                                AppOpsManager.OP_FLAG_SELF |
+                                                AppOpsManager.OP_FLAG_TRUSTED_PROXIED)
+                                        : oe.getTime();
+                                if (lastAccess > weekAgo) results[i] = 1;
+                            }
+                        }
+                    } catch (Exception ignored) {}
+                }
+                map.put(pi.packageName, results);
+            }
+        } catch (Exception ignored) {}
+        return map;
+    }
+
+    /**
+     * Shizuku-powered AppOps — reads ALL packages' ops including camera, mic,
+     * location, AND clipboard.
+     */
+    private Map<String, int[]> getShizukuAppOpsMap(List<PackageInfo> pkgs) {
+        Map<String, int[]> map = new HashMap<>();
+        if (!ShizukuCommandHelper.isAvailable()) return map;
+
+        try {
+            String fullDump = ShizukuCommandHelper.dumpAllAppOps();
+            if (fullDump.isEmpty()) return map;
+            long weekMs = 7L * 24 * 3600 * 1000;
+
+            for (PackageInfo pi : pkgs) {
+                int[] results = new int[4]; // camera, mic, location, clipboard
+                String pkgSection = extractPackageSection(fullDump, pi.packageName);
+                if (pkgSection.isEmpty()) continue;
+
+                results[0] = ShizukuCommandHelper.wasOpUsedRecently(pkgSection, "CAMERA",    weekMs) ? 1 : 0;
+                results[1] = ShizukuCommandHelper.wasOpUsedRecently(pkgSection, "RECORD_AUDIO", weekMs) ? 1 : 0;
+                results[2] = ShizukuCommandHelper.wasOpUsedRecently(pkgSection, "FINE_LOCATION", weekMs) ? 1 : 0;
+                results[3] = ShizukuCommandHelper.wasOpUsedRecently(pkgSection, "READ_CLIPBOARD", weekMs) ? 1 : 0;
+
+                map.put(pi.packageName, results);
+            }
+        } catch (Exception ignored) {}
+        return map;
+    }
+
+    private String extractPackageSection(String fullDump, String pkg) {
+        int start = fullDump.indexOf("Package " + pkg);
+        if (start < 0) start = fullDump.indexOf(pkg + ":");
+        if (start < 0) return "";
+        int end = fullDump.indexOf("\nPackage ", start + 1);
+        if (end < 0) end = Math.min(start + 4000, fullDump.length());
+        return fullDump.substring(start, end);
+    }
+
+    // ── Alerts ────────────────────────────────────────────────────────────────
+
+    private List<SecurityAlert> buildAlerts(List<AppSecurityInfo> apps) {
+        List<SecurityAlert> alerts = new ArrayList<>();
+        long now = System.currentTimeMillis();
+
+        for (AppSecurityInfo app : apps) {
+            // Spyware/stalkerware — highest priority
+            if (app.threatLevel >= SpyDetectionEngine.THREAT_STALKER) {
+                alerts.add(0, new SecurityAlert(
+                        SecurityAlert.TYPE_HIGH_RISK, SecurityAlert.SEV_CRITICAL,
+                        "☠ STALKERWARE: " + app.appName,
+                        app.threatReason + " — remove immediately",
+                        app.packageName, app.appName, now));
+            } else if (app.threatLevel >= SpyDetectionEngine.THREAT_SUSPECT) {
+                alerts.add(new SecurityAlert(
+                        SecurityAlert.TYPE_HIGH_RISK, SecurityAlert.SEV_CRITICAL,
+                        "⚠ Suspicious app: " + app.appName,
+                        app.threatReason,
+                        app.packageName, app.appName, now));
+            }
+
+            if (app.isSystemApp) continue;
+
+            if (app.cameraUsedRecently) {
+                alerts.add(new SecurityAlert(SecurityAlert.TYPE_CAMERA,
+                        SecurityAlert.SEV_WARNING,
+                        "Camera used: " + app.appName,
+                        app.appName + " accessed the camera in the last 7 days",
+                        app.packageName, app.appName, now));
+            }
+            if (app.micUsedRecently) {
+                alerts.add(new SecurityAlert(SecurityAlert.TYPE_MIC,
+                        SecurityAlert.SEV_WARNING,
+                        "Mic used: " + app.appName,
+                        app.appName + " accessed the microphone in the last 7 days",
+                        app.packageName, app.appName, now));
+            }
+            if (app.clipboardUsedRecently && app.hasInternet) {
+                alerts.add(new SecurityAlert(SecurityAlert.TYPE_HIGH_RISK,
+                        SecurityAlert.SEV_CRITICAL,
+                        "Clipboard theft risk: " + app.appName,
+                        app.appName + " read your clipboard and has Internet access",
+                        app.packageName, app.appName, now));
+            }
+            if (app.isDeviceAdmin) {
+                alerts.add(new SecurityAlert(SecurityAlert.TYPE_HIGH_RISK,
+                        SecurityAlert.SEV_CRITICAL,
+                        "Device Admin: " + app.appName,
+                        app.appName + " has Device Administrator privilege — can wipe/lock device",
+                        app.packageName, app.appName, now));
+            }
+            if (app.isBankingRisk && app.riskLevel == AppSecurityInfo.RISK_HIGH) {
+                alerts.add(new SecurityAlert(SecurityAlert.TYPE_HIGH_RISK,
+                        SecurityAlert.SEV_CRITICAL,
+                        "Banking threat: " + app.appName,
+                        app.riskFactors.isEmpty() ? "Poses a risk to banking app security"
+                                : app.riskFactors.get(0),
+                        app.packageName, app.appName, now));
+            }
+            if (app.riskLevel == AppSecurityInfo.RISK_HIGH && !app.isSuspectedSpyware) {
+                alerts.add(new SecurityAlert(SecurityAlert.TYPE_HIGH_RISK,
+                        SecurityAlert.SEV_WARNING,
+                        "High-risk app: " + app.appName,
+                        "Risk score " + app.riskScore + "/100 — " +
+                                (app.riskFactors.isEmpty() ? "multiple dangerous permissions"
+                                        : app.riskFactors.get(0)),
+                        app.packageName, app.appName, now));
+            }
+        }
+
+        // Elevated privilege alerts
+        for (DeviceSecurityHelper.ElevatedApp ea : mElevatedApps) {
+            boolean alreadyAdded = false;
+            for (SecurityAlert a : alerts) {
+                if (a.packageName.equals(ea.packageName)) { alreadyAdded = true; break; }
+            }
+            if (!alreadyAdded && !ea.packageName.startsWith("com.android")
+                    && !ea.packageName.startsWith("android")) {
+                alerts.add(new SecurityAlert(SecurityAlert.TYPE_HIGH_RISK,
+                        SecurityAlert.SEV_WARNING,
+                        ea.privilege + ": " + ea.appName,
+                        ea.description,
+                        ea.packageName, ea.appName, now));
+            }
+        }
+
+        return alerts;
+    }
+
+    // ── Utility ───────────────────────────────────────────────────────────────
+
+    public static int countWithPerm(List<AppSecurityInfo> apps, String perm) {
+        int c = 0;
+        for (AppSecurityInfo a : apps) {
+            switch (perm) {
+                case "camera":   if (a.hasCamera)     c++; break;
+                case "mic":      if (a.hasMicrophone) c++; break;
+                case "location": if (a.hasLocation)   c++; break;
+                case "running":  if (a.isRunning)     c++; break;
+                case "high":     if (a.riskLevel == AppSecurityInfo.RISK_HIGH)   c++; break;
+                case "medium":   if (a.riskLevel == AppSecurityInfo.RISK_MEDIUM) c++; break;
+                case "spyware":  if (a.isSuspectedSpyware) c++; break;
+                case "admin":    if (a.isDeviceAdmin) c++; break;
+            }
+        }
+        return c;
+    }
+
+    private static long orDefault(Map<String, Long> map, String key, long def) {
+        Long v = map.get(key);
+        return v != null ? v : def;
+    }
+
+    private static boolean isKnownHighNetworkApp(String pkg) {
+        return pkg.startsWith("com.google") || pkg.startsWith("com.netflix")
+                || pkg.startsWith("com.spotify") || pkg.startsWith("com.youtube")
+                || pkg.startsWith("com.amazon") || pkg.startsWith("com.facebook");
+    }
+
+    private static void progress(ScanCallback cb, int current, int total, String phase) {
+        if (cb != null) cb.onProgress(current, total, phase);
+    }
+}

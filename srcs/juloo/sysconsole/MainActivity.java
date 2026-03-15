@@ -24,6 +24,7 @@ import rikka.shizuku.Shizuku;
  *
  * Shows Shizuku + overlay permission status and launches the floating
  * SysConsoleService overlay once both permissions are granted.
+ * Below the console section, the Family Security Auditor is accessible.
  */
 public class MainActivity extends Activity {
 
@@ -93,7 +94,8 @@ public class MainActivity extends Activity {
         root.setPadding(dp(24), dp(24), dp(24), dp(24));
         sv.addView(root);
 
-        // Title
+        // ── EXISTING: System Console section ─────────────────────────────────
+
         TextView tvTitle = new TextView(this);
         tvTitle.setText("🖥  System Console");
         tvTitle.setTextSize(22f);
@@ -175,7 +177,171 @@ public class MainActivity extends Activity {
                 LinearLayout.LayoutParams.MATCH_PARENT, dp(48)));
         mBtnLaunch.setOnClickListener(v -> launchConsole());
 
+        // ── SECURITY AUDITOR DIVIDER ──────────────────────────────────────────
+        root.addView(buildSecurityAuditorSection());
+
         setContentView(sv);
+    }
+
+    private View buildSecurityAuditorSection() {
+        LinearLayout section = new LinearLayout(this);
+        section.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams sLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        sLp.topMargin = dp(32);
+        section.setLayoutParams(sLp);
+
+        // Divider line
+        View divider = new View(this);
+        divider.setBackgroundColor(0xFFE2E8F0);
+        LinearLayout.LayoutParams divLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(1));
+        divLp.bottomMargin = dp(24);
+        section.addView(divider, divLp);
+
+        // Header row: icon + title
+        LinearLayout headerRow = new LinearLayout(this);
+        headerRow.setOrientation(LinearLayout.HORIZONTAL);
+        headerRow.setGravity(Gravity.CENTER_VERTICAL);
+        headerRow.setPadding(0, 0, 0, dp(6));
+
+        TextView tvIcon = new TextView(this);
+        tvIcon.setText("🛡");
+        tvIcon.setTextSize(26f);
+        tvIcon.setPadding(0, 0, dp(12), 0);
+        headerRow.addView(tvIcon);
+
+        LinearLayout titleCol = new LinearLayout(this);
+        titleCol.setOrientation(LinearLayout.VERTICAL);
+        TextView tvTitle = new TextView(this);
+        tvTitle.setText("Family Security Auditor");
+        tvTitle.setTextSize(18f);
+        tvTitle.setTextColor(0xFF0F172A);
+        tvTitle.setTypeface(tvTitle.getTypeface(), android.graphics.Typeface.BOLD);
+        titleCol.addView(tvTitle);
+        TextView tvTagline = new TextView(this);
+        tvTagline.setText("Complete visibility, total peace of mind.");
+        tvTagline.setTextSize(12f);
+        tvTagline.setTextColor(0xFF64748B);
+        tvTagline.setPadding(0, dp(2), 0, 0);
+        titleCol.addView(tvTagline);
+        headerRow.addView(titleCol);
+        section.addView(headerRow);
+
+        // Feature highlights card (dark)
+        LinearLayout featCard = new LinearLayout(this);
+        featCard.setOrientation(LinearLayout.VERTICAL);
+        featCard.setPadding(dp(16), dp(16), dp(16), dp(16));
+        GradientDrawable featBg = new GradientDrawable();
+        featBg.setColor(0xFF1A2A3A);
+        featBg.setCornerRadius(dp(14));
+        featCard.setBackground(featBg);
+        LinearLayout.LayoutParams fcLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        fcLp.topMargin    = dp(14);
+        fcLp.bottomMargin = dp(14);
+        featCard.setLayoutParams(fcLp);
+
+        String[][] features = {
+            {"📊", "Risk scoring for every installed app"},
+            {"📷", "Real-time camera & microphone monitoring"},
+            {"📍", "Location access tracking per app"},
+            {"📡", "Live feed of active sensor usage"},
+            {"⚠", "Automatic security alerts & notifications"},
+            {"🔍", "Deep AppOps access via Shizuku"},
+        };
+        for (String[] f : features) {
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT);
+            rlp.bottomMargin = dp(10);
+            row.setLayoutParams(rlp);
+
+            TextView icon = new TextView(this);
+            icon.setText(f[0]);
+            icon.setTextSize(15f);
+            icon.setPadding(0, 0, dp(12), 0);
+            row.addView(icon);
+
+            TextView label = new TextView(this);
+            label.setText(f[1]);
+            label.setTextSize(13f);
+            label.setTextColor(0xFFCBD5E1);
+            row.addView(label);
+            featCard.addView(row);
+        }
+
+        // Shizuku status chip inside the card
+        boolean binderAlive = false;
+        try { binderAlive = Shizuku.pingBinder(); } catch (Exception ignored) {}
+
+        LinearLayout statusChip = new LinearLayout(this);
+        statusChip.setOrientation(LinearLayout.HORIZONTAL);
+        statusChip.setGravity(Gravity.CENTER_VERTICAL);
+        statusChip.setPadding(dp(10), dp(6), dp(10), dp(6));
+        GradientDrawable chipBg = new GradientDrawable();
+        chipBg.setColor(binderAlive ? 0x2200A896 : 0x22E63946);
+        chipBg.setCornerRadius(dp(20));
+        statusChip.setBackground(chipBg);
+        LinearLayout.LayoutParams chipLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        chipLp.topMargin = dp(6);
+        statusChip.setLayoutParams(chipLp);
+
+        View chipDot = new View(this);
+        GradientDrawable dotD = new GradientDrawable();
+        dotD.setShape(GradientDrawable.OVAL);
+        dotD.setColor(binderAlive ? 0xFF00A896 : 0xFFE63946);
+        chipDot.setBackground(dotD);
+        LinearLayout.LayoutParams dotLp = new LinearLayout.LayoutParams(dp(8), dp(8));
+        dotLp.rightMargin = dp(6);
+        dotLp.gravity = Gravity.CENTER_VERTICAL;
+        statusChip.addView(chipDot, dotLp);
+
+        TextView chipText = new TextView(this);
+        chipText.setText(binderAlive ? "Shizuku: Connected ✓" : "Shizuku: Not connected");
+        chipText.setTextSize(11f);
+        chipText.setTextColor(binderAlive ? 0xFF00A896 : 0xFFE63946);
+        chipText.setTypeface(chipText.getTypeface(), android.graphics.Typeface.BOLD);
+        statusChip.addView(chipText);
+        featCard.addView(statusChip);
+
+        section.addView(featCard);
+
+        // Launch button
+        Button launchBtn = new Button(this);
+        launchBtn.setText("Open Security Auditor  →");
+        launchBtn.setTextSize(14f);
+        launchBtn.setTextColor(0xFFFFFFFF);
+        launchBtn.setTypeface(launchBtn.getTypeface(), android.graphics.Typeface.BOLD);
+        launchBtn.setAllCaps(false);
+        GradientDrawable btnBg = new GradientDrawable();
+        btnBg.setColor(0xFF00A896);
+        btnBg.setCornerRadius(dp(12));
+        launchBtn.setBackground(btnBg);
+        LinearLayout.LayoutParams launchLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(52));
+        launchLp.bottomMargin = dp(8);
+        launchBtn.setOnClickListener(v ->
+                startActivity(new Intent(this, SecurityDashboardActivity.class)));
+        section.addView(launchBtn, launchLp);
+
+        // Privacy note
+        TextView privacy = new TextView(this);
+        privacy.setText("🔒  All analysis stays on-device — no cloud upload.");
+        privacy.setTextSize(11f);
+        privacy.setTextColor(0xFF94A3B8);
+        privacy.setGravity(Gravity.CENTER);
+        privacy.setPadding(0, dp(4), 0, dp(16));
+        section.addView(privacy);
+
+        return section;
     }
 
     private Button makeButton(String label, int textColor, int fillColor, int strokeColor) {

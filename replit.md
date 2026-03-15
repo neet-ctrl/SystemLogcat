@@ -57,3 +57,56 @@ Contains only the System Console feature — no keyboard code.
 ```bash
 cd sysconsole && ./gradlew assembleDebug
 ```
+
+---
+
+## Family Security Auditor — Full Feature Set
+
+A comprehensive Shizuku-powered security dashboard built into the System Console APK.
+
+### Architecture — Scan Pipeline (9 data sources)
+| Source | What it provides |
+|---|---|
+| `PackageManager` | Installed apps, requested permissions, services |
+| `AppOpsManager` | Camera/mic/location recent usage (non-root) |
+| `UsageStatsManager` | Last-used timestamps, foreground/background time |
+| `ActivityManager` | Running process list |
+| `NetworkUsageHelper` | Per-app 7-day network bytes (NetworkStatsManager + TrafficStats) |
+| `ShizukuCommandHelper` | Full AppOps dump, `ps -A` process list, `dumpsys package` granted perms, device admin, accessibility, notification listeners |
+| `SpyDetectionEngine` | 20+ known stalkerware DB + permission-combo heuristics |
+| `BankingRiskAnalyzer` | Banking app detection, OTP interception + overlay phishing checks |
+| `DeviceSecurityHelper` | Device admins, VPN apps, accessibility services, notification listener apps |
+
+### Key Source Files
+| File | Purpose |
+|---|---|
+| `SecurityScanManager.java` | Master 9-source scan pipeline, ScanCallback with phase labels |
+| `ShizukuCommandHelper.java` | Privileged shell via `Shizuku.newProcess()` — AppOps, processes, dumpsys |
+| `SpyDetectionEngine.java` | Known stalkerware DB + heuristic rules (20+ threats) |
+| `BankingRiskAnalyzer.java` | Banking identification + OTP/overlay phishing analysis |
+| `NetworkUsageHelper.java` | Per-app network bytes via `NetworkStatsManager` |
+| `DeviceSecurityHelper.java` | Elevated-privilege app enumeration (admin/VPN/accessibility) |
+| `AppInstallReceiver.java` | Real-time `ACTION_PACKAGE_ADDED/REMOVED` monitoring |
+| `SecurityReportExporter.java` | Full audit text export + Android share sheet |
+| `AppSecurityInfo.java` | Data model — 35+ fields including threat level, banking risk, network bytes |
+| `SecurityDashboardActivity.java` | Main hub: spyware section, elevated apps, alerts, running apps |
+| `AppDetailsActivity.java` | Per-app: risk gauge, all permissions, Shizuku-granted perms, network, threat banner |
+| `MonitorActivity.java` | Live real-time sensor/AppOps feed |
+
+### Features
+- **Spyware & Stalkerware Detection** — known threat DB + 6 permission-combo heuristic rules
+- **Shizuku Deep Scan** — runs `dumpsys appops`, `ps -A`, `cmd appops get <pkg>` with privilege
+- **Per-App Granted Permissions** — via `dumpsys package <pkg>` parsed by Shizuku
+- **Full Running Process List** — from Shizuku `ps -A` (not just visible app processes)
+- **Real-Time Install Monitoring** — `AppInstallReceiver` fires risk analysis on every install
+- **Banking Risk Analysis** — OTP interception detection, overlay phishing detection
+- **Network Usage (7-day)** — per app, shown in details and factored into risk score
+- **Device Admin / VPN / Accessibility / Notification Listener detection** — with Shizuku augmentation
+- **Security Report Export** — shareable text report covering all threats, risks, and alerts
+- **Risk Score 0-100** — multi-factor including actual AppOps usage evidence
+
+### GitHub Actions CI/CD — `.github/workflows/security-auditor-ci.yml`
+- Job 1: Debug APK build (always)
+- Job 2: Android Lint (always)
+- Job 3: Security file audit (verifies all required files exist, checks for hardcoded secrets, counts Shizuku API usages)
+- Job 4: Signed release APK (on `v*` tag push or manual trigger with secret keystore)
