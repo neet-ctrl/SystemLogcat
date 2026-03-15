@@ -1,0 +1,42 @@
+name: Build System Console APK
+
+on:
+  push:
+    branches: [ "main", "master" ]
+    paths:
+      - 'sysconsole/**'
+      - '.github/workflows/sysconsole-build.yml'
+  pull_request:
+    branches: [ "main", "master" ]
+    paths:
+      - 'sysconsole/**'
+      - '.github/workflows/sysconsole-build.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v3
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: gradle
+
+    - name: Grant execute permission for gradlew
+      working-directory: sysconsole
+      run: chmod +x gradlew
+
+    - name: Build debug APK
+      working-directory: sysconsole
+      run: ./gradlew assembleDebug
+
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: sysconsole-debug
+        path: sysconsole/build/outputs/apk/debug/*.apk

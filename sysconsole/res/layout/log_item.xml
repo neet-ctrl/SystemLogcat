@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/log_item_root"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@drawable/dev_console_log_item_bg"
+    android:paddingStart="8dp"
+    android:paddingEnd="8dp"
+    android:paddingTop="8dp"
+    android:paddingBottom="8dp"
+    android:layout_marginStart="4dp"
+    android:layout_marginEnd="4dp"
+    android:layout_marginTop="2dp"
+    android:layout_marginBottom="2dp">
+
+    <!-- Row 1: entry# + level badge + source badge + timestamp + selection + copy -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="6dp">
+
+        <TextView
+            android:id="@+id/log_number"
+            android:layout_width="wrap_content"
+            android:layout_height="18dp"
+            android:text="#1"
+            android:textSize="9sp"
+            android:textColor="#6B7280"
+            android:background="@drawable/dev_console_badge_gray_outline"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp"
+            android:gravity="center"
+            android:fontFamily="monospace"
+            android:layout_marginEnd="4dp"/>
+
+        <TextView
+            android:id="@+id/log_level_badge"
+            android:layout_width="wrap_content"
+            android:layout_height="18dp"
+            android:text="INFO"
+            android:textSize="9sp"
+            android:textColor="#FFFFFF"
+            android:paddingStart="5dp"
+            android:paddingEnd="5dp"
+            android:gravity="center"
+            android:fontFamily="monospace"
+            android:layout_marginEnd="4dp"/>
+
+        <TextView
+            android:id="@+id/log_source_badge"
+            android:layout_width="wrap_content"
+            android:layout_height="18dp"
+            android:text="app"
+            android:textSize="9sp"
+            android:textColor="#374151"
+            android:background="@drawable/dev_console_badge_gray_outline"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp"
+            android:gravity="center"
+            android:fontFamily="monospace"
+            android:ellipsize="end"
+            android:maxWidth="80dp"
+            android:maxLines="1"
+            android:layout_marginEnd="6dp"/>
+
+        <TextView
+            android:id="@+id/log_timestamp"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="12:34:56"
+            android:textSize="9sp"
+            android:textColor="#9CA3AF"
+            android:fontFamily="monospace"/>
+
+        <TextView
+            android:id="@+id/log_selected_indicator"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:text=""
+            android:textSize="12sp"
+            android:textColor="#FFFFFF"
+            android:gravity="center"
+            android:background="@drawable/dev_console_check_unchecked"
+            android:visibility="gone"
+            android:layout_marginEnd="4dp"/>
+
+        <TextView
+            android:id="@+id/btn_copy_single"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:text="⎘"
+            android:textSize="14sp"
+            android:textColor="#9CA3AF"
+            android:gravity="center"
+            android:background="@drawable/dev_console_icon_btn"/>
+
+    </LinearLayout>
+
+    <!-- Row 2: message -->
+    <TextView
+        android:id="@+id/log_message"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Log message"
+        android:textSize="12sp"
+        android:textColor="#111827"
+        android:maxLines="8"
+        android:ellipsize="end"
+        android:fontFamily="monospace"
+        android:lineSpacingMultiplier="1.4"/>
+
+    <!-- Row 3: metadata (hidden by default) -->
+    <TextView
+        android:id="@+id/log_metadata"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="gone"
+        android:layout_marginTop="6dp"
+        android:padding="6dp"
+        android:background="#F3F4F6"
+        android:textSize="10sp"
+        android:textColor="#6B7280"
+        android:fontFamily="monospace"
+        android:text=""/>
+
+</LinearLayout>
