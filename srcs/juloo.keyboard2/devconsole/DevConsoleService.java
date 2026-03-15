@@ -6,9 +6,15 @@ import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Paint;
 import android.graphics.PixelFormat;
+import android.graphics.RectF;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.pdf.PdfDocument;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
@@ -28,8 +34,10 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.core.content.FileProvider;
+
 import java.io.File;
-import java.io.FileWriter;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -174,7 +182,8 @@ public class DevConsoleService extends Service {
 
         mParams = new WindowManager.LayoutParams(w, h, layer,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-                        | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                        | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
+                        | WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
                 PixelFormat.TRANSLUCENT);
         mParams.gravity = Gravity.TOP | Gravity.START;
         mParams.x = (dm.widthPixels  - w) / 2;
@@ -822,7 +831,7 @@ public class DevConsoleService extends Service {
         }).start();
     }
 
-    /** Matches React exportSavedLogs — exports a specific collection as styled HTML */
+    /** Export a specific collection as a styled PDF matching the dev console UI, then share it */
     private void exportSavedLogs(DevConsoleDatabaseHelper.SavedLogCollection col) {
         new Thread(() -> {
             try {
@@ -831,25 +840,255 @@ public class DevConsoleService extends Service {
                     mHandler.post(() -> toast("Export Failed \u2014 Collection has no logs to export"));
                     return;
                 }
-                writeHtmlFile(col.name, logs);
+                File pdfFile = writePdfFile(col.name, logs);
+                mHandler.post(() -> sharePdfFile(pdfFile, col.name));
             } catch (Exception e) {
                 mHandler.post(() -> toast("Export Failed \u2014 " + e.getMessage()));
             }
         }).start();
     }
 
-    private void writeHtmlFile(String title, List<DevConsoleLog> logs) throws IOException {
-        String html = buildHtml(title, logs);
+    private void sharePdfFile(File pdfFile, String collectionName) {
+        try {
+            String authority = getPackageName() + ".provider";
+            Uri uri = FileProvider.getUriForFile(this, authority, pdfFile);
+            Intent shareIntent = new Intent(Intent.ACTION_SEND);
+            shareIntent.setType("application/pdf");
+            shareIntent.putExtra(Intent.EXTRA_STREAM, uri);
+            shareIntent.putExtra(Intent.EXTRA_SUBJECT, "Dev Console \u2014 " + collectionName);
+            shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    | Intent.FLAG_ACTIVITY_NEW_TASK);
+            Intent chooser = Intent.createChooser(shareIntent, "Share PDF");
+            chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(chooser);
+        } catch (Exception e) {
+            toast("Share Failed \u2014 " + e.getMessage());
+        }
+    }
+
+    /**
+     * Generates a PDF that visually mirrors the dev console:
+     * dark header bar, per-level coloured card backgrounds, coloured level badge,
+     * source badge, timestamp, message text, optional metadata block.
+     */
+    private File writePdfFile(String title, List<DevConsoleLog> logs) throws IOException {
+        final int PAGE_W = 842;
+        final int PAGE_H = 1190;
+        final int MARGIN  = 28;
+        final int CONTENT_W = PAGE_W - MARGIN * 2;
+
+        final float CARD_RADIUS  = 8f;
+        final float BADGE_RADIUS = 5f;
+        final float BADGE_PAD_H  = 8f;
+        final float BADGE_PAD_V  = 3f;
+        final float CARD_PAD     = 10f;
+        final float CARD_GAP     = 7f;
+
+        Paint bgPaint      = new Paint(Paint.ANTI_ALIAS_FLAG);
+        Paint cardPaint    = new Paint(Paint.ANTI_ALIAS_FLAG);
+        Paint badgePaint   = new Paint(Paint.ANTI_ALIAS_FLAG);
+        Paint borderPaint  = new Paint(Paint.ANTI_ALIAS_FLAG);
+        borderPaint.setStyle(Paint.Style.STROKE);
+        borderPaint.setStrokeWidth(1f);
+
+        Paint numPaint  = new Paint(Paint.ANTI_ALIAS_FLAG);
+        numPaint.setTypeface(Typeface.MONOSPACE);
+        numPaint.setTextSize(11f);
+        numPaint.setColor(Color.parseColor("#6B7280"));
+
+        Paint badgeTextPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        badgeTextPaint.setTypeface(Typeface.create(Typeface.MONOSPACE, Typeface.BOLD));
+        badgeTextPaint.setTextSize(10f);
+        badgeTextPaint.setColor(0xFFFFFFFF);
+
+        Paint srcTextPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        srcTextPaint.setTypeface(Typeface.MONOSPACE);
+        srcTextPaint.setTextSize(10f);
+        srcTextPaint.setColor(Color.parseColor("#374151"));
+
+        Paint tsPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        tsPaint.setTypeface(Typeface.MONOSPACE);
+        tsPaint.setTextSize(10f);
+        tsPaint.setColor(Color.parseColor("#9CA3AF"));
+
+        Paint msgPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        msgPaint.setTypeface(Typeface.MONOSPACE);
+        msgPaint.setTextSize(11.5f);
+
+        Paint metaPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        metaPaint.setTypeface(Typeface.MONOSPACE);
+        metaPaint.setTextSize(9.5f);
+        metaPaint.setColor(Color.parseColor("#6B7280"));
+
+        Paint headerBgPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        headerBgPaint.setColor(Color.parseColor("#111827"));
+
+        Paint headerTextPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        headerTextPaint.setTypeface(Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD));
+        headerTextPaint.setTextSize(13f);
+        headerTextPaint.setColor(0xFFFFFFFF);
+
+        Paint headerSubPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        headerSubPaint.setTypeface(Typeface.MONOSPACE);
+        headerSubPaint.setTextSize(10f);
+        headerSubPaint.setColor(Color.parseColor("#9CA3AF"));
+
+        PdfDocument doc = new PdfDocument();
+        int pageNum = 0;
+        PdfDocument.Page page = null;
+        Canvas canvas = null;
+        float y = 0;
+
+        String dateStr = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.US).format(new Date());
+
+        for (int i = 0; i < logs.size(); i++) {
+            DevConsoleLog log = logs.get(i);
+            String lvl = log.level != null ? log.level.toUpperCase(Locale.US) : "LOG";
+
+            int cardBg, cardBorder, badgeColor;
+            int msgColor;
+            switch (lvl) {
+                case "ERROR":
+                    cardBg = Color.parseColor("#FFF5F5");
+                    cardBorder = Color.parseColor("#FECACA");
+                    badgeColor = Color.parseColor("#EF4444");
+                    msgColor   = Color.parseColor("#7F1D1D");
+                    break;
+                case "WARN":
+                    cardBg = Color.parseColor("#FEFCE8");
+                    cardBorder = Color.parseColor("#FEF08A");
+                    badgeColor = Color.parseColor("#EAB308");
+                    msgColor   = Color.parseColor("#78350F");
+                    break;
+                case "INFO":
+                    cardBg = Color.parseColor("#EFF6FF");
+                    cardBorder = Color.parseColor("#BFDBFE");
+                    badgeColor = Color.parseColor("#3B82F6");
+                    msgColor   = Color.parseColor("#1E3A5F");
+                    break;
+                default:
+                    cardBg = Color.parseColor("#F9FAFB");
+                    cardBorder = Color.parseColor("#E5E7EB");
+                    badgeColor = Color.parseColor("#6B7280");
+                    msgColor   = Color.parseColor("#374151");
+                    break;
+            }
+            msgPaint.setColor(msgColor);
+
+            String numText  = "#" + (i + 1);
+            String srcText  = log.source != null ? log.source : "";
+            String tsText   = log.timestamp != null ? log.timestamp : "";
+            String msgText  = log.message  != null ? log.message  : "";
+            boolean hasMeta = log.metadata != null && !log.metadata.isEmpty();
+
+            List<String> msgLines  = wrapText(msgText,  CONTENT_W - CARD_PAD * 2, msgPaint);
+            List<String> metaLines = hasMeta ? wrapText(log.metadata, CONTENT_W - CARD_PAD * 2 - 6f, metaPaint) : null;
+
+            float badgeW  = badgeTextPaint.measureText(lvl)  + BADGE_PAD_H * 2;
+            float srcW    = srcTextPaint.measureText(srcText) + BADGE_PAD_H * 2;
+            float rowH    = 14f + BADGE_PAD_V * 2;
+            float msgH    = msgLines.size() * 14f;
+            float metaH   = hasMeta ? (metaLines.size() * 12f + CARD_PAD + 6f) : 0f;
+            float cardH   = CARD_PAD + rowH + CARD_PAD / 2f + msgH + metaH + CARD_PAD;
+
+            float headerH = 48f;
+
+            if (page == null || y + cardH > PAGE_H - MARGIN) {
+                if (page != null) doc.finishPage(page);
+                pageNum++;
+                PdfDocument.PageInfo info = new PdfDocument.PageInfo.Builder(PAGE_W, PAGE_H, pageNum).create();
+                page   = doc.startPage(info);
+                canvas = page.getCanvas();
+
+                canvas.drawRect(0, 0, PAGE_W, headerH, headerBgPaint);
+                canvas.drawText("\u25CF Enhanced Console \u2014 " + title, MARGIN, 18f, headerTextPaint);
+                canvas.drawText(dateStr + "  \u00B7  " + logs.size() + " entries  \u00B7  page " + pageNum,
+                        MARGIN, 36f, headerSubPaint);
+                y = headerH + MARGIN / 2f;
+            }
+
+            float cx = MARGIN;
+            float cy = y;
+
+            cardPaint.setColor(cardBg);
+            borderPaint.setColor(cardBorder);
+            RectF cardRect = new RectF(cx, cy, cx + CONTENT_W, cy + cardH);
+            canvas.drawRoundRect(cardRect, CARD_RADIUS, CARD_RADIUS, cardPaint);
+            canvas.drawRoundRect(cardRect, CARD_RADIUS, CARD_RADIUS, borderPaint);
+
+            float rx = cx + CARD_PAD;
+            float ry = cy + CARD_PAD + rowH * 0.75f;
+
+            canvas.drawText(numText, rx, ry, numPaint);
+            rx += numPaint.measureText(numText) + 6f;
+
+            badgePaint.setColor(badgeColor);
+            float bx1 = rx, by1 = cy + CARD_PAD, bx2 = rx + badgeW, by2 = by1 + rowH;
+            canvas.drawRoundRect(new RectF(bx1, by1, bx2, by2), BADGE_RADIUS, BADGE_RADIUS, badgePaint);
+            canvas.drawText(lvl, bx1 + BADGE_PAD_H, ry, badgeTextPaint);
+            rx = bx2 + 6f;
+
+            badgePaint.setColor(Color.parseColor("#E5E7EB"));
+            float sx1 = rx, sy1 = by1, sx2 = rx + srcW, sy2 = by2;
+            canvas.drawRoundRect(new RectF(sx1, sy1, sx2, sy2), BADGE_RADIUS, BADGE_RADIUS, badgePaint);
+            canvas.drawText(srcText, sx1 + BADGE_PAD_H, ry, srcTextPaint);
+            rx = sx2 + 6f;
+
+            canvas.drawText(tsText, rx, ry, tsPaint);
+
+            float my = cy + CARD_PAD + rowH + CARD_PAD / 2f;
+            for (String line : msgLines) {
+                canvas.drawText(line, cx + CARD_PAD, my + 11f, msgPaint);
+                my += 14f;
+            }
+
+            if (hasMeta) {
+                Paint metaBgPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+                metaBgPaint.setColor(Color.parseColor("#F3F4F6"));
+                float mx1 = cx + CARD_PAD, my1 = my + 4f;
+                float mx2 = cx + CONTENT_W - CARD_PAD;
+                float my2 = my1 + metaLines.size() * 12f + 6f;
+                canvas.drawRoundRect(new RectF(mx1, my1, mx2, my2), 4f, 4f, metaBgPaint);
+                float ty = my1 + 11f;
+                for (String line : metaLines) {
+                    canvas.drawText(line, mx1 + 6f, ty, metaPaint);
+                    ty += 12f;
+                }
+            }
+
+            y = cy + cardH + CARD_GAP;
+        }
+
+        if (page != null) doc.finishPage(page);
+
         String fname = "console_" + title.replaceAll("[^a-zA-Z0-9]", "_")
-                + "_" + new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date()) + ".html";
-        File dir = getExternalFilesDir("DevConsole");
-        if (dir == null) dir = getFilesDir();
-        if (!dir.exists()) dir.mkdirs();
-        File f = new File(dir, fname);
-        FileWriter fw = new FileWriter(f);
-        fw.write(html); fw.close();
-        final String path = f.getAbsolutePath();
-        mHandler.post(() -> toast("Exported \u2014 Saved to: " + path));
+                + "_" + new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date()) + ".pdf";
+        File cacheDir = new File(getCacheDir(), "DevConsole");
+        if (!cacheDir.exists()) cacheDir.mkdirs();
+        File f = new File(cacheDir, fname);
+        FileOutputStream fos = new FileOutputStream(f);
+        doc.writeTo(fos);
+        fos.close();
+        doc.close();
+        return f;
+    }
+
+    /** Wrap text to fit within maxWidth using the given Paint, returning individual lines */
+    private List<String> wrapText(String text, float maxWidth, Paint paint) {
+        List<String> result = new ArrayList<>();
+        if (text == null || text.isEmpty()) { result.add(""); return result; }
+        String[] paragraphs = text.split("\n", -1);
+        for (String para : paragraphs) {
+            if (para.isEmpty()) { result.add(""); continue; }
+            int start = 0;
+            while (start < para.length()) {
+                int count = paint.breakText(para, start, para.length(), true, maxWidth, null);
+                if (count <= 0) count = 1;
+                result.add(para.substring(start, start + count));
+                start += count;
+            }
+        }
+        return result;
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -893,54 +1132,6 @@ public class DevConsoleService extends Service {
         }
         b.setNegativeButton("Close", null);
         show(b);
-    }
-
-    // ══════════════════════════════════════════════════════════════════════════
-    // HTML export  (matches React exportSavedLogs HTML template closely)
-    // ══════════════════════════════════════════════════════════════════════════
-
-    private String buildHtml(String title, List<DevConsoleLog> logs) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("<!DOCTYPE html><html><head><meta charset='utf-8'><title>").append(he(title)).append("</title>")
-          .append("<style>")
-          .append("*{box-sizing:border-box;margin:0;padding:0}")
-          .append("body{background:#fff;color:#111827;font-family:ui-monospace,monospace;font-size:13px;padding:16px}")
-          .append("h2{color:#111827;margin-bottom:16px;font-size:16px}")
-          .append(".e{border:1px solid #E5E7EB;border-radius:6px;padding:10px;margin-bottom:8px}")
-          .append(".e.ERROR{background:#FFF5F5;border-color:#FECACA}")
-          .append(".e.WARN{background:#FEFCE8;border-color:#FEF08A}")
-          .append(".e.INFO{background:#EFF6FF;border-color:#BFDBFE}")
-          .append(".e.DEBUG,.e.LOG{background:#F9FAFB;border-color:#E5E7EB}")
-          .append(".h{display:flex;align-items:center;gap:6px;margin-bottom:6px;flex-wrap:wrap}")
-          .append(".n{font-size:10px;color:#6B7280;border:1px solid #D1D5DB;border-radius:4px;padding:1px 5px}")
-          .append(".b{font-size:10px;color:#fff;border-radius:4px;padding:1px 6px;font-weight:600}")
-          .append(".b.ERROR{background:#EF4444}.b.WARN{background:#EAB308}.b.INFO{background:#3B82F6}.b.DEBUG,.b.LOG{background:#6B7280}")
-          .append(".src{font-size:10px;color:#374151;border:1px solid #D1D5DB;border-radius:4px;padding:1px 5px}")
-          .append(".ts{font-size:10px;color:#9CA3AF}")
-          .append(".msg{font-size:12px;line-height:1.5;word-break:break-all}")
-          .append(".meta{margin-top:6px;background:#F3F4F6;padding:6px;border-radius:4px;font-size:10px;color:#6B7280}")
-          .append("</style></head><body>")
-          .append("<h2>").append(he(title)).append(" &nbsp;&mdash;&nbsp; ")
-          .append(new SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.US).format(new Date()))
-          .append(" &nbsp;(").append(logs.size()).append(" entries)</h2>");
-
-        for (int i = 0; i < logs.size(); i++) {
-            DevConsoleLog l = logs.get(i);
-            String lvl = l.level.toUpperCase();
-            sb.append("<div class='e ").append(lvl).append("'>")
-              .append("<div class='h'>")
-              .append("<span class='n'>#").append(i + 1).append("</span>")
-              .append("<span class='b ").append(lvl).append("'>").append(lvl).append("</span>")
-              .append("<span class='src'>").append(he(l.source)).append("</span>")
-              .append("<span class='ts'>").append(he(l.timestamp)).append("</span>")
-              .append("</div>")
-              .append("<div class='msg'>").append(he(l.message)).append("</div>");
-            if (l.metadata != null && !l.metadata.isEmpty())
-                sb.append("<div class='meta'>").append(he(l.metadata)).append("</div>");
-            sb.append("</div>");
-        }
-        sb.append("</body></html>");
-        return sb.toString();
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -1109,8 +1300,4 @@ public class DevConsoleService extends Service {
         return Math.round(dp * getResources().getDisplayMetrics().density);
     }
 
-    private static String he(String s) {
-        if (s == null) return "";
-        return s.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;");
-    }
 }

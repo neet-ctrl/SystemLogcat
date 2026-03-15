@@ -1,0 +1,383 @@
+#4470  [ERROR]  15/03/26 13:10:03  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4469  [ERROR]  15/03/26 13:10:03  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4468  [ERROR]  15/03/26 13:10:03  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4467  [ERROR]  15/03/26 13:10:03  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4466  [ERROR]  15/03/26 13:10:03  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4465  [ERROR]  15/03/26 13:10:03  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4464  [ERROR]  15/03/26 13:10:03  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4463  [ERROR]  15/03/26 13:10:03  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4462  [ERROR]  15/03/26 13:10:03  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4461  [ERROR]  15/03/26 13:10:03  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4460  [ERROR]  15/03/26 13:10:03  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4459  [ERROR]  15/03/26 13:10:03  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4458  [ERROR]  15/03/26 13:10:03  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4457  [ERROR]  15/03/26 13:10:03  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4456  [ERROR]  15/03/26 13:10:03  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4455  [ERROR]  15/03/26 13:10:03  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4454  [ERROR]  15/03/26 13:10:03  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4453  [ERROR]  15/03/26 13:10:03  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4452  [ERROR]  15/03/26 13:10:03  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4451  [ERROR]  15/03/26 13:10:03  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4450  [ERROR]  15/03/26 13:10:03  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4449  [ERROR]  15/03/26 13:10:03  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4448  [ERROR]  15/03/26 13:10:03  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4447  [ERROR]  15/03/26 13:10:03  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4446  [ERROR]  15/03/26 13:10:03  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4445  [ERROR]  15/03/26 13:10:03  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4444  [ERROR]  15/03/26 13:10:03  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4443  [ERROR]  15/03/26 13:10:03  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4442  [ERROR]  15/03/26 13:10:03  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4441  [ERROR]  15/03/26 13:10:03  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4440  [ERROR]  15/03/26 13:10:03  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4439  [ERROR]  15/03/26 13:10:03  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4438  [ERROR]  15/03/26 13:10:03  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4437  [ERROR]  15/03/26 13:10:03  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4436  [ERROR]  15/03/26 13:10:03  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4435  [ERROR]  15/03/26 13:10:03  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4434  [ERROR]  15/03/26 13:10:03  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4433  [ERROR]  15/03/26 13:10:03  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4432  [ERROR]  15/03/26 13:10:03  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4431  [ERROR]  15/03/26 13:10:03  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4430  [ERROR]  15/03/26 13:10:03  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4429  [ERROR]  15/03/26 13:10:03  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4428  [ERROR]  15/03/26 13:10:03  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4427  [ERROR]  15/03/26 13:10:03  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4426  [ERROR]  15/03/26 13:10:02  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4425  [ERROR]  15/03/26 13:10:02  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4424  [ERROR]  15/03/26 13:10:02  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4423  [ERROR]  15/03/26 13:10:02  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4422  [ERROR]  15/03/26 13:10:02  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4380  [ERROR]  15/03/26 13:09:51  SBE
+this page is abnormal implementation
+
+#4343  [ERROR]  15/03/26 13:09:51  SBE
+this page is abnormal implementation
+
+#4309  [ERROR]  15/03/26 13:09:50  SBE
+this page is abnormal implementation
+
+#4210  [ERROR]  15/03/26 13:09:42  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4209  [ERROR]  15/03/26 13:09:42  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4208  [ERROR]  15/03/26 13:09:42  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4207  [ERROR]  15/03/26 13:09:42  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4206  [ERROR]  15/03/26 13:09:42  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4205  [ERROR]  15/03/26 13:09:42  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4204  [ERROR]  15/03/26 13:09:42  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4203  [ERROR]  15/03/26 13:09:42  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4202  [ERROR]  15/03/26 13:09:42  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4201  [ERROR]  15/03/26 13:09:42  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4200  [ERROR]  15/03/26 13:09:42  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4199  [ERROR]  15/03/26 13:09:42  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4198  [ERROR]  15/03/26 13:09:42  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4197  [ERROR]  15/03/26 13:09:42  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4196  [ERROR]  15/03/26 13:09:42  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4195  [ERROR]  15/03/26 13:09:42  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4194  [ERROR]  15/03/26 13:09:42  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4193  [ERROR]  15/03/26 13:09:42  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4192  [ERROR]  15/03/26 13:09:42  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4191  [ERROR]  15/03/26 13:09:42  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4190  [ERROR]  15/03/26 13:09:42  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4189  [ERROR]  15/03/26 13:09:42  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4188  [ERROR]  15/03/26 13:09:41  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4187  [ERROR]  15/03/26 13:09:41  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4186  [ERROR]  15/03/26 13:09:41  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4185  [ERROR]  15/03/26 13:09:41  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4184  [ERROR]  15/03/26 13:09:41  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4183  [ERROR]  15/03/26 13:09:41  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4182  [ERROR]  15/03/26 13:09:41  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4181  [ERROR]  15/03/26 13:09:41  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4180  [ERROR]  15/03/26 13:09:41  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4179  [ERROR]  15/03/26 13:09:41  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4178  [ERROR]  15/03/26 13:09:41  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4177  [ERROR]  15/03/26 13:09:41  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4176  [ERROR]  15/03/26 13:09:41  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4175  [ERROR]  15/03/26 13:09:41  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4174  [ERROR]  15/03/26 13:09:41  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4173  [ERROR]  15/03/26 13:09:41  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4172  [ERROR]  15/03/26 13:09:41  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4171  [ERROR]  15/03/26 13:09:41  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4170  [ERROR]  15/03/26 13:09:41  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4169  [ERROR]  15/03/26 13:09:41  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4168  [ERROR]  15/03/26 13:09:41  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4167  [ERROR]  15/03/26 13:09:41  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4166  [ERROR]  15/03/26 13:09:41  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4165  [ERROR]  15/03/26 13:09:41  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4164  [ERROR]  15/03/26 13:09:41  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4163  [ERROR]  15/03/26 13:09:41  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4158  [ERROR]  15/03/26 13:09:41  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4155  [ERROR]  15/03/26 13:09:41  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4154  [ERROR]  15/03/26 13:09:41  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#4102  [ERROR]  15/03/26 13:09:40  SBE
+this page is abnormal implementation
+
+#4097  [WARN]  15/03/26 13:09:40  Choreographer
+Already have a pending vsync event.  There should only be one at a time.
+
+#4088  [WARN]  15/03/26 13:09:37  WindowOnBackDispatcher
+sendCancelIfRunning: isInProgress=false callback=android.view.ViewRootImpl$$ExternalSyntheticLambda12@2884200
+
+#3793  [ERROR]  15/03/26 13:09:29  SBE
+this page is abnormal implementation
+
+#3759  [ERROR]  15/03/26 13:09:28  SBE
+this page is abnormal implementation
+
+#3721  [ERROR]  15/03/26 13:09:28  SBE
+this page is abnormal implementation
+
+#3687  [ERROR]  15/03/26 13:09:27  SBE
+this page is abnormal implementation
+
+#3678  [WARN]  15/03/26 13:09:22  WindowOnBackDispatcher
+sendCancelIfRunning: isInProgress=false callback=android.view.ViewRootImpl$$ExternalSyntheticLambda12@291af37
+
+#3677  [ERROR]  15/03/26 13:09:22  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#3676  [ERROR]  15/03/26 13:09:22  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#3675  [ERROR]  15/03/26 13:09:22  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#3674  [ERROR]  15/03/26 13:09:22  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#3662  [WARN]  15/03/26 13:08:14  WindowOnBackDispatcher
+sendCancelIfRunning: isInProgress=false callback=android.view.ViewRootImpl$$ExternalSyntheticLambda12@48f5bf9
+
+#3661  [ERROR]  15/03/26 13:08:14  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#3660  [ERROR]  15/03/26 13:08:14  RippleDrawable
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+#3658  [WARN]  15/03/26 13:08:13  ContextImpl
+Failed to ensure /dev/null/Android/data/juloo.keyboard2.debug/files/DevConsole: java.lang.SecurityException: Invalid mkdirs path: /dev/null/Android/data/juloo.keyboard2.debug/files/DevConsole is not a known app path.
+
+#3656  [WARN]  15/03/26 13:08:13  ContextImpl
+Failed to ensure /dev/null/Android/data/juloo.keyboard2.debug/files/DevConsole: java.lang.SecurityException: Invalid mkdirs path: /dev/null/Android/data/juloo.keyboard2.debug/files/DevConsole is not a known app path.
+
+#3654  [WARN]  15/03/26 13:08:13  ContextImpl
+Failed to ensure /dev/null/Android/data/juloo.keyboard2.debug/files/DevConsole: java.lang.SecurityException: Invalid mkdirs path: /dev/null/Android/data/juloo.keyboard2.debug/files/DevConsole is not a known app path.
+
+#3652  [WARN]  15/03/26 13:08:12  ContextImpl
+Failed to ensure /dev/null/Android/data/juloo.keyboard2.debug/files/DevConsole: java.lang.SecurityException: Invalid mkdirs path: /dev/null/Android/data/juloo.keyboard2.debug/files/DevConsole is not a known app path.
+
+#3650  [WARN]  15/03/26 13:08:12  ContextImpl
+Failed to ensure /dev/null/Android/data/juloo.keyboard2.debug/files/DevConsole: java.lang.SecurityException: Invalid mkdirs path: /dev/null/Android/data/juloo.keyboard2.debug/files/DevConsole is not a known app path.
+
+#3648  [WARN]  15/03/26 13:08:11  ContextImpl
+Failed to ensure /dev/null/Android/data/juloo.keyboard2.debug/files/DevConsole: java.lang.SecurityException: Invalid mkdirs path: /dev/null/Android/data/juloo.keyboard2.debug/files/DevConsole is not a known app path.
+
+#3605  [ERROR]  15/03/26 13:08:08  SBE
+this page is abnormal implementation
+
+#3571  [ERROR]  15/03/26 13:08:08  SBE
+this page is abnormal implementation
+
+#3565  [ERROR]  15/03/26 13:08:08  SBE
+this page is abnormal implementation
+
+#3500  [ERROR]  15/03/26 13:08:07  SBE
+this page is abnormal implementation
