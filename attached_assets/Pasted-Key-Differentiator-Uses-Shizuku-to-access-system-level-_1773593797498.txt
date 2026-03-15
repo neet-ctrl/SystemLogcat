@@ -1,0 +1,183 @@
+Key Differentiator: Uses Shizuku to access system-level data (AppOps, running processes, usage stats) that normal apps cannot see, delivering professional-grade auditing without root.
+
+2. Visual Style & Design Language
+
+· Theme: Modern, clean, and trustworthy. Use a calming dark/light mode (system default with manual override).
+· Primary Colors: Deep blue (#1A2A3A) as primary, with accents of teal (#00A896) for positive indicators, orange (#FF9F1C) for warnings, and red (#E63946) for critical alerts.
+· Typography: Sans-serif (Roboto or Inter) with clear hierarchy.
+· Icons: Material Symbols outlined style for consistency.
+· Animations: Subtle transitions between screens, ripple effects on taps.
+· Layout: Card-based design with ample whitespace for readability.
+
+3. Core Screens and Their Functionality
+
+3.1. Splash Screen / Onboarding
+
+· Purpose: Initial load and first-time setup guidance.
+· Elements:
+  · App logo (shield with magnifying glass) and name: "Family Security Auditor"
+  · Brief tagline: "Complete visibility, total peace of mind."
+  · Progress indicator while checking Shizuku status.
+· If Shizuku not running: Full-screen prompt with simple steps:
+  1. Install Shizuku from Play Store.
+  2. Open Shizuku and activate (with wireless debugging or root).
+  3. Return to this app.
+  · A "Verify Shizuku" button to re-check.
+· Once Shizuku is ready: Proceed to main dashboard.
+
+3.2. Main Dashboard
+
+· Purpose: At-a-glance summary of device security status.
+· Layout:
+  · Top Bar: App icon, title "Security Dashboard", and a menu icon (hamburger or three dots) for Settings and About.
+  · Status Card (prominent):
+    · Overall risk level: "Low" (green), "Medium" (orange), or "High" (red).
+    · Percentage of apps scanned (e.g., "45 apps analyzed").
+    · Last full scan timestamp.
+    · A "Refresh" button to trigger a new scan.
+  · Quick Stats Cards (horizontal scroll):
+    · Total installed apps.
+    · Number of apps with camera permission.
+    · Number of apps with microphone permission.
+    · Number of apps with location permission.
+    · Number of apps running in background.
+    · Each card shows a count and a small trend icon (if changed since last scan).
+  · Recent Alerts (list):
+    · Title: "Recent Alerts"
+    · Up to 5 most critical alerts (e.g., "Camera used by [App] 2 mins ago", "High-risk app installed: [App]").
+    · Tap on an alert to jump to the relevant app details.
+    · "See all alerts" link at bottom.
+  · Active Apps Section:
+    · Title: "Currently Running Apps"
+    · Horizontal list of app icons with names and a "Live" badge.
+    · Tapping an icon opens the app details.
+  · Bottom Navigation: Dashboard | Apps | Monitor | Settings (explained below).
+
+3.3. Apps List Screen
+
+· Purpose: Browse all installed apps with security insights.
+· Layout:
+  · Search bar at top (filter by name).
+  · Filter/Sort options (icon): sort by name, installation date, risk score, or permission count; filter by system/user apps, or risk level.
+  · App cards (vertical list):
+    · App icon, name, and package name (smaller text).
+    · Risk badge: colored dot (green/low, orange/medium, red/high) and numeric score (e.g., 92/100).
+    · Short permission summary: icons for camera, mic, location, etc., if granted. Overlay a "used recently" indicator (tiny pulse icon) if the permission was used in the last 24h.
+    · "Last used" timestamp (e.g., "Used 2h ago").
+    · On tap: opens App Details screen.
+
+3.4. App Details Screen
+
+· Purpose: Deep dive into a single app's permissions and behavior.
+· Sections (scrollable):
+  1. Header:
+     · Large app icon, name, package name, version.
+     · Overall risk score with colored gauge.
+     · "Uninstall" button (if user app) with confirmation.
+  2. Permission Analysis:
+     · Tabbed view: "Granted" vs "All Permissions".
+     · Each permission item: name (e.g., "Camera"), status (allowed/denied), and a "Used recently" badge if AppOps shows usage within 7 days.
+     · For dangerous permissions: additional context (e.g., "This app can take photos anytime").
+     · A "History" button next to each permission to see usage timeline (opens a small popup graph of accesses over time).
+  3. Behavior Insights:
+     · Background activity: "Ran in background X times in last 24h" (from UsageStats).
+     · Data usage: approximate network usage if available.
+     · Services: list of background services currently or frequently running.
+  4. Risk Factors (list):
+     · e.g., "Has internet + camera: can exfiltrate photos"
+     · "Has accessibility service: can read screen content"
+     · "Targets old Android version: may lack modern security"
+     · "Contains known tracker libraries: [Tracker names]"
+     · Each factor contributes to the risk score.
+  5. Alerts History:
+     · Timeline of events triggered by this app (e.g., "Camera accessed at 2025-03-15 14:32", "Location accessed at ...").
+
+3.5. Real-Time Monitor Screen
+
+· Purpose: Live view of active sensor usage and running apps.
+· Layout:
+  · Live Feed (auto-updating):
+    · Shows a list of recent events in reverse chronological order:
+      · "Camera used by WhatsApp" – timestamp.
+      · "Microphone used by Phone" – timestamp.
+      · "Location accessed by Maps" – timestamp.
+      · "New app installed: TikTok" – timestamp.
+    · Each event can be tapped to see details.
+  · Sensor Status Cards:
+    · Camera: "Currently in use by [App]" or "Idle".
+    · Microphone: similarly.
+    · Location: similarly.
+    · With a colored indicator (red if active, green if idle).
+  · Currently Running Apps Card:
+    · Grid of app icons with names, each with a "Running" badge.
+    · Tapping opens app details.
+  · Toggle recording: A button to start/stop logging events to a file for later review.
+
+3.6. Alerts & Notifications
+
+· Purpose: Centralized list of all security alerts.
+· Access: Via Dashboard's "See all alerts" or dedicated menu.
+· Layout:
+  · Filter by type (all, permission usage, high-risk apps, system changes).
+  · List of alerts with:
+    · Icon (camera, mic, etc.) and color-coded severity.
+    · Title: e.g., "Camera access: Instagram"
+    · Description: e.g., "Instagram used camera in background at 3:45 PM"
+    · Timestamp.
+    · "Dismiss" button (local) or "Ignore app" (add to whitelist).
+  · Option to clear all alerts.
+
+3.7. Settings Screen
+
+· Purpose: Configure app behavior and manage whitelists.
+· Sections:
+  · General:
+    · Theme (Light/Dark/System).
+    · Scan frequency (manual, daily, weekly).
+    · Enable/disable real-time monitoring.
+  · Alert Preferences:
+    · Choose which events trigger notifications (camera, mic, location, new app installs, background activity, etc.).
+    · Notification sound/vibration.
+  · Whitelist:
+    · List of apps excluded from high-risk warnings (e.g., trusted banking apps).
+    · Add/remove apps.
+  · Shizuku Status:
+    · Current status (connected/not connected).
+    · "Test Shizuku" button to verify.
+    · Help link.
+  · Data Management:
+    · Clear history/logs.
+    · Export logs (for tech support).
+  · About:
+    · App version, licenses, contact.
+
+4. Interactive Features
+
+· Pull-to-refresh on Dashboard and Apps List.
+· Long-press on an app card to quickly add to whitelist or view details.
+· Search with auto-suggestions.
+· Share app details as text (for family tech support).
+· Tap on risk score to see breakdown (factors and weights).
+
+5. Data Presentation & Visual Cues
+
+· Risk Score: Circular progress with color coding (green 0-33, orange 34-66, red 67-100). Hover/tap shows numeric value.
+· Permission Usage History: Small bar chart per permission showing accesses per day for the last week.
+· Active Sensor Indicators: Persistent notification (optional) showing if camera/mic is in use, with quick access to stop the app.
+· App Icons: Use adaptive icons; fallback to package default.
+
+6. On-Device Data & Privacy
+
+· All analysis stays on the device—no cloud upload.
+· Logs are stored locally and can be cleared by user.
+· No personal data (contacts, files) is accessed; only app metadata and system stats.
+
+7. Summary of Key Features
+
+· Complete app inventory with permission breakdown.
+· Real-time monitoring of camera, microphone, location usage.
+· Risk scoring based on permission combinations, background behavior, and known trackers.
+· Active app tracking with foreground/background status.
+· Alerts for suspicious activity (e.g., camera use while banking app open).
+· Shizuku-powered deep access to AppOps and system internals.
+· User-friendly interface designed for non-experts.
