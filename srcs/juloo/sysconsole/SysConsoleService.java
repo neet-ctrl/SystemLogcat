@@ -135,6 +135,8 @@ public class SysConsoleService extends Service {
 
     // ── PID cache ─────────────────────────────────────────────────────────────
     private final HashMap<Integer, String> mPidToAppName = new HashMap<>();
+    // Persistent: never cleared — accumulates pid→primaryPackage as processes are seen
+    private final HashMap<Integer, String> mPidToPackage = new HashMap<>();
 
     // ── Core ──────────────────────────────────────────────────────────────────
     private final Handler               mHandler = new Handler(Looper.getMainLooper());
@@ -427,16 +429,22 @@ public class SysConsoleService extends Service {
                     PackageManager pm = getPackageManager();
                     for (ActivityManager.RunningAppProcessInfo proc : procs) {
                         String display = proc.processName;
+                        String primaryPkg = proc.processName;
                         if (proc.pkgList != null && proc.pkgList.length > 0) {
+                            primaryPkg = proc.pkgList[0];
                             try {
                                 ApplicationInfo ai = pm.getApplicationInfo(proc.pkgList[0], 0);
                                 display = pm.getApplicationLabel(ai) + " (" + proc.pkgList[0] + ")";
                             } catch (Exception ignored) {}
                         }
                         map.put(proc.pid, display);
+                        // Persist pid→package so filter still works after process dies
+                        synchronized (mPidToPackage) { mPidToPackage.put(proc.pid, primaryPkg); }
                     }
                 }
                 synchronized (mPidToAppName) { mPidToAppName.clear(); mPidToAppName.putAll(map); }
+                // Refresh adapter so any logs that now have a resolved app name get updated
+                mHandler.post(() -> { if (mAdapter != null) mAdapter.notifyDataSetChanged(); });
             } catch (Exception e) { Log.w(TAG, "PID refresh: " + e.getMessage()); }
         }).start();
         mHandler.postDelayed(this::refreshPidMap, 5000);
@@ -596,16 +604,19 @@ public class SysConsoleService extends Service {
 
     private boolean matchesApkFilter(SysConsoleLog l) {
         if (mApkFilterPackage == null) return true;
-        if (l.source != null) {
-            String src = l.source.toLowerCase(Locale.US);
-            String pkg = mApkFilterPackage.toLowerCase(Locale.US);
-            if (src.contains(pkg) || pkg.contains(src)) return true;
-            String[] segs = mApkFilterPackage.split("\\.");
-            if (segs.length > 0) {
-                String last = segs[segs.length-1].toLowerCase(Locale.US);
-                if (last.length() > 3 && src.contains(last)) return true;
-            }
+        // Primary: exact PID→package match using persistent map
+        int pid = mLogPidMap.get(l.id, -1);
+        if (pid >= 0) {
+            String pkg;
+            synchronized (mPidToPackage) { pkg = mPidToPackage.get(pid); }
+            if (pkg != null && pkg.equalsIgnoreCase(mApkFilterPackage)) return true;
+            // Also check live display name (covers label+package string)
+            String appInfo;
+            synchronized (mPidToAppName) { appInfo = mPidToAppName.get(pid); }
+            if (appInfo != null && appInfo.toLowerCase(Locale.US)
+                    .contains(mApkFilterPackage.toLowerCase(Locale.US))) return true;
         }
+        // Fallback: metadata already resolved the app name at parse time
         if (l.metadata != null && l.metadata.toLowerCase(Locale.US)
                 .contains(mApkFilterPackage.toLowerCase(Locale.US))) return true;
         return false;
@@ -1066,7 +1077,23 @@ public class SysConsoleService extends Service {
             styleBadge(vh.levelBadge,log.level);
             vh.sourceBadge.setText(log.source); vh.timestamp.setText(log.timestamp); vh.message.setText(log.message);
             styleMsg(vh.message,log.level);
-            if(log.metadata!=null&&!log.metadata.isEmpty()){vh.metadata.setVisibility(View.VISIBLE);vh.metadata.setText(log.metadata);}else{vh.metadata.setVisibility(View.GONE);}
+            // Build metadata: start from stored metadata, then append app name if not already there
+            String displayMeta = log.metadata != null ? log.metadata : "";
+            if (!displayMeta.contains("App:")) {
+                int pidForLog = mLogPidMap.get(log.id, -1);
+                if (pidForLog >= 0) {
+                    String appInfo;
+                    synchronized (mPidToAppName) { appInfo = mPidToAppName.get(pidForLog); }
+                    if (appInfo == null) {
+                        synchronized (mPidToPackage) { appInfo = mPidToPackage.get(pidForLog); }
+                    }
+                    if (appInfo != null) {
+                        displayMeta = displayMeta.isEmpty() ? "App: " + appInfo : displayMeta + "\nApp: " + appInfo;
+                    }
+                }
+            }
+            if (!displayMeta.isEmpty()) { vh.metadata.setVisibility(View.VISIBLE); vh.metadata.setText(displayMeta); }
+            else { vh.metadata.setVisibility(View.GONE); }
             setItemBg(cv2,log.level,sel);
             if(mSelectionMode){vh.selIndicator.setVisibility(View.VISIBLE);vh.selIndicator.setText(sel?"\u2713":"");vh.selIndicator.setTextColor(0xFFFFFFFF);vh.selIndicator.setBackgroundResource(sel?R.drawable.dev_console_check_checked:R.drawable.dev_console_check_unchecked);}else{vh.selIndicator.setVisibility(View.GONE);}
             vh.copySingle.setVisibility(mSelectionMode?View.GONE:View.VISIBLE);
