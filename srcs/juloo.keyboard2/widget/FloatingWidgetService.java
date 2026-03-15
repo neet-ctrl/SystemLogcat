@@ -26,8 +26,8 @@ public class FloatingWidgetService extends Service {
     private WindowManager              windowManager;
     private View                       floatingView;
     private WindowManager.LayoutParams params;
-    private View                       collapsedView;
-    private View                       expandedView;
+    private View                       collapsedView;   // the single circle icon
+    private View                       expandedView;    // the full panel
 
     @Override
     public IBinder onBind(Intent intent) { return null; }
@@ -48,6 +48,7 @@ public class FloatingWidgetService extends Service {
         android.util.DisplayMetrics metrics = new android.util.DisplayMetrics();
         windowManager.getDefaultDisplay().getMetrics(metrics);
 
+        // Start expanded showing the full clipboard panel
         params = new WindowManager.LayoutParams(
                 WindowManager.LayoutParams.MATCH_PARENT,
                 500,
@@ -67,41 +68,34 @@ public class FloatingWidgetService extends Service {
         setupResize();
     }
 
-    // ── Button wiring ────────────────────────────────────────────────────────
+    // ── Buttons ──────────────────────────────────────────────────────────────
 
     private void setupButtons() {
-        // ── Collapsed state: clipboard button → expand clipboard panel ────────
-        View btnClipboard = floatingView.findViewById(R.id.btn_collapsed_clipboard);
-        if (btnClipboard != null) {
-            btnClipboard.setOnClickListener(v -> expandClipboard());
+        // Collapsed icon → expand the clipboard panel
+        if (collapsedView != null) {
+            collapsedView.setOnClickListener(v -> expand());
         }
 
-        // ── Collapsed state: DevConsole button → launch DevConsoleService ─────
-        View btnConsoleCollapsed = floatingView.findViewById(R.id.btn_collapsed_console);
-        if (btnConsoleCollapsed != null) {
-            btnConsoleCollapsed.setOnClickListener(v -> launchDevConsole());
+        // Expanded header: iv_collapse → shrink to circle icon
+        ImageView ivCollapse = floatingView.findViewById(R.id.iv_collapse);
+        if (ivCollapse != null) {
+            ivCollapse.setOnClickListener(v -> collapse());
         }
 
-        // ── Expanded header: DevConsole button ────────────────────────────────
-        View btnConsoleExpanded = floatingView.findViewById(R.id.btn_open_console);
-        if (btnConsoleExpanded != null) {
-            btnConsoleExpanded.setOnClickListener(v -> launchDevConsole());
+        // Expanded header: close button → dismiss widget entirely
+        Button btnClose = floatingView.findViewById(R.id.btn_close);
+        if (btnClose != null) {
+            btnClose.setOnClickListener(v -> stopSelf());
         }
 
-        // ── Expanded header: collapse (minimize to icon row) ──────────────────
-        ImageView collapseBtn = floatingView.findViewById(R.id.iv_collapse);
-        if (collapseBtn != null) {
-            collapseBtn.setOnClickListener(v -> collapseToIcon());
-        }
-
-        // ── Expanded header: close (dismiss widget entirely) ──────────────────
-        Button closeBtn = floatingView.findViewById(R.id.btn_close);
-        if (closeBtn != null) {
-            closeBtn.setOnClickListener(v -> stopSelf());
+        // Expanded header: Dev Console button → launch DevConsoleService
+        View btnConsole = floatingView.findViewById(R.id.btn_open_console);
+        if (btnConsole != null) {
+            btnConsole.setOnClickListener(v -> launchDevConsole());
         }
     }
 
-    private void expandClipboard() {
+    private void expand() {
         collapsedView.setVisibility(View.GONE);
         expandedView.setVisibility(View.VISIBLE);
         params.width  = WindowManager.LayoutParams.MATCH_PARENT;
@@ -109,7 +103,7 @@ public class FloatingWidgetService extends Service {
         windowManager.updateViewLayout(floatingView, params);
     }
 
-    private void collapseToIcon() {
+    private void collapse() {
         expandedView.setVisibility(View.GONE);
         collapsedView.setVisibility(View.VISIBLE);
         params.width  = WindowManager.LayoutParams.WRAP_CONTENT;
@@ -117,7 +111,6 @@ public class FloatingWidgetService extends Service {
         windowManager.updateViewLayout(floatingView, params);
     }
 
-    /** Start the floating DevConsoleService overlay */
     private void launchDevConsole() {
         juloo.keyboard2.devconsole.DevConsoleHelper.show(this);
     }
@@ -128,9 +121,9 @@ public class FloatingWidgetService extends Service {
         ListView listView = floatingView.findViewById(R.id.clip_list);
         if (listView == null) return;
         updateFloatingList();
-        ClipboardHistoryService service = ClipboardHistoryService.get_service(this);
-        if (service != null) {
-            service.set_on_clipboard_history_change(() -> {
+        ClipboardHistoryService svc = ClipboardHistoryService.get_service(this);
+        if (svc != null) {
+            svc.set_on_clipboard_history_change(() -> {
                 if (floatingView != null) floatingView.post(this::updateFloatingList);
             });
         }
@@ -153,7 +146,7 @@ public class FloatingWidgetService extends Service {
                 text.setText(item);
                 text.setMaxLines(2);
                 text.setEllipsize(android.text.TextUtils.TruncateAt.END);
-                view.findViewById(R.id.btn_copy).setOnClickListener(v ->
+                view.findViewById(R.id.btn_copy).setOnClickListener(vv ->
                         ClipboardHistoryService.copyToClipboard(getContext(), item));
                 return view;
             }
@@ -167,21 +160,19 @@ public class FloatingWidgetService extends Service {
 
     private void setupDrag() {
         floatingView.setOnTouchListener(new View.OnTouchListener() {
-            private int   initialX, initialY;
-            private float initialTouchX, initialTouchY;
+            private int   ix, iy;
+            private float tx, ty;
 
             @Override
             public boolean onTouch(View v, MotionEvent event) {
                 switch (event.getAction()) {
                     case MotionEvent.ACTION_DOWN:
-                        initialX      = params.x;
-                        initialY      = params.y;
-                        initialTouchX = event.getRawX();
-                        initialTouchY = event.getRawY();
+                        ix = params.x; iy = params.y;
+                        tx = event.getRawX(); ty = event.getRawY();
                         return true;
                     case MotionEvent.ACTION_MOVE:
-                        params.x = initialX + (int)(event.getRawX() - initialTouchX);
-                        params.y = initialY + (int)(event.getRawY() - initialTouchY);
+                        params.x = ix + (int)(event.getRawX() - tx);
+                        params.y = iy + (int)(event.getRawY() - ty);
                         windowManager.updateViewLayout(floatingView, params);
                         return true;
                 }
@@ -196,26 +187,25 @@ public class FloatingWidgetService extends Service {
         View resizeHandle = floatingView.findViewById(R.id.iv_resize);
         if (resizeHandle == null) return;
         resizeHandle.setOnTouchListener(new View.OnTouchListener() {
-            private int   initialWidth, initialHeight;
-            private float initialTouchX, initialTouchY;
+            private int   iw, ih;
+            private float tx, ty;
 
             @Override
             public boolean onTouch(View v, MotionEvent event) {
                 switch (event.getAction()) {
                     case MotionEvent.ACTION_DOWN:
-                        initialWidth = params.width == WindowManager.LayoutParams.MATCH_PARENT
+                        iw = (params.width == WindowManager.LayoutParams.MATCH_PARENT)
                                 ? floatingView.getWidth() : params.width;
-                        initialHeight  = params.height;
-                        initialTouchX  = event.getRawX();
-                        initialTouchY  = event.getRawY();
+                        ih = params.height;
+                        tx = event.getRawX(); ty = event.getRawY();
                         return true;
                     case MotionEvent.ACTION_MOVE:
                         android.util.DisplayMetrics dm = new android.util.DisplayMetrics();
                         windowManager.getDefaultDisplay().getMetrics(dm);
                         params.width  = Math.max(300, Math.min(
-                                initialWidth  + (int)(event.getRawX() - initialTouchX), dm.widthPixels));
+                                iw + (int)(event.getRawX() - tx), dm.widthPixels));
                         params.height = Math.max(200,
-                                initialHeight + (int)(event.getRawY() - initialTouchY));
+                                ih + (int)(event.getRawY() - ty));
                         windowManager.updateViewLayout(floatingView, params);
                         return true;
                 }
@@ -223,8 +213,6 @@ public class FloatingWidgetService extends Service {
             }
         });
     }
-
-    // ── Destroy ──────────────────────────────────────────────────────────────
 
     @Override
     public void onDestroy() {

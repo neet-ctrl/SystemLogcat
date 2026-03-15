@@ -1,59 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Root must be match_parent so the ListView with layout_weight=1 gets proper height -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="wrap_content"
-    android:layout_height="wrap_content">
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
 
-    <!--
-        Collapsed view: two small floating buttons side by side.
-        Left  = Clipboard History (existing)
-        Right = Developer Console (new)
-    -->
-    <LinearLayout
+    <!-- Collapsed view: single circular icon (original behaviour restored) -->
+    <ImageView
         android:id="@+id/collapse_view"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:src="@drawable/ic_launcher_foreground"
+        android:background="@drawable/doc_anim_circle"
         android:visibility="gone"
-        android:background="@drawable/bg_rounded_card"
-        android:elevation="8dp"
-        android:padding="4dp">
+        android:contentDescription="Expand Clipboard History"/>
 
-        <!-- Clipboard button -->
-        <ImageView
-            android:id="@+id/btn_collapsed_clipboard"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:src="@drawable/ic_launcher_foreground"
-            android:background="@drawable/doc_anim_circle"
-            android:contentDescription="Open Clipboard History"
-            android:padding="4dp"
-            android:layout_marginEnd="4dp"/>
-
-        <!-- Dev Console button -->
-        <TextView
-            android:id="@+id/btn_collapsed_console"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:text="🔧"
-            android:textSize="22sp"
-            android:gravity="center"
-            android:background="@drawable/dev_console_dot_btn"
-            android:contentDescription="Open Developer Console"
-            android:padding="4dp"/>
-
-    </LinearLayout>
-
-    <!-- Expanded clipboard panel (unchanged) -->
+    <!-- Expanded view: full clipboard panel -->
     <LinearLayout
         android:id="@+id/expanded_container"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="match_parent"
         android:orientation="vertical"
         android:background="@drawable/bg_rounded_card"
         android:elevation="8dp"
         android:padding="12dp">
 
-        <!-- Header row -->
+        <!-- Header row: title + DevConsole button + collapse + close -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -70,7 +41,7 @@
                 android:textColor="#333333"
                 android:textStyle="bold"/>
 
-            <!-- Open Dev Console button (inside expanded header) -->
+            <!-- Dev Console button in header (same as in the fixed widget) -->
             <TextView
                 android:id="@+id/btn_open_console"
                 android:layout_width="36dp"
@@ -104,6 +75,7 @@
 
         </LinearLayout>
 
+        <!-- Clip list fills remaining space -->
         <ListView
             android:id="@+id/clip_list"
             android:layout_width="match_parent"
@@ -112,6 +84,7 @@
             android:divider="@android:color/transparent"
             android:dividerHeight="8dp"/>
 
+        <!-- Resize handle -->
         <ImageView
             android:id="@+id/iv_resize"
             android:layout_width="40dp"
