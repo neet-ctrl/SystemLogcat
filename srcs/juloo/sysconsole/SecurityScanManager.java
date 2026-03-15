@@ -10,12 +10,18 @@ import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ServiceInfo;
 import android.os.Build;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.FileWriter;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 /**
  * Master security scan engine.
@@ -42,9 +48,12 @@ public class SecurityScanManager {
     private List<DeviceSecurityHelper.ElevatedApp> mElevatedApps = new ArrayList<>();
     private long                                mLastScanTime   = 0;
 
+    private static final String CACHE_FILE = "scan_cache.json";
+
     public SecurityScanManager(Context context) {
         this.ctx = context.getApplicationContext();
         this.pm  = ctx.getPackageManager();
+        loadFromCache();
     }
 
     public interface ScanCallback {
@@ -59,6 +68,7 @@ public class SecurityScanManager {
             mCachedApps   = results;
             mCachedAlerts = alerts;
             mLastScanTime = System.currentTimeMillis();
+            saveToCache();
             if (cb != null) cb.onComplete(results, alerts);
         }).start();
     }
@@ -718,5 +728,195 @@ public class SecurityScanManager {
 
     private static void progress(ScanCallback cb, int current, int total, String phase) {
         if (cb != null) cb.onProgress(current, total, phase);
+    }
+
+    // ── Persistence (JSON file in filesDir) ───────────────────────────────────
+
+    private void saveToCache() {
+        try {
+            JSONObject root = new JSONObject();
+            root.put("ts", mLastScanTime);
+
+            JSONArray jApps = new JSONArray();
+            for (AppSecurityInfo a : mCachedApps) jApps.put(appToJson(a));
+            root.put("apps", jApps);
+
+            JSONArray jAlerts = new JSONArray();
+            for (SecurityAlert al : mCachedAlerts) jAlerts.put(alertToJson(al));
+            root.put("alerts", jAlerts);
+
+            File f = new File(ctx.getFilesDir(), CACHE_FILE);
+            FileWriter fw = new FileWriter(f);
+            fw.write(root.toString());
+            fw.close();
+        } catch (Exception ignored) {}
+    }
+
+    private void loadFromCache() {
+        try {
+            File f = new File(ctx.getFilesDir(), CACHE_FILE);
+            if (!f.exists()) return;
+
+            StringBuilder sb = new StringBuilder();
+            BufferedReader br = new BufferedReader(new FileReader(f));
+            String line;
+            while ((line = br.readLine()) != null) sb.append(line);
+            br.close();
+
+            JSONObject root = new JSONObject(sb.toString());
+            mLastScanTime = root.optLong("ts", 0);
+
+            JSONArray jApps = root.optJSONArray("apps");
+            if (jApps != null) {
+                List<AppSecurityInfo> apps = new ArrayList<>();
+                for (int i = 0; i < jApps.length(); i++) {
+                    try { apps.add(jsonToApp(jApps.getJSONObject(i))); }
+                    catch (Exception ignored) {}
+                }
+                mCachedApps = apps;
+            }
+
+            JSONArray jAlerts = root.optJSONArray("alerts");
+            if (jAlerts != null) {
+                List<SecurityAlert> alerts = new ArrayList<>();
+                for (int i = 0; i < jAlerts.length(); i++) {
+                    try { alerts.add(jsonToAlert(jAlerts.getJSONObject(i))); }
+                    catch (Exception ignored) {}
+                }
+                mCachedAlerts = alerts;
+            }
+        } catch (Exception ignored) {}
+    }
+
+    private JSONObject appToJson(AppSecurityInfo a) throws Exception {
+        JSONObject o = new JSONObject();
+        o.put("pkg",      a.packageName);
+        o.put("name",     a.appName     != null ? a.appName     : "");
+        o.put("ver",      a.versionName != null ? a.versionName : "");
+        o.put("verCode",  a.versionCode);
+        o.put("sys",      a.isSystemApp);
+        o.put("install",  a.installTime);
+        o.put("lastUsed", a.lastUsed);
+        o.put("bgRuns",   a.backgroundRunCount);
+        o.put("bgTime",   a.backgroundTimeMs);
+        o.put("netBytes", a.networkBytesTotal);
+        o.put("running",  a.isRunning);
+        o.put("hasCamera",    a.hasCamera);
+        o.put("hasMic",       a.hasMicrophone);
+        o.put("hasLoc",       a.hasLocation);
+        o.put("hasContacts",  a.hasContacts);
+        o.put("hasStorage",   a.hasStorage);
+        o.put("hasSms",       a.hasSms);
+        o.put("hasPhone",     a.hasPhone);
+        o.put("hasCal",       a.hasCalendar);
+        o.put("hasBodSens",   a.hasBodySensors);
+        o.put("hasAccess",    a.hasAccessibility);
+        o.put("hasNet",       a.hasInternet);
+        o.put("hasOverlay",   a.hasOverlay);
+        o.put("hasVpn",       a.hasVpn);
+        o.put("hasNotif",     a.hasNotificationAccess);
+        o.put("hasMedia",     a.hasReadMediaImages);
+        o.put("hasOutCall",   a.hasProcessOutgoingCalls);
+        o.put("hasBoot",      a.hasBootReceiver);
+        o.put("camRecent",    a.cameraUsedRecently);
+        o.put("micRecent",    a.micUsedRecently);
+        o.put("locRecent",    a.locationUsedRecently);
+        o.put("isAdmin",      a.isDeviceAdmin);
+        o.put("isAccSvc",     a.isAccessibilityService);
+        o.put("isNotifLsn",   a.isNotificationListener);
+        o.put("isVpnSvc",     a.isVpnService);
+        o.put("threat",       a.threatLevel);
+        o.put("threatLabel",  a.threatLabel  != null ? a.threatLabel  : "");
+        o.put("threatReason", a.threatReason != null ? a.threatReason : "");
+        o.put("isSpy",        a.isSuspectedSpyware);
+        o.put("isBank",       a.isBankingApp);
+        o.put("isBankRisk",   a.isBankingRisk);
+        o.put("riskScore",    a.riskScore);
+        o.put("riskLevel",    a.riskLevel);
+        JSONArray factors = new JSONArray();
+        for (String s : a.riskFactors) factors.put(s);
+        o.put("factors", factors);
+        JSONArray granted = new JSONArray();
+        for (String s : a.grantedPermissions) granted.put(s);
+        o.put("granted", granted);
+        return o;
+    }
+
+    private AppSecurityInfo jsonToApp(JSONObject o) throws Exception {
+        AppSecurityInfo a = new AppSecurityInfo();
+        a.packageName    = o.optString("pkg");
+        a.appName        = o.optString("name");
+        a.versionName    = o.optString("ver");
+        a.versionCode    = o.optInt("verCode");
+        a.isSystemApp    = o.optBoolean("sys");
+        a.installTime    = o.optLong("install");
+        a.lastUsed       = o.optLong("lastUsed");
+        a.backgroundRunCount = o.optInt("bgRuns");
+        a.backgroundTimeMs   = o.optLong("bgTime");
+        a.networkBytesTotal  = o.optLong("netBytes");
+        a.isRunning           = o.optBoolean("running");
+        a.hasCamera           = o.optBoolean("hasCamera");
+        a.hasMicrophone       = o.optBoolean("hasMic");
+        a.hasLocation         = o.optBoolean("hasLoc");
+        a.hasContacts         = o.optBoolean("hasContacts");
+        a.hasStorage          = o.optBoolean("hasStorage");
+        a.hasSms              = o.optBoolean("hasSms");
+        a.hasPhone            = o.optBoolean("hasPhone");
+        a.hasCalendar         = o.optBoolean("hasCal");
+        a.hasBodySensors      = o.optBoolean("hasBodSens");
+        a.hasAccessibility    = o.optBoolean("hasAccess");
+        a.hasInternet         = o.optBoolean("hasNet");
+        a.hasOverlay          = o.optBoolean("hasOverlay");
+        a.hasVpn              = o.optBoolean("hasVpn");
+        a.hasNotificationAccess   = o.optBoolean("hasNotif");
+        a.hasReadMediaImages      = o.optBoolean("hasMedia");
+        a.hasProcessOutgoingCalls = o.optBoolean("hasOutCall");
+        a.hasBootReceiver         = o.optBoolean("hasBoot");
+        a.cameraUsedRecently      = o.optBoolean("camRecent");
+        a.micUsedRecently         = o.optBoolean("micRecent");
+        a.locationUsedRecently    = o.optBoolean("locRecent");
+        a.isDeviceAdmin           = o.optBoolean("isAdmin");
+        a.isAccessibilityService  = o.optBoolean("isAccSvc");
+        a.isNotificationListener  = o.optBoolean("isNotifLsn");
+        a.isVpnService            = o.optBoolean("isVpnSvc");
+        a.threatLevel    = o.optInt("threat");
+        a.threatLabel    = o.optString("threatLabel");
+        a.threatReason   = o.optString("threatReason");
+        a.isSuspectedSpyware = o.optBoolean("isSpy");
+        a.isBankingApp       = o.optBoolean("isBank");
+        a.isBankingRisk      = o.optBoolean("isBankRisk");
+        a.riskScore  = o.optInt("riskScore");
+        a.riskLevel  = o.optInt("riskLevel");
+        JSONArray factors = o.optJSONArray("factors");
+        if (factors != null)
+            for (int i = 0; i < factors.length(); i++) a.riskFactors.add(factors.getString(i));
+        JSONArray granted = o.optJSONArray("granted");
+        if (granted != null)
+            for (int i = 0; i < granted.length(); i++) a.grantedPermissions.add(granted.getString(i));
+        try { a.icon = pm.getApplicationIcon(a.packageName); } catch (Exception ignored) {}
+        return a;
+    }
+
+    private JSONObject alertToJson(SecurityAlert al) throws Exception {
+        JSONObject o = new JSONObject();
+        o.put("type",  al.type);
+        o.put("sev",   al.severity);
+        o.put("title", al.title      != null ? al.title       : "");
+        o.put("desc",  al.description != null ? al.description : "");
+        o.put("pkg",   al.packageName != null ? al.packageName : "");
+        o.put("app",   al.appName    != null ? al.appName     : "");
+        o.put("ts",    al.timestamp);
+        o.put("dis",   al.dismissed);
+        return o;
+    }
+
+    private SecurityAlert jsonToAlert(JSONObject o) throws Exception {
+        SecurityAlert al = new SecurityAlert(
+                o.optInt("type"), o.optInt("sev"),
+                o.optString("title"), o.optString("desc"),
+                o.optString("pkg"),   o.optString("app"),
+                o.optLong("ts"));
+        al.dismissed = o.optBoolean("dis");
+        return al;
     }
 }
