@@ -4,6 +4,7 @@ import android.content.pm.PackageManager;
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 import rikka.shizuku.Shizuku;
@@ -16,10 +17,16 @@ import rikka.shizuku.Shizuku;
  *   - dumpsys appops — all app operation states
  *   - dumpsys activity processes — foreground/background service info
  *   - cmd package list packages — with disabled/enabled state
+ *
+ * Note: newProcess() is called via reflection to handle API-level visibility
+ * differences across Shizuku versions (13.x marks it private/package-private).
  */
 public class ShizukuCommandHelper {
 
     private static final int TIMEOUT_MS = 8000;
+
+    // Cached reflected method so we only look it up once
+    private static Method sNewProcessMethod = null;
 
     public static boolean isAvailable() {
         try {
@@ -31,13 +38,28 @@ public class ShizukuCommandHelper {
     }
 
     /**
+     * Spawns a privileged process via Shizuku using reflection.
+     * Shizuku.newProcess() is private in some 13.x builds so getDeclaredMethod +
+     * setAccessible is the only reliable way to call it without a compile error.
+     */
+    private static Process spawnProcess(String[] args) throws Exception {
+        if (sNewProcessMethod == null) {
+            Method m = Shizuku.class.getDeclaredMethod(
+                    "newProcess", String[].class, String[].class, String.class);
+            m.setAccessible(true);
+            sNewProcessMethod = m;
+        }
+        return (Process) sNewProcessMethod.invoke(null, args, null, null);
+    }
+
+    /**
      * Run a privileged shell command and return its stdout as a single string.
      * Returns empty string on failure.
      */
     public static String run(String... args) {
         if (!isAvailable()) return "";
         try {
-            Process process = Shizuku.newProcess(args, null, null);
+            Process process = spawnProcess(args);
             StringBuilder sb = new StringBuilder();
             try (InputStream is = process.getInputStream();
                  BufferedReader br = new BufferedReader(new InputStreamReader(is))) {

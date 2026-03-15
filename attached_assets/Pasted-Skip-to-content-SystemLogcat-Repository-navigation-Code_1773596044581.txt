@@ -1,0 +1,92 @@
+Skip to content
+SystemLogcat
+Repository navigation
+Code
+Issues
+Actions
+Make Apk CI
+Integrate security audit features into the main build workflow #13
+Annotations
+1 error and 1 warning
+Build-Apk
+failed now in 39s
+3s
+0s
+1s
+1s
+3s
+28s
+
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run_2-1773595961947.json
+FAILURE: Build failed with an exception.
+
+[Incubating] Problems report is available at: file:///home/runner/work/SystemLogcat/SystemLogcat/build/reports/problems/problems-report.html
+
+* What went wrong:
+Execution failed for task ':compileDebugJavaWithJavac'.
+> Compilation failed; see the compiler output below.
+  Note: Recompile with -Xlint:deprecation for details.
+  /home/runner/work/SystemLogcat/SystemLogcat/srcs/juloo/sysconsole/SecurityScanManager.java:490: error: cannot find symbol
+                  AppOpsManager.OP_CAMERA,
+                               ^
+    symbol:   variable OP_CAMERA
+    location: class AppOpsManager
+  /home/runner/work/SystemLogcat/SystemLogcat/srcs/juloo/sysconsole/SecurityScanManager.java:491: error: cannot find symbol
+                  AppOpsManager.OP_RECORD_AUDIO,
+                               ^
+    symbol:   variable OP_RECORD_AUDIO
+    location: class AppOpsManager
+  /home/runner/work/SystemLogcat/SystemLogcat/srcs/juloo/sysconsole/SecurityScanManager.java:492: error: cannot find symbol
+                  AppOpsManager.OP_FINE_LOCATION
+                               ^
+    symbol:   variable OP_FINE_LOCATION
+    location: class AppOpsManager
+  /home/runner/work/SystemLogcat/SystemLogcat/srcs/juloo/sysconsole/SecurityScanManager.java:500: error: cannot find symbol
+21 actionable tasks: 21 executed
+                          List<AppOpsManager.PackageOps> pkgOps =
+                                            ^
+    symbol:   class PackageOps
+    location: class AppOpsManager
+  /home/runner/work/SystemLogcat/SystemLogcat/srcs/juloo/sysconsole/SecurityScanManager.java:503: error: cannot find symbol
+                          for (AppOpsManager.PackageOps po : pkgOps) {
+                                            ^
+    symbol:   class PackageOps
+    location: class AppOpsManager
+  /home/runner/work/SystemLogcat/SystemLogcat/srcs/juloo/sysconsole/SecurityScanManager.java:505: error: cannot find symbol
+                              for (AppOpsManager.OpEntry oe : po.getOps()) {
+                                                ^
+    symbol:   class OpEntry
+    location: class AppOpsManager
+  /home/runner/work/SystemLogcat/SystemLogcat/srcs/juloo/sysconsole/SecurityScanManager.java:508: error: cannot find symbol
+                                                  AppOpsManager.OP_FLAG_SELF |
+                                                               ^
+    symbol:   variable OP_FLAG_SELF
+    location: class AppOpsManager
+  /home/runner/work/SystemLogcat/SystemLogcat/srcs/juloo/sysconsole/SecurityScanManager.java:509: error: cannot find symbol
+                                                  AppOpsManager.OP_FLAG_TRUSTED_PROXIED)
+                                                               ^
+    symbol:   variable OP_FLAG_TRUSTED_PROXIED
+    location: class AppOpsManager
+  /home/runner/work/SystemLogcat/SystemLogcat/srcs/juloo/sysconsole/ShizukuCommandHelper.java:40: error: newProcess(String[],String[],String) has private access in Shizuku
+              Process process = Shizuku.newProcess(args, null, null);
+                                       ^
+  Note: Some input files use or override a deprecated API.
+  /home/runner/work/SystemLogcat/SystemLogcat/srcs/juloo/sysconsole/SecurityScanManager.java:501: error: cannot find symbol
+                                  aom.getPackagesForOps(new int[]{opsToCheck[i]});
+                                     ^
+    symbol:   method getPackagesForOps(int[])
+    location: variable aom of type AppOpsManager
+  10 errors
+
+* Try:
+> Check your code and dependencies to fix the compilation error(s)
+> Run with --scan to get full insights.
+
+BUILD FAILED in 27s
+Error: Process completed with exit code 1.
+0s
+0s
+1s
+0s
+0s
+0s

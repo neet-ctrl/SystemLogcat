@@ -10,6 +10,7 @@ import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ServiceInfo;
 import android.os.Build;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -477,7 +478,14 @@ public class SecurityScanManager {
     }
 
     /**
-     * Standard AppOps query — works for our own UID without special permissions.
+     * Standard AppOps query using reflection to access the hidden API
+     * (getPackagesForOps, PackageOps, OpEntry are all @hide in the SDK).
+     *
+     * OP integer constants (stable across API 21-35):
+     *   OP_FINE_LOCATION  = 1
+     *   OP_CAMERA         = 26
+     *   OP_RECORD_AUDIO   = 27
+     *   OP_READ_CLIPBOARD = 29
      */
     private Map<String, int[]> getAppOpsData() {
         Map<String, int[]> map = new HashMap<>();
@@ -485,38 +493,69 @@ public class SecurityScanManager {
             AppOpsManager aom = (AppOpsManager)
                     ctx.getSystemService(Context.APP_OPS_SERVICE);
             if (aom == null) return map;
+
             long weekAgo = System.currentTimeMillis() - 7L * 24 * 3600 * 1000;
-            int[] opsToCheck = {
-                AppOpsManager.OP_CAMERA,
-                AppOpsManager.OP_RECORD_AUDIO,
-                AppOpsManager.OP_FINE_LOCATION
-            };
-            List<PackageInfo> pkgs = pm.getInstalledPackages(0);
-            for (PackageInfo pi : pkgs) {
-                if (pi.applicationInfo == null) continue;
-                int[] results = new int[4];
-                for (int i = 0; i < opsToCheck.length; i++) {
-                    try {
-                        List<AppOpsManager.PackageOps> pkgOps =
-                                aom.getPackagesForOps(new int[]{opsToCheck[i]});
-                        if (pkgOps == null) continue;
-                        for (AppOpsManager.PackageOps po : pkgOps) {
-                            if (!po.getPackageName().equals(pi.packageName)) continue;
-                            for (AppOpsManager.OpEntry oe : po.getOps()) {
-                                long lastAccess = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
-                                        ? oe.getLastAccessTime(
-                                                AppOpsManager.OP_FLAG_SELF |
-                                                AppOpsManager.OP_FLAG_TRUSTED_PROXIED)
-                                        : oe.getTime();
-                                if (lastAccess > weekAgo) results[i] = 1;
+
+            // Hidden ops — use raw int values (stable in AOSP since API 19)
+            // Index: 0=camera, 1=mic, 2=location, 3=clipboard
+            int[] opsToCheck = { 26, 27, 1, 29 };
+
+            // Reflect: AppOpsManager.getPackagesForOps(int[])
+            Method getPackagesForOps = AppOpsManager.class.getDeclaredMethod(
+                    "getPackagesForOps", int[].class);
+            getPackagesForOps.setAccessible(true);
+
+            for (int opIdx = 0; opIdx < opsToCheck.length; opIdx++) {
+                try {
+                    Object rawList = getPackagesForOps.invoke(
+                            aom, new int[]{ opsToCheck[opIdx] });
+                    if (!(rawList instanceof List)) continue;
+
+                    for (Object packageOps : (List<?>) rawList) {
+                        // PackageOps.getPackageName()
+                        String pkg = (String) packageOps.getClass()
+                                .getMethod("getPackageName").invoke(packageOps);
+
+                        // PackageOps.getOps() → List<OpEntry>
+                        Object opsList = packageOps.getClass()
+                                .getMethod("getOps").invoke(packageOps);
+                        if (!(opsList instanceof List)) continue;
+
+                        for (Object opEntry : (List<?>) opsList) {
+                            long lastAccess = getOpLastAccess(opEntry);
+                            if (lastAccess > weekAgo) {
+                                int[] results = map.containsKey(pkg)
+                                        ? map.get(pkg) : new int[4];
+                                if (opIdx < results.length) results[opIdx] = 1;
+                                map.put(pkg, results);
                             }
                         }
-                    } catch (Exception ignored) {}
-                }
-                map.put(pi.packageName, results);
+                    }
+                } catch (Exception ignored) {}
             }
         } catch (Exception ignored) {}
         return map;
+    }
+
+    /**
+     * Extract last-access timestamp from a reflected OpEntry object.
+     * Tries the API-29+ getLastAccessTime(int flags) first, then
+     * falls back to the older no-arg getTime().
+     */
+    private static long getOpLastAccess(Object opEntry) {
+        try {
+            // API 29+: getLastAccessTime(int flags)  — flags 0xF = all sources
+            Method getLastAccessTime = opEntry.getClass()
+                    .getMethod("getLastAccessTime", int.class);
+            return (long) getLastAccessTime.invoke(opEntry, 0xF);
+        } catch (Exception e1) {
+            try {
+                // Pre-API-29: getTime()
+                return (long) opEntry.getClass().getMethod("getTime").invoke(opEntry);
+            } catch (Exception e2) {
+                return 0L;
+            }
+        }
     }
 
     /**
