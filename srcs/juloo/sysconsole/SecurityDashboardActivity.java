@@ -53,7 +53,12 @@ public class SecurityDashboardActivity extends Activity {
     private TextView     mScanPercentText;
     private ProgressBar  mScanProgress;
 
-    private final Handler mHandler = new Handler(Looper.getMainLooper());
+    private final Handler  mHandler           = new Handler(Looper.getMainLooper());
+    private boolean        mIsScanRunning     = false;
+    private Runnable       mBgScanRunnable;
+
+    private static final long BG_POLL_MS          = 10 * 60_000L;       // 10 min silent
+    private static final long FULL_SCAN_INTERVAL_MS = 24 * 3600_000L;   // 24 h overlay
 
     @Override
     protected void onCreate(Bundle s) {
@@ -64,14 +69,35 @@ public class SecurityDashboardActivity extends Activity {
         registerInstallReceiver();
         loadCachedData();
         if (mMgr.getCachedApps().isEmpty()) {
-            // Auto-scan on first open so the user immediately sees data
+            // First-ever launch → auto deep scan with overlay
             mHandler.postDelayed(this::startScan, 400);
         }
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        // Restart 10-minute silent background polling whenever screen is visible
+        startBackgroundPolling();
+        // If 24 h have passed since last scan, run a full overlay scan
+        if (!mMgr.getCachedApps().isEmpty()) {
+            long elapsed = System.currentTimeMillis() - mMgr.getLastScanTime();
+            if (elapsed >= FULL_SCAN_INTERVAL_MS) {
+                mHandler.postDelayed(this::startScan, 1500);
+            }
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        stopBackgroundPolling();
+    }
+
+    @Override
     protected void onDestroy() {
         super.onDestroy();
+        stopBackgroundPolling();
         try { unregisterReceiver(mInstallReceiver); } catch (Exception ignored) {}
     }
 
@@ -588,7 +614,52 @@ public class SecurityDashboardActivity extends Activity {
 
     // ── Scan ──────────────────────────────────────────────────────────────────
 
+    // ── Background silent polling (every 10 min) ──────────────────────────────
+
+    private void startBackgroundPolling() {
+        if (mBgScanRunnable != null) return;
+        mBgScanRunnable = new Runnable() {
+            @Override public void run() {
+                startSilentScan();
+                mHandler.postDelayed(this, BG_POLL_MS);
+            }
+        };
+        mHandler.postDelayed(mBgScanRunnable, BG_POLL_MS);
+    }
+
+    private void stopBackgroundPolling() {
+        if (mBgScanRunnable != null) {
+            mHandler.removeCallbacks(mBgScanRunnable);
+            mBgScanRunnable = null;
+        }
+    }
+
+    /**
+     * Silent scan: runs in background every 10 min.
+     * No overlay is shown. Data is preserved until new scan finishes.
+     */
+    private void startSilentScan() {
+        if (mIsScanRunning) return;
+        mIsScanRunning = true;
+        mMgr.scanAsync(new SecurityScanManager.ScanCallback() {
+            @Override public void onProgress(int c, int t, String p) {}
+            @Override public void onComplete(List<AppSecurityInfo> apps,
+                                              List<SecurityAlert> alerts) {
+                mIsScanRunning = false;
+                if (!apps.isEmpty())
+                    mHandler.post(() -> refreshWithData(apps, alerts));
+            }
+        });
+    }
+
+    /**
+     * Full overlay scan: shown on first launch and every 24 hours.
+     * Displays progress overlay; old data is kept until scan finishes.
+     */
     private void startScan() {
+        if (mIsScanRunning) return;
+        mIsScanRunning = true;
+
         mScanOverlay.setVisibility(View.VISIBLE);
         if (mScanPhaseText    != null) mScanPhaseText.setText("Initializing…");
         if (mScanProgress     != null) mScanProgress.setProgress(0);
@@ -606,15 +677,17 @@ public class SecurityDashboardActivity extends Activity {
             }
             @Override
             public void onComplete(List<AppSecurityInfo> apps, List<SecurityAlert> alerts) {
+                mIsScanRunning = false;
                 mHandler.post(() -> {
                     if (mScanProgress    != null) mScanProgress.setProgress(100);
                     if (mScanPercentText != null) mScanPercentText.setText("  100%");
+                    // Hold at 100% briefly then dismiss
                     mHandler.postDelayed(() -> {
                         mScanOverlay.setVisibility(View.GONE);
-                        if (mTvLastScan != null) mTvLastScan.setTextColor(
-                                SecurityUiHelper.CLR_SECONDARY);
-                        refreshWithData(apps, alerts);
-                    }, 400);
+                        if (mTvLastScan != null)
+                            mTvLastScan.setTextColor(SecurityUiHelper.CLR_SECONDARY);
+                        if (!apps.isEmpty()) refreshWithData(apps, alerts);
+                    }, 500);
                 });
             }
         });
