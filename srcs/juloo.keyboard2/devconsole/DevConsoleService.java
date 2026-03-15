@@ -92,14 +92,17 @@ public class DevConsoleService extends Service {
     private View     mEmptyState;
     private TextView mBtnScrollTop;
     private TextView mBtnScrollBottom;
+    private TextView mBtnFilter;
 
     // ── State ────────────────────────────────────────────────────────────────
-    private final List<DevConsoleLog> mLogs        = new ArrayList<>();
+    private final List<DevConsoleLog> mAllLogs     = new ArrayList<>(); // master (unfiltered)
+    private final List<DevConsoleLog> mLogs        = new ArrayList<>(); // filtered display list
     private final Set<Integer>        mSelectedIds = new HashSet<>();
     private LogAdapter                mAdapter;
     private boolean                   mSelectionMode = false;
     private boolean                   mShowingLogcat = false;
     private boolean                   mIsConnected   = false;
+    private String                    mFilterLevel   = "ALL"; // current level filter
 
     // ── Core ─────────────────────────────────────────────────────────────────
     private final Handler            mHandler = new Handler(Looper.getMainLooper());
@@ -112,15 +115,15 @@ public class DevConsoleService extends Service {
                 public void onNewLog(DevConsoleLog log, boolean isLogcat) {
                     if (isLogcat != mShowingLogcat) return;
                     mHandler.post(() -> {
-                        mLogs.add(0, log);
-                        if (mLogs.size() > 1000) mLogs.remove(mLogs.size() - 1);
-                        refreshAdapter();
+                        mAllLogs.add(0, log);
+                        if (mAllLogs.size() > 1000) mAllLogs.remove(mAllLogs.size() - 1);
+                        applyFilter();
                     });
                 }
 
                 @Override
                 public void onLogsCleared() {
-                    mHandler.post(() -> { mLogs.clear(); refreshAdapter(); });
+                    mHandler.post(() -> { mAllLogs.clear(); mLogs.clear(); refreshAdapter(); });
                 }
             };
 
@@ -210,6 +213,7 @@ public class DevConsoleService extends Service {
         mEmptyState     = mRoot.findViewById(R.id.empty_state);
         mBtnScrollTop   = mRoot.findViewById(R.id.btn_scroll_top);
         mBtnScrollBottom = mRoot.findViewById(R.id.btn_scroll_bottom);
+        mBtnFilter      = mRoot.findViewById(R.id.btn_filter);
 
         mAdapter = new LogAdapter();
         mLogList.setAdapter(mAdapter);
@@ -236,6 +240,7 @@ public class DevConsoleService extends Service {
         mBtnMaximize.setOnClickListener(v -> toggleMaximize());
         mBtnClose.setOnClickListener(v -> stopSelf());
         mBtnToggleSource.setOnClickListener(v -> toggleSource());
+        mBtnFilter.setOnClickListener(v -> showFilterDialog());
 
         mBtnSelectAll.setOnClickListener(v -> selectAllLogs());
         mBtnClearSelection.setOnClickListener(v -> clearSelection());
@@ -369,12 +374,65 @@ public class DevConsoleService extends Service {
     // ══════════════════════════════════════════════════════════════════════════
 
     private void loadCurrentSource() {
-        mLogs.clear();
+        mAllLogs.clear();
         List<DevConsoleLog> src = mShowingLogcat
                 ? mManager.getLogcatLogs()
                 : mManager.getAppLogs();
-        mLogs.addAll(src);
+        mAllLogs.addAll(src);
+        applyFilter();
+    }
+
+    private void applyFilter() {
+        mLogs.clear();
+        if ("ALL".equals(mFilterLevel)) {
+            mLogs.addAll(mAllLogs);
+        } else {
+            for (DevConsoleLog l : mAllLogs) {
+                if (mFilterLevel.equalsIgnoreCase(l.level)) mLogs.add(l);
+            }
+        }
         refreshAdapter();
+        updateFilterButton();
+    }
+
+    private void updateFilterButton() {
+        if (mBtnFilter == null) return;
+        if ("ALL".equals(mFilterLevel)) {
+            mBtnFilter.setText("\u22a1 ALL");
+            mBtnFilter.setTextColor(0xFF374151);
+        } else {
+            mBtnFilter.setText("\u22a1 " + mFilterLevel);
+            switch (mFilterLevel.toUpperCase()) {
+                case "ERROR": mBtnFilter.setTextColor(0xFFEF4444); break;
+                case "WARN":  mBtnFilter.setTextColor(0xFFD97706); break;
+                case "INFO":  mBtnFilter.setTextColor(0xFF2563EB); break;
+                case "DEBUG": mBtnFilter.setTextColor(0xFF6B7280); break;
+                default:      mBtnFilter.setTextColor(0xFF374151); break;
+            }
+        }
+    }
+
+    private void showFilterDialog() {
+        final String[] levels = {"ALL", "ERROR", "WARN", "INFO", "DEBUG", "LOG"};
+        int current = 0;
+        for (int i = 0; i < levels.length; i++) {
+            if (levels[i].equals(mFilterLevel)) { current = i; break; }
+        }
+
+        AlertDialog.Builder b = dialogBuilder();
+        b.setTitle("Filter Logs by Level");
+        b.setSingleChoiceItems(levels, current, null);
+        b.setPositiveButton("Apply", (d, w) -> {
+            int sel = ((AlertDialog) d).getListView().getCheckedItemPosition();
+            if (sel >= 0 && sel < levels.length) {
+                mFilterLevel = levels[sel];
+                applyFilter();
+                toast("Filter: " + mFilterLevel + " \u2014 showing "
+                        + mLogs.size() + " of " + mAllLogs.size() + " logs");
+            }
+        });
+        b.setNegativeButton("Cancel", null);
+        show(b);
     }
 
     private void refreshAdapter() {
@@ -396,7 +454,8 @@ public class DevConsoleService extends Service {
         else if (mShowingLogcat)    state = "Capturing";
         else if (mIsConnected)      state = "Live";
         else                        state = "Disconnected";
-        mTvStatusInfo.setText(mLogs.size() + " logs \u2022 " + state);
+        String filterTag = "ALL".equals(mFilterLevel) ? "" : " \u00b7 " + mFilterLevel;
+        mTvStatusInfo.setText(mLogs.size() + " logs \u2022 " + state + filterTag);
     }
 
     private void updateConnectionDot() {
@@ -754,10 +813,10 @@ public class DevConsoleService extends Service {
                 mIsConnected = false;
                 updateConnectionDot();
 
-                mLogs.clear();
-                mLogs.addAll(logs);
-                Collections.reverse(mLogs);
-                refreshAdapter();
+                mAllLogs.clear();
+                mAllLogs.addAll(logs);
+                Collections.reverse(mAllLogs);
+                applyFilter();
                 toast("Logs Loaded (Paused) \u2014 Loaded \"" + col.name + "\" with " + logs.size() + " entries. Tap \u25B6 to resume.");
             });
         }).start();

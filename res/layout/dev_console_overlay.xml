@@ -8,172 +8,211 @@
     android:elevation="16dp">
 
     <!-- ════════════════════════════════════════════════════════════
-         HEADER BAR  (matches React CardHeader)
-         Left: dot + title + server/browser toggle + status
-         Right: action buttons
+         HEADER  — split into two rows so every button is reachable
+         on small / narrow screens by scrolling the button row.
+         Row 1 : connection dot · title · source toggle · status text
+         Row 2 : HorizontalScrollView → all action buttons
          ════════════════════════════════════════════════════════════ -->
     <LinearLayout
         android:id="@+id/console_header"
         android:layout_width="match_parent"
-        android:layout_height="44dp"
+        android:layout_height="wrap_content"
         android:background="#F5F5F5"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:paddingStart="8dp"
-        android:paddingEnd="4dp">
+        android:orientation="vertical">
 
-        <!-- Connection status dot -->
-        <View
-            android:id="@+id/connection_dot"
-            android:layout_width="8dp"
-            android:layout_height="8dp"
-            android:background="@drawable/dev_console_dot"
-            android:layout_marginEnd="6dp"/>
+        <!-- ── Row 1 : identity / status ─────────────────────────── -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="34dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp">
 
-        <!-- Title -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Enhanced Console"
-            android:textColor="#111827"
-            android:textSize="12sp"
-            android:textStyle="bold"
-            android:layout_marginEnd="6dp"/>
+            <!-- Connection status dot -->
+            <View
+                android:id="@+id/connection_dot"
+                android:layout_width="8dp"
+                android:layout_height="8dp"
+                android:background="@drawable/dev_console_dot"
+                android:layout_marginEnd="6dp"/>
 
-        <!-- Server / Browser toggle -->
-        <TextView
-            android:id="@+id/btn_toggle_source"
-            android:layout_width="wrap_content"
-            android:layout_height="24dp"
-            android:text="⬛ Server"
-            android:textSize="10sp"
-            android:textColor="#374151"
-            android:background="@drawable/dev_console_badge_outline"
-            android:paddingStart="6dp"
-            android:paddingEnd="6dp"
-            android:gravity="center"
-            android:layout_marginEnd="6dp"/>
+            <!-- Title -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Enhanced Console"
+                android:textColor="#111827"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:layout_marginEnd="6dp"/>
 
-        <!-- Status text "N logs • Live" -->
-        <TextView
-            android:id="@+id/tv_status_info"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="0 logs • Live"
-            android:textColor="#6B7280"
-            android:textSize="10sp"
-            android:ellipsize="end"
-            android:maxLines="1"/>
+            <!-- Server / Logcat toggle -->
+            <TextView
+                android:id="@+id/btn_toggle_source"
+                android:layout_width="wrap_content"
+                android:layout_height="24dp"
+                android:text="⬛ Server"
+                android:textSize="10sp"
+                android:textColor="#374151"
+                android:background="@drawable/dev_console_badge_outline"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp"
+                android:gravity="center"
+                android:layout_marginEnd="6dp"/>
 
-        <!-- Selection badge (hidden by default) -->
-        <TextView
-            android:id="@+id/tv_selection_badge"
-            android:layout_width="wrap_content"
-            android:layout_height="20dp"
-            android:text="0 selected"
-            android:textSize="9sp"
-            android:textColor="#1D4ED8"
-            android:background="@drawable/dev_console_badge_blue"
-            android:paddingStart="6dp"
-            android:paddingEnd="6dp"
-            android:gravity="center"
-            android:visibility="gone"
-            android:layout_marginEnd="4dp"/>
+            <!-- Status text "N logs • Live" -->
+            <TextView
+                android:id="@+id/tv_status_info"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="0 logs • Live"
+                android:textColor="#6B7280"
+                android:textSize="10sp"
+                android:ellipsize="end"
+                android:maxLines="1"/>
 
-        <!-- Action buttons: Pause -->
-        <TextView
-            android:id="@+id/btn_pause"
-            android:layout_width="30dp"
-            android:layout_height="30dp"
-            android:text="⏸"
-            android:textSize="14sp"
-            android:textColor="#374151"
-            android:gravity="center"
-            android:background="@drawable/dev_console_icon_btn"/>
+            <!-- Selection badge (hidden by default) -->
+            <TextView
+                android:id="@+id/tv_selection_badge"
+                android:layout_width="wrap_content"
+                android:layout_height="20dp"
+                android:text="0 selected"
+                android:textSize="9sp"
+                android:textColor="#1D4ED8"
+                android:background="@drawable/dev_console_badge_blue"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp"
+                android:gravity="center"
+                android:visibility="gone"/>
 
-        <!-- Refresh -->
-        <TextView
-            android:id="@+id/btn_refresh"
-            android:layout_width="30dp"
-            android:layout_height="30dp"
-            android:text="↺"
-            android:textSize="15sp"
-            android:textColor="#374151"
-            android:gravity="center"
-            android:background="@drawable/dev_console_icon_btn"/>
+        </LinearLayout>
 
-        <!-- Errors / Warnings -->
-        <TextView
-            android:id="@+id/btn_errors"
-            android:layout_width="30dp"
-            android:layout_height="30dp"
-            android:text="⚠"
-            android:textSize="14sp"
-            android:textColor="#6B7280"
-            android:gravity="center"
-            android:background="@drawable/dev_console_icon_btn"/>
+        <!-- ── Row 2 : scrollable action buttons ─────────────────── -->
+        <HorizontalScrollView
+            android:layout_width="match_parent"
+            android:layout_height="36dp"
+            android:scrollbars="none"
+            android:fillViewport="false"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp">
 
-        <!-- Copy -->
-        <TextView
-            android:id="@+id/btn_copy"
-            android:layout_width="30dp"
-            android:layout_height="30dp"
-            android:text="⎘"
-            android:textSize="15sp"
-            android:textColor="#374151"
-            android:gravity="center"
-            android:background="@drawable/dev_console_icon_btn"/>
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
 
-        <!-- Save (Archive) -->
-        <TextView
-            android:id="@+id/btn_save"
-            android:layout_width="30dp"
-            android:layout_height="30dp"
-            android:text="🗄"
-            android:textSize="13sp"
-            android:textColor="#374151"
-            android:gravity="center"
-            android:background="@drawable/dev_console_icon_btn"/>
+                <!-- Filter button  (⊡ ALL — changes label when active) -->
+                <TextView
+                    android:id="@+id/btn_filter"
+                    android:layout_width="wrap_content"
+                    android:layout_height="28dp"
+                    android:text="⊡ ALL"
+                    android:textSize="9sp"
+                    android:textColor="#374151"
+                    android:background="@drawable/dev_console_badge_outline"
+                    android:paddingStart="6dp"
+                    android:paddingEnd="6dp"
+                    android:gravity="center"
+                    android:layout_marginEnd="2dp"/>
 
-        <!-- Saved Logs (Clock) -->
-        <TextView
-            android:id="@+id/btn_saved"
-            android:layout_width="30dp"
-            android:layout_height="30dp"
-            android:text="🕐"
-            android:textSize="13sp"
-            android:textColor="#374151"
-            android:gravity="center"
-            android:background="@drawable/dev_console_icon_btn"/>
+                <!-- Pause / Resume -->
+                <TextView
+                    android:id="@+id/btn_pause"
+                    android:layout_width="30dp"
+                    android:layout_height="30dp"
+                    android:text="⏸"
+                    android:textSize="14sp"
+                    android:textColor="#374151"
+                    android:gravity="center"
+                    android:background="@drawable/dev_console_icon_btn"/>
 
-        <!-- Maximize -->
-        <TextView
-            android:id="@+id/btn_maximize"
-            android:layout_width="30dp"
-            android:layout_height="30dp"
-            android:text="⤢"
-            android:textSize="14sp"
-            android:textColor="#374151"
-            android:gravity="center"
-            android:background="@drawable/dev_console_icon_btn"/>
+                <!-- Refresh -->
+                <TextView
+                    android:id="@+id/btn_refresh"
+                    android:layout_width="30dp"
+                    android:layout_height="30dp"
+                    android:text="↺"
+                    android:textSize="15sp"
+                    android:textColor="#374151"
+                    android:gravity="center"
+                    android:background="@drawable/dev_console_icon_btn"/>
 
-        <!-- Close -->
-        <TextView
-            android:id="@+id/btn_close"
-            android:layout_width="30dp"
-            android:layout_height="30dp"
-            android:text="✕"
-            android:textSize="14sp"
-            android:textColor="#374151"
-            android:gravity="center"
-            android:background="@drawable/dev_console_icon_btn"/>
+                <!-- Errors / Warnings -->
+                <TextView
+                    android:id="@+id/btn_errors"
+                    android:layout_width="30dp"
+                    android:layout_height="30dp"
+                    android:text="⚠"
+                    android:textSize="14sp"
+                    android:textColor="#6B7280"
+                    android:gravity="center"
+                    android:background="@drawable/dev_console_icon_btn"/>
+
+                <!-- Copy -->
+                <TextView
+                    android:id="@+id/btn_copy"
+                    android:layout_width="30dp"
+                    android:layout_height="30dp"
+                    android:text="⎘"
+                    android:textSize="15sp"
+                    android:textColor="#374151"
+                    android:gravity="center"
+                    android:background="@drawable/dev_console_icon_btn"/>
+
+                <!-- Save (Archive) -->
+                <TextView
+                    android:id="@+id/btn_save"
+                    android:layout_width="30dp"
+                    android:layout_height="30dp"
+                    android:text="🗄"
+                    android:textSize="13sp"
+                    android:textColor="#374151"
+                    android:gravity="center"
+                    android:background="@drawable/dev_console_icon_btn"/>
+
+                <!-- Saved Logs (Clock) -->
+                <TextView
+                    android:id="@+id/btn_saved"
+                    android:layout_width="30dp"
+                    android:layout_height="30dp"
+                    android:text="🕐"
+                    android:textSize="13sp"
+                    android:textColor="#374151"
+                    android:gravity="center"
+                    android:background="@drawable/dev_console_icon_btn"/>
+
+                <!-- Maximize / Restore -->
+                <TextView
+                    android:id="@+id/btn_maximize"
+                    android:layout_width="30dp"
+                    android:layout_height="30dp"
+                    android:text="⤢"
+                    android:textSize="14sp"
+                    android:textColor="#374151"
+                    android:gravity="center"
+                    android:background="@drawable/dev_console_icon_btn"/>
+
+                <!-- Close -->
+                <TextView
+                    android:id="@+id/btn_close"
+                    android:layout_width="30dp"
+                    android:layout_height="30dp"
+                    android:text="✕"
+                    android:textSize="14sp"
+                    android:textColor="#374151"
+                    android:gravity="center"
+                    android:background="@drawable/dev_console_icon_btn"/>
+
+            </LinearLayout>
+        </HorizontalScrollView>
 
     </LinearLayout>
 
     <!-- ════════════════════════════════════════════════════════════
-         SELECTION MODE BAR  (matches React selection controls bar)
-         Shown only when isSelectionMode = true
+         SELECTION MODE BAR
          ════════════════════════════════════════════════════════════ -->
     <LinearLayout
         android:id="@+id/selection_bar"
@@ -247,7 +286,7 @@
         android:background="#E5E7EB"/>
 
     <!-- ════════════════════════════════════════════════════════════
-         LOG AREA  (matches React CardContent)
+         LOG AREA
          ════════════════════════════════════════════════════════════ -->
     <RelativeLayout
         android:layout_width="match_parent"
@@ -294,7 +333,7 @@
 
         </LinearLayout>
 
-        <!-- Scroll to top/bottom buttons (top-right overlay, matches React) -->
+        <!-- Scroll to top/bottom buttons (top-right overlay) -->
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
