@@ -20,6 +20,7 @@
     <EditText android:id="@+id/launcher_tryhere_area" style="@style/paragraph" android:inputType="text" android:hint="@string/launcher_tryhere_hint" android:importantForAutofill="no"/>
     <Button android:id="@+id/btn_clipboard_history" style="@style/paragraph" android:text="Open Clipboard History" android:layout_width="wrap_content" android:layout_gravity="center"/>
     <Button android:id="@+id/btn_typing_master" style="@style/paragraph" android:text="Typing Master (Open-Typer)" android:layout_width="wrap_content" android:layout_gravity="center"/>
+    <Button android:id="@+id/btn_dev_console" style="@style/paragraph" android:text="Open Dev Console" android:layout_width="wrap_content" android:layout_gravity="center"/>
     <TextView style="@style/paragraph" android:text="@string/launcher_sourcecode"/>
     <TextView style="@style/paragraph" android:text="@string/launcher_repo_url" android:autoLink="web" android:linksClickable="true"/>
   </LinearLayout>

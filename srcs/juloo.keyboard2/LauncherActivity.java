@@ -20,9 +20,9 @@ import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.os.Build;
-import android.provider.Settings;
 import java.util.ArrayList;
 import java.util.List;
+import juloo.keyboard2.devconsole.DevConsoleHelper;
 
 public class LauncherActivity extends Activity implements Handler.Callback
 {
@@ -57,6 +57,10 @@ public class LauncherActivity extends Activity implements Handler.Callback
             Intent intent = new Intent(this, TypingMasterActivity.class);
             startActivity(intent);
         });
+    }
+    View btnDevConsole = findViewById(R.id.btn_dev_console);
+    if (btnDevConsole != null) {
+        btnDevConsole.setOnClickListener(v -> DevConsoleHelper.show(this));
     }
 
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {

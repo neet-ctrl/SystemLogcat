@@ -33,11 +33,7 @@ public final class DevConsoleHelper {
         }
         Intent intent = new Intent(context, DevConsoleService.class);
         intent.setAction(DevConsoleService.ACTION_SHOW);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            context.startForegroundService(intent);
-        } else {
-            context.startService(intent);
-        }
+        context.startService(intent);
     }
 
     public static void hide(Context context) {
