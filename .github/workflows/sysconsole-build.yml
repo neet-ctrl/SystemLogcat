@@ -149,6 +149,7 @@ jobs:
           "srcs/juloo/sysconsole/AppSecurityInfo.java"
           "srcs/juloo/sysconsole/SecurityAlert.java"
           "srcs/juloo/sysconsole/SecurityUiHelper.java"
+          "srcs/juloo/sysconsole/ScheduledScanReceiver.java"
         )
         ALL_OK=true
         for f in "${FILES[@]}"; do
