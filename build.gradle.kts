@@ -19,7 +19,7 @@ android {
 
   defaultConfig {
     applicationId = "juloo.keyboard2"
-    minSdk = 21
+    minSdk = 23
     targetSdk { version = release(35) }
     versionCode = 50
     versionName = "1.32.1"

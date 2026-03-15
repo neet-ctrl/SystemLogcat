@@ -1,0 +1,63 @@
+Skip to content
+SystemLogcat
+Repository navigation
+Code
+Issues
+Actions
+Make Apk CI
+Add system-wide console functionality with Shizuku integration #1
+Annotations
+1 error and 1 warning
+Build-Apk
+failed 1 minute ago in 1m 23s
+3s
+2s
+0s
+0s
+2s
+1m 8s
+> Task :checkDebugAarMetadata
+> Task :createDebugCompatibleScreenManifests
+> Task :extractDeepLinksDebug
+> Task :compileDebugNavigationResources
+> Task :mergeDebugShaders
+
+> Task :processDebugMainManifest FAILED
+
+See https://developer.android.com/r/studio-ui/build/manifest-merger for more information about the manifest merger.
+
+/home/runner/work/SystemLogcat/SystemLogcat/AndroidManifest.xml Error:
+	uses-sdk:minSdkVersion 21 cannot be smaller than version 23 declared in library [dev.rikka.shizuku:provider:13.1.5] /home/runner/.gradle/caches/8.14.3/transforms/1266534db15662fdf6f62b153cdec227/transformed/provider-13.1.5/AndroidManifest.xml as the library might be using APIs not available in 21
+	Suggestion: use a compatible library with a minSdk of at most 21,
+		or increase this project's minSdk version to at least 23,
+		or use tools:overrideLibrary="rikka.shizuku.provider" to force usage (may lead to runtime failures)
+
+> Task :packageDebugResources
+> Task :mergeDebugResources
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run_2-1773570036020.json
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+16 actionable tasks: 16 executed
+Configuration cache entry stored.
+Execution failed for task ':processDebugMainManifest'.
+> Manifest merger failed : uses-sdk:minSdkVersion 21 cannot be smaller than version 23 declared in library [dev.rikka.shizuku:provider:13.1.5] /home/runner/.gradle/caches/8.14.3/transforms/1266534db15662fdf6f62b153cdec227/transformed/provider-13.1.5/AndroidManifest.xml as the library might be using APIs not available in 21
+  	Suggestion: use a compatible library with a minSdk of at most 21,
+  		or increase this project's minSdk version to at least 23,
+  		or use tools:overrideLibrary="rikka.shizuku.provider" to force usage (may lead to runtime failures)
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 1m 8s
+Error: Process completed with exit code 1.
+0s
+0s
+6s
+1s
+0s
+0s
