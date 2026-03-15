@@ -738,17 +738,27 @@ public class SecurityScanManager {
             root.put("ts", mLastScanTime);
 
             JSONArray jApps = new JSONArray();
-            for (AppSecurityInfo a : mCachedApps) jApps.put(appToJson(a));
+            for (AppSecurityInfo a : mCachedApps) {
+                try { jApps.put(appToJson(a)); } catch (Exception ignored) {}
+            }
             root.put("apps", jApps);
 
             JSONArray jAlerts = new JSONArray();
-            for (SecurityAlert al : mCachedAlerts) jAlerts.put(alertToJson(al));
+            for (SecurityAlert al : mCachedAlerts) {
+                try { jAlerts.put(alertToJson(al)); } catch (Exception ignored) {}
+            }
             root.put("alerts", jAlerts);
 
-            File f = new File(ctx.getFilesDir(), CACHE_FILE);
-            FileWriter fw = new FileWriter(f);
-            fw.write(root.toString());
+            String json = root.toString();
+            File dir = ctx.getFilesDir();
+            if (dir == null) return;
+            File tmp = new File(dir, CACHE_FILE + ".tmp");
+            File dest = new File(dir, CACHE_FILE);
+            FileWriter fw = new FileWriter(tmp);
+            fw.write(json);
+            fw.flush();
             fw.close();
+            tmp.renameTo(dest);
         } catch (Exception ignored) {}
     }
 
@@ -821,6 +831,7 @@ public class SecurityScanManager {
         o.put("camRecent",    a.cameraUsedRecently);
         o.put("micRecent",    a.micUsedRecently);
         o.put("locRecent",    a.locationUsedRecently);
+        o.put("clipRecent",   a.clipboardUsedRecently);
         o.put("isAdmin",      a.isDeviceAdmin);
         o.put("isAccSvc",     a.isAccessibilityService);
         o.put("isNotifLsn",   a.isNotificationListener);
@@ -875,6 +886,7 @@ public class SecurityScanManager {
         a.cameraUsedRecently      = o.optBoolean("camRecent");
         a.micUsedRecently         = o.optBoolean("micRecent");
         a.locationUsedRecently    = o.optBoolean("locRecent");
+        a.clipboardUsedRecently   = o.optBoolean("clipRecent");
         a.isDeviceAdmin           = o.optBoolean("isAdmin");
         a.isAccessibilityService  = o.optBoolean("isAccSvc");
         a.isNotificationListener  = o.optBoolean("isNotifLsn");

@@ -126,6 +126,14 @@ public class SecurityUiHelper {
         return v;
     }
 
+    /** Fixed-width spacer for use inside horizontal LinearLayouts. */
+    public View hspacer(int dp) {
+        View v = new View(ctx);
+        v.setLayoutParams(new LinearLayout.LayoutParams(dp(dp),
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+        return v;
+    }
+
     public LinearLayout statCard(String value, String labelText, int accentColor) {
         LinearLayout c = new LinearLayout(ctx);
         c.setOrientation(LinearLayout.VERTICAL);

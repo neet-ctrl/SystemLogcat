@@ -802,7 +802,7 @@ public class SecurityDashboardActivity extends Activity {
         row.addView(textCol);
 
         row.addView(mUi.badge(SpyDetectionEngine.threatLevelName(a.threatLevel),
-                color & 0x33FFFFFF | 0xFF000000, color, 20));
+                color & 0x33FFFFFF, color, 20));
         return row;
     }
 
@@ -845,7 +845,7 @@ public class SecurityDashboardActivity extends Activity {
         row.addView(textCol);
 
         row.addView(mUi.badge(ea.privilege.split(" ")[0],
-                ea.riskColor & 0x33FFFFFF | 0xFF000000, ea.riskColor, 20));
+                ea.riskColor & 0x33FFFFFF, ea.riskColor, 20));
         return row;
     }
 

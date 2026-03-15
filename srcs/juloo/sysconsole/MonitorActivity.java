@@ -1,6 +1,7 @@
 package juloo.sysconsole;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.os.Handler;
@@ -8,6 +9,7 @@ import android.os.Looper;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
+import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -203,9 +205,15 @@ public class MonitorActivity extends Activity {
         section.setOrientation(LinearLayout.VERTICAL);
         section.addView(mUi.sectionHeader("CURRENTLY RUNNING APPS"));
 
+        HorizontalScrollView hsv = new HorizontalScrollView(this);
+        hsv.setHorizontalScrollBarEnabled(false);
+
         mRunningContainer = new LinearLayout(this);
         mRunningContainer.setOrientation(LinearLayout.HORIZONTAL);
-        section.addView(mRunningContainer);
+        mRunningContainer.setPadding(0, mUi.dp(4), mUi.dp(8), mUi.dp(4));
+
+        hsv.addView(mRunningContainer);
+        section.addView(hsv);
         return section;
     }
 
@@ -294,9 +302,17 @@ public class MonitorActivity extends Activity {
         chip.addView(tvName);
 
         chip.addView(mUi.spacer(3));
-        View liveBadge = mUi.badge("Live", SecurityUiHelper.CLR_TEAL & 0x33FFFFFF | 0xFF000000,
+        View liveBadge = mUi.badge("Live", SecurityUiHelper.CLR_TEAL & 0x33FFFFFF,
                 SecurityUiHelper.CLR_TEAL, 20);
         chip.addView(liveBadge);
+
+        chip.setClickable(true);
+        chip.setFocusable(true);
+        chip.setOnClickListener(v -> {
+            Intent i = new Intent(this, AppDetailsActivity.class);
+            i.putExtra(AppDetailsActivity.EXTRA_PKG, a.packageName);
+            startActivity(i);
+        });
 
         return chip;
     }
@@ -556,8 +572,17 @@ public class MonitorActivity extends Activity {
         tvName.setGravity(Gravity.CENTER);
         chip.addView(tvName);
         chip.addView(mUi.spacer(3));
-        chip.addView(mUi.badge("Svc", SecurityUiHelper.CLR_TEAL & 0x33FFFFFF | 0xFF000000,
+        chip.addView(mUi.badge("Svc", SecurityUiHelper.CLR_TEAL & 0x33FFFFFF,
                 SecurityUiHelper.CLR_TEAL, 20));
+
+        final String finalPkg = pkg;
+        chip.setClickable(true);
+        chip.setFocusable(true);
+        chip.setOnClickListener(v -> {
+            Intent i = new Intent(this, AppDetailsActivity.class);
+            i.putExtra(AppDetailsActivity.EXTRA_PKG, finalPkg);
+            startActivity(i);
+        });
         return chip;
     }
 

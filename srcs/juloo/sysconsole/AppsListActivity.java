@@ -386,11 +386,11 @@ public class AppsListActivity extends Activity {
         tvName.setMaxLines(1);
         nameRow.addView(tvName);
         if (app.isRunning) {
-            nameRow.addView(mUi.spacer(5));
+            nameRow.addView(mUi.hspacer(5));
             nameRow.addView(mUi.badge("● Live", 0x22009900, SecurityUiHelper.CLR_GREEN, 18));
         }
         if (app.isSuspectedSpyware) {
-            nameRow.addView(mUi.spacer(4));
+            nameRow.addView(mUi.hspacer(4));
             nameRow.addView(mUi.badge("⚠ SPYWARE", 0x33E63946, SecurityUiHelper.CLR_RED, 18));
         }
         nameCol.addView(nameRow);
@@ -410,7 +410,7 @@ public class AppsListActivity extends Activity {
 
         int riskColor = app.riskColor();
         rightCol.addView(mUi.badge(app.riskLevelLabel().toUpperCase(),
-                riskColor & 0x33FFFFFF | 0xFF000000, riskColor, 20));
+                riskColor & 0x33FFFFFF, riskColor, 20));
         rightCol.addView(mUi.spacer(3));
 
         TextView tvScore = mUi.label(app.riskScore + "/100", 10f, riskColor, true);
@@ -639,7 +639,7 @@ public class AppsListActivity extends Activity {
             }
             int gc = isGranted ? SecurityUiHelper.CLR_GREEN : 0xFF64748B;
             badgeCol.addView(mUi.badge(isGranted ? "Granted" : "Denied",
-                    gc & 0x33FFFFFF | 0xFF000000, gc, 18));
+                    gc & 0x33FFFFFF, gc, 18));
         } else {
             badgeCol.addView(mUi.badge("Requested", 0x33FF9F1C,
                     SecurityUiHelper.CLR_ORANGE, 18));
@@ -680,7 +680,7 @@ public class AppsListActivity extends Activity {
             boolean dangerous = isDangerous(perm);
             int dotColor = dangerous ? SecurityUiHelper.CLR_ORANGE : SecurityUiHelper.CLR_GREEN;
             row.addView(mUi.colorDot(dotColor, 5));
-            row.addView(mUi.spacer(8));
+            row.addView(mUi.hspacer(8));
 
             String shortPerm = perm.startsWith("android.permission.")
                     ? perm.substring("android.permission.".length()) : perm;
@@ -730,7 +730,7 @@ public class AppsListActivity extends Activity {
                     || factor.toLowerCase().contains("exfiltrate");
             int dotColor = critical ? SecurityUiHelper.CLR_RED : SecurityUiHelper.CLR_ORANGE;
             row.addView(mUi.colorDot(dotColor, 6));
-            row.addView(mUi.spacer(8));
+            row.addView(mUi.hspacer(8));
 
             TextView tv = mUi.label(factor, 11f, SecurityUiHelper.CLR_TEXT, false);
             tv.setLayoutParams(new LinearLayout.LayoutParams(
@@ -849,7 +849,7 @@ public class AppsListActivity extends Activity {
             startActivity(i);
         });
         row.addView(details);
-        row.addView(mUi.spacer(8));
+        row.addView(mUi.hspacer(8));
 
         // Uninstall (user apps only)
         if (!app.isSystemApp) {
@@ -866,7 +866,7 @@ public class AppsListActivity extends Activity {
                     .setNegativeButton("Cancel", null)
                     .show());
             row.addView(uninstall);
-            row.addView(mUi.spacer(8));
+            row.addView(mUi.hspacer(8));
         }
 
         // Open system app info

@@ -152,7 +152,7 @@ public class AlertsActivity extends Activity {
 
         LinearLayout typeRow = mUi.row(true);
         View typeBadge = mUi.badge(alert.typeLabel(),
-                alert.severityColor() & 0x33FFFFFF | (alert.severityColor() & 0xFF000000),
+                alert.severityColor() & 0x33FFFFFF,
                 alert.severityColor(), 20);
         typeRow.addView(typeBadge);
 
