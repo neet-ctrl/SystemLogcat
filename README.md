@@ -1,22 +1,28 @@
 # System Console — devConsole App
 
-A floating, device-wide logcat viewer for Android, powered by [Shizuku](https://shizuku.rikka.app/).
+A floating, device-wide logcat viewer and family security auditor for Android, powered by [Shizuku](https://shizuku.rikka.app/).
 
 ---
 
 ## What it does
 
-System Console runs as a floating overlay window that you can drag, resize, and collapse into a small icon while using any other app. It streams live logcat output from the entire Android system (or filtered to a specific app), lets you search and filter logs by severity level or package, copy entries to the clipboard, save collections to an on-device database, and export them as PDF files.
+System Console has two major modes:
+
+1. **Floating Logcat Console** — A draggable, resizable overlay window that streams live logcat output from every process on the device. Filter by app, severity level, or search term. Copy, save, and export logs as PDF.
+
+2. **Family Security Auditor** — A full security dashboard that scans every installed APK for risk factors, detects spyware and stalkerware, analyzes banking-app threats, monitors live sensor access (camera, mic, location), and lets you uninstall suspicious apps directly via Shizuku — no root required.
 
 ---
 
 ## Features
 
+### Floating Console
+
 | Feature | Details |
 |---|---|
 | **Live logcat stream** | Uses Shizuku to run `logcat -v threadtime` with elevated privileges, giving access to every process on the device |
 | **Floating overlay** | Draggable, resizable window; collapses to a 56 dp icon that snaps to the screen edge |
-| **App filter with search** | Tap the `📦 APP` button, then type in the search bar to instantly filter the installed app list |
+| **App filter with search** | Tap `📦 APP`, then type to instantly filter the installed app list |
 | **Level filter** | Filter logs by ALL / ERROR / WARN / INFO / DEBUG / LOG |
 | **Selection mode** | Long-press any log entry to enter selection mode; select individual entries or all at once, then copy |
 | **Save collections** | Save the current log view with a custom name; stored in SQLite on-device |
@@ -27,6 +33,27 @@ System Console runs as a floating overlay window that you can drag, resize, and 
 | **Refresh** | Restart the logcat process and clear all buffered logs |
 | **System / App toggle** | Switch between device-wide system logs and this app's own logs |
 | **Copy options** | Copy all logs, copy a range by index, or copy individually selected entries |
+
+### Family Security Auditor
+
+| Feature | Details |
+|---|---|
+| **Security Dashboard** | Overview card showing total apps scanned, high-risk count, active alerts, and last scan time |
+| **App Security Tab** | Lists every installed APK fetched live via PackageManager + Shizuku — no pre-scan required |
+| **Risk scoring** | Each app is scored 0–100 based on permission combos, privilege escalation, sensor usage, and network behavior |
+| **Permission tags** | Each app row shows colour-coded tags: CAM, MIC, LOC, SMS, A11Y, OVL, VPN, NOTIF |
+| **Live process badge** | Apps with a running process show a green `● LIVE` badge |
+| **Filters** | Filter by All / High / Medium / Low risk; toggle System apps on or off; real-time search by name or package |
+| **Tap to act** | Tapping any app row shows a dialog: View Details or Uninstall |
+| **Uninstall via Shizuku** | Runs `pm uninstall --user 0 <package>` silently; app is removed from the list immediately on success |
+| **Uninstall fallback** | If Shizuku is not running, falls back to the standard Android system uninstall dialog |
+| **System app protection** | System apps cannot be uninstalled — the option is labelled and blocked with a toast |
+| **App detail screen** | Full audit page per app: granted permissions, background time, network usage, privilege analysis, risk factors |
+| **Spy / stalkerware detection** | Known-threat database + permission-combo heuristics via SpyDetectionEngine |
+| **Banking risk analysis** | Detects OTP-interception risk, overlay phishing, and banking-app combinations via BankingRiskAnalyzer |
+| **Live sensor monitor** | Parses full AppOps dump via Shizuku to show which apps accessed camera/mic/location recently |
+| **Alerts tab** | Aggregated security alerts with severity levels |
+| **Security settings** | Scheduled scan interval, alert thresholds, notification preferences |
 
 ---
 
@@ -44,8 +71,9 @@ System Console runs as a floating overlay window that you can drag, resize, and 
 |---|---|
 | `SYSTEM_ALERT_WINDOW` | Required to draw the floating console overlay over other apps |
 | `READ_LOGS` | Grants access to full device logcat output via Shizuku |
-| `QUERY_ALL_PACKAGES` | Used to list installed apps for the app-filter picker |
+| `QUERY_ALL_PACKAGES` | Used to list all installed apps for the app-filter picker and security scan |
 | `FOREGROUND_SERVICE` | Keeps the overlay service alive while the app is in the background |
+| `PACKAGE_USAGE_STATS` | Used by the security auditor to read per-app last-used and background time |
 | `moe.shizuku.manager.permission.API_V23` | Required by the Shizuku SDK |
 
 ---
@@ -56,10 +84,23 @@ System Console runs as a floating overlay window that you can drag, resize, and 
 2. **Start Shizuku** using wireless debugging (Developer Options → Wireless debugging) or via root.
 3. **Install System Console** (debug APK from GitHub Actions, or build from source).
 4. **Open System Console** — the main screen shows Shizuku and overlay permission status.
-5. Grant both permissions when prompted, then tap **Open System Console**.
-6. The floating console will appear. Drag the header to move it; drag the `◢` handle to resize.
+5. Grant both permissions when prompted.
+6. Tap **Open System Console** for the floating logcat overlay, or **Security Auditor** for the security dashboard.
 
-### Filtering by app
+### Using the App Security Tab
+
+1. Open the **Family Security Auditor** and tap the **Apps** tab.
+2. All installed apps are loaded immediately — no prior scan needed.
+3. Use the filter chips (**All / High / Medium / Low**) to narrow by risk level.
+4. Toggle the **System** chip to show or hide system apps.
+5. Type in the search bar to filter by app name or package name.
+6. **Tap any app row** to open the options dialog:
+   - **View Details** — opens the full audit screen for that app.
+   - **Uninstall via Shizuku** — silently uninstalls using `pm uninstall --user 0`. Requires Shizuku to be running. The app is removed from the list immediately on success.
+   - If Shizuku is not available, the option falls back to the standard Android uninstall screen.
+   - System apps show "System apps cannot be uninstalled" instead.
+
+### Filtering by app in the Logcat Console
 
 1. Tap the **`📦 APP`** button in the toolbar.
 2. A dialog appears with the full list of installed apps.
@@ -131,25 +172,73 @@ All workflows upload the resulting APK as a build artifact named `<owner> <branc
 
 ```
 .
-├── AndroidManifest.xml          # App manifest — permissions, activities, services, providers
-├── build.gradle.kts             # Gradle build config — dependencies (AndroidX, Shizuku), SDK versions
-├── gradle.properties            # android.useAndroidX=true
-├── settings.gradle.kts          # Repository config (Google, Maven Central, Rikka)
-├── gradlew / gradlew.bat        # Gradle wrapper
+├── AndroidManifest.xml              # App manifest — permissions, activities, services, providers
+├── build.gradle.kts                 # Gradle build config — dependencies (AndroidX, Shizuku), SDK versions
+├── gradle.properties                # android.useAndroidX=true
+├── settings.gradle.kts              # Repository config (Google, Maven Central, Rikka)
+├── gradlew / gradlew.bat            # Gradle wrapper
 ├── res/
-│   ├── drawable/                # Custom drawables for console UI (buttons, badges, dots)
+│   ├── drawable/                    # Custom drawables for console UI (buttons, badges, dots)
 │   ├── layout/
-│   │   ├── console_overlay.xml  # Main floating overlay layout
-│   │   └── log_item.xml         # Single log row layout
-│   ├── mipmap-*/                # App launcher icons at all screen densities
-│   ├── values/strings.xml       # App name string resource
-│   └── xml/provider_paths.xml   # FileProvider paths for PDF export
+│   │   ├── console_overlay.xml      # Main floating overlay layout
+│   │   └── log_item.xml             # Single log row layout
+│   ├── mipmap-*/                    # App launcher icons at all screen densities
+│   ├── values/strings.xml           # App name string resource
+│   └── xml/provider_paths.xml       # FileProvider paths for PDF export
 └── srcs/juloo/sysconsole/
-    ├── MainActivity.java         # Launcher activity — permission status + console launch
-    ├── SysConsoleService.java    # Core service — overlay window, logcat, filters, dialogs
-    ├── SysConsoleLog.java        # Log entry model with level, source, message, timestamp
-    └── SysConsoleDatabaseHelper.java  # SQLite helper — save/load/delete log collections
+    ├── MainActivity.java            # Launcher activity — permission status + console/auditor launch
+    ├── SysConsoleService.java       # Core service — overlay window, logcat, filters, dialogs
+    ├── SysConsoleLog.java           # Log entry model with level, source, message, timestamp
+    ├── SysConsoleDatabaseHelper.java# SQLite helper — save/load/delete log collections
+    ├── SecurityHub.java             # Singleton hub — owns SecurityScanManager instance
+    ├── SecurityScanManager.java     # Full security scan engine — all data sources + risk scoring
+    ├── SecurityDashboardActivity.java  # Main security auditor dashboard screen
+    ├── AppsListActivity.java        # App Security tab — live APK list, filters, Shizuku uninstall
+    ├── AppDetailsActivity.java      # Per-app full audit detail screen
+    ├── AppSecurityInfo.java         # Data model for a single app's security profile
+    ├── AlertsActivity.java          # Security alerts list screen
+    ├── MonitorActivity.java         # Live sensor access monitor screen
+    ├── SecuritySettingsActivity.java# Auditor settings screen
+    ├── ShizukuCommandHelper.java    # Privileged shell runner via Shizuku.newProcess()
+    ├── SpyDetectionEngine.java      # Spyware/stalkerware heuristics + known-threat DB
+    ├── BankingRiskAnalyzer.java     # Banking-app threat analysis (OTP, overlay phishing)
+    ├── NetworkUsageHelper.java      # Per-app network bytes — 7-day window via NetworkStatsManager
+    ├── DeviceSecurityHelper.java    # Elevated-privilege app enumeration (admin, VPN, accessibility)
+    ├── SecurityUiHelper.java        # Shared UI building utilities (colours, dp, cards, labels)
+    ├── SecurityAlert.java           # Alert data model
+    ├── AppInstallReceiver.java      # BroadcastReceiver for new app installs
+    └── ScheduledScanReceiver.java   # AlarmManager receiver for scheduled background scans
 ```
+
+---
+
+## Recent changes
+
+### App Security Tab — full rewrite (AppsListActivity)
+
+**What was broken before:**
+- The tab called `getCachedApps()` which returned nothing unless a full Deep Scan had been run from the Dashboard first. Opening the tab with a fresh install showed an empty list with "No scan data yet."
+- The filter chips (All / High / Low) depended on that same empty cache, so they appeared but did nothing.
+- The 2-column grid layout was inconsistent and filter state was not visually reflected.
+
+**What was fixed:**
+- **Live loading on open** — the tab now fires its own background load the instant it opens. It calls `PackageManager.getInstalledPackages()` directly (always works) and simultaneously uses Shizuku's `pm list packages -f` and `ps -A` to cross-reference packages and detect running processes. No pre-scan needed.
+- **Working filters** — All / High / Medium / Low chips filter the live-loaded list. Each chip visually highlights with its colour (red = High, orange = Medium, green = Low, teal = All). The System toggle shows/hides system apps with its own active state.
+- **Clean list UI** — replaced the broken 2-column grid with a reliable single-column list. Each row shows: app icon, name, package, coloured permission tags (CAM / MIC / LOC / SMS / A11Y / OVL / VPN / NOTIF), a green `● LIVE` badge if the process is running, and a numeric risk score with a HIGH / MED / LOW label.
+- **Real-time search** — search bar filters by app name or package name as you type.
+- **Loading indicator** — an indeterminate progress bar shows while loading; status text shows exactly what phase is running ("Fetching…", "Analyzing 45/312…", "87 of 312 apps").
+
+### Shizuku-powered uninstall
+
+**How it works:**
+- Tapping any app row now opens an options dialog instead of going directly to the detail screen.
+- Options: **View Details** or **Uninstall via Shizuku** (or **Uninstall (system dialog)** if Shizuku is not running).
+- Selecting Uninstall shows a second confirmation dialog with the package name and a warning about permanent removal.
+- On confirm, a background thread runs `pm uninstall --user 0 <package>` via Shizuku. If that fails, it retries without `--user 0`.
+- **On success**: a success toast appears and the app is immediately removed from the list — no reload required.
+- **On failure**: an error toast tells you to check Shizuku is running.
+- **System apps**: the uninstall option is visible but tapping it shows a toast explaining system apps cannot be removed this way.
+- **No Shizuku**: falls back to Android's built-in `ACTION_DELETE` intent (the standard system uninstall screen).
 
 ---
 
@@ -160,6 +249,7 @@ All workflows upload the resulting APK as a build artifact named `<owner> <branc
 - PID-to-app-name mapping is refreshed every 5 seconds using `ActivityManager.getRunningAppProcesses()` and cached in a `HashMap` guarded by `synchronized`.
 - Log entries are capped at 2 000 in both the full buffer (`mAllLogs`) and the filtered view (`mLogs`).
 - Saved collections are stored in SQLite using `SysConsoleDatabaseHelper` (two tables: `saved_collections` and `saved_log_entries` with a foreign key and cascade delete).
+- The security scan engine (`SecurityScanManager`) uses nine data sources layered in order of depth: PackageManager → AppOpsManager → UsageStatsManager → ActivityManager → NetworkStatsManager → Shizuku (full AppOps, process list, granted permissions, device policy, accessibility) → SpyDetectionEngine → BankingRiskAnalyzer → DeviceSecurityHelper.
 
 ---
 
