@@ -11,12 +11,12 @@ jobs:
     steps:
     - name: Checkout repo
       uses: actions/checkout@v4
-    - name: Restore debug keystore from GitHub Secrets
+    - uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+    - name: Restore or generate debug keystore
       run: |
-        # Check if exist and use the secret named DEBUG_KEYSTORE
-        # The contents of the secret can be obtained -
-        #  from the debug.keystore.asc from you local folder 
-        #  (refer to CONTRIBUTING.md Using the local debug.keystore on the Github CI actions)
         if [[ ! "${{ secrets.DEBUG_KEYSTORE }}" = "" ]]; then
             echo "${{ secrets.DEBUG_KEYSTORE }}" > "debug.keystore.asc"
             if [[ -s "debug.keystore.asc" ]]; then
@@ -24,10 +24,18 @@ jobs:
                 gpg -d --passphrase "debug0" --batch "debug.keystore.asc" > "debug.keystore"
             fi
         fi
-    - uses: actions/setup-java@v4
-      with:
-        distribution: 'temurin'
-        java-version: '17'
+        if [[ ! -f "debug.keystore" ]]; then
+            echo "Generating a new debug keystore"
+            keytool -genkeypair -v \
+              -keystore debug.keystore \
+              -alias debug \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -storepass debug0 \
+              -keypass debug0 \
+              -dname "CN=Debug, O=Debug, L=Debug, S=Debug, C=US"
+        fi
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v4
     - name: Build debug APK
