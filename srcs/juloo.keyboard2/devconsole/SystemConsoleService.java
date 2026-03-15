@@ -57,6 +57,8 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 
+import java.lang.reflect.Method;
+
 import juloo.keyboard2.R;
 import rikka.shizuku.Shizuku;
 
@@ -316,11 +318,22 @@ public class SystemConsoleService extends Service {
     // Shizuku logcat reader
     // ══════════════════════════════════════════════════════════════════════════
 
+    /**
+     * Shizuku.newProcess() was made private in API 13.1.x.
+     * We access it via reflection to stay compatible with the published AAR.
+     */
+    private Process shizukuNewProcess(String[] cmd, String[] env, String dir) throws Throwable {
+        Method m = Shizuku.class.getDeclaredMethod("newProcess",
+                String[].class, String[].class, String.class);
+        m.setAccessible(true);
+        return (Process) m.invoke(null, cmd, env, dir);
+    }
+
     private void startShizukuLogcat() {
         if (mLogcatRunning) return;
         try {
             // Use Shizuku to spawn logcat as shell — reads ALL device logs
-            mLogcatProcess = Shizuku.newProcess(
+            mLogcatProcess = shizukuNewProcess(
                     new String[]{"logcat", "-v", "threadtime", "-T", "500"}, null, null);
             mLogcatRunning = true;
             mIsConnected   = true;
