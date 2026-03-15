@@ -166,12 +166,21 @@ jobs:
           "android.permission.QUERY_ALL_PACKAGES"
           "android.permission.GET_TASKS"
           "android.permission.FOREGROUND_SERVICE"
+          "android.permission.SCHEDULE_EXACT_ALARM"
         )
         ALL_OK=true
         for p in "${REQUIRED_PERMS[@]}"; do
           if grep -q "$p" AndroidManifest.xml; then echo "  ✓ $p"
           else echo "  ✗ Missing: $p" && ALL_OK=false; fi
         done
+        echo ""
+        echo "=== Launcher Activity ==="
+        if grep -q "SecurityDashboardActivity" AndroidManifest.xml && \
+           grep -A5 "SecurityDashboardActivity" AndroidManifest.xml | grep -q "android.intent.action.MAIN"; then
+          echo "  ✓ SecurityDashboardActivity is the launcher"
+        else
+          echo "  ✗ SecurityDashboardActivity must be the MAIN launcher" && ALL_OK=false
+        fi
         echo ""
         echo "=== Activities ==="
         REQUIRED_ACTIVITIES=(
@@ -185,6 +194,16 @@ jobs:
         for a in "${REQUIRED_ACTIVITIES[@]}"; do
           if grep -q "$a" AndroidManifest.xml; then echo "  ✓ $a"
           else echo "  ✗ Missing activity: $a" && ALL_OK=false; fi
+        done
+        echo ""
+        echo "=== Receivers ==="
+        REQUIRED_RECEIVERS=(
+          "ScheduledScanReceiver"
+          "AppInstallReceiver"
+        )
+        for r in "${REQUIRED_RECEIVERS[@]}"; do
+          if grep -q "$r" AndroidManifest.xml; then echo "  ✓ $r"
+          else echo "  ✗ Missing receiver: $r" && ALL_OK=false; fi
         done
         $ALL_OK || exit 1
 
@@ -233,12 +252,37 @@ jobs:
         grep -q "postDelayed.*30_000\|30_000.*postDelayed" srcs/juloo/sysconsole/MonitorActivity.java \
           && echo "  ✓ Periodic polling for new events implemented" || echo "  ✗ Missing"
 
-    - name: Verify auto-scan on dashboard launch
+    - name: Verify auto-scan behaviour
       run: |
-        grep -q "postDelayed.*startScan\|isEmpty.*startScan\|startScan.*isEmpty" \
+        echo "=== First-run auto deep scan (with overlay) ==="
+        grep -q "getCachedApps.*isEmpty\|isEmpty.*startScan\|postDelayed.*startScan" \
           srcs/juloo/sysconsole/SecurityDashboardActivity.java \
-          && echo "✓ Auto-scan on first launch is implemented" \
-          || echo "✗ Auto-scan on first launch is missing"
+          && echo "  ✓ Auto-scan on first launch is implemented" \
+          || echo "  ✗ Auto-scan on first launch is missing"
+
+        echo "=== 24-hour auto deep scan (with overlay) ==="
+        grep -q "FULL_SCAN_INTERVAL_MS\|24.*3600\|elapsed.*startScan" \
+          srcs/juloo/sysconsole/SecurityDashboardActivity.java \
+          && echo "  ✓ 24-hour repeat scan implemented" \
+          || echo "  ✗ 24-hour repeat scan missing"
+
+        echo "=== 10-minute silent background polling (no overlay) ==="
+        grep -q "BG_POLL_MS\|10.*60_000\|startSilentScan\|startBackgroundPolling" \
+          srcs/juloo/sysconsole/SecurityDashboardActivity.java \
+          && echo "  ✓ Silent 10-minute background polling implemented" \
+          || echo "  ✗ Silent background polling missing"
+
+        echo "=== Scheduled scan via AlarmManager ==="
+        grep -q "AlarmManager\|setExactAndAllowWhileIdle\|ScheduledScanReceiver" \
+          srcs/juloo/sysconsole/SecurityDashboardActivity.java \
+          && echo "  ✓ AlarmManager schedule scan implemented" \
+          || echo "  ✗ AlarmManager schedule scan missing"
+
+        echo "=== Schedule button visible on dashboard ==="
+        grep -q "showScheduleScanDialog\|Schedule.*Scan\|⏰" \
+          srcs/juloo/sysconsole/SecurityDashboardActivity.java \
+          && echo "  ✓ Schedule button present in dashboard top bar" \
+          || echo "  ✗ Schedule button missing"
 
     - name: Count implemented security rules
       run: |

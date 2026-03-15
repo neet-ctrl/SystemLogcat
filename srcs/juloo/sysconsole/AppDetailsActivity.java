@@ -102,12 +102,19 @@ public class AppDetailsActivity extends Activity {
         setContentView(root);
     }
 
+    private int getStatusBarHeight() {
+        int result = 0;
+        int resId = getResources().getIdentifier("status_bar_height", "dimen", "android");
+        if (resId > 0) result = getResources().getDimensionPixelSize(resId);
+        return Math.max(result, mUi.dp(24));
+    }
+
     private View buildTopBar() {
         LinearLayout bar = new LinearLayout(this);
         bar.setOrientation(LinearLayout.HORIZONTAL);
         bar.setGravity(Gravity.CENTER_VERTICAL);
         bar.setBackgroundColor(SecurityUiHelper.CLR_NAV_BG);
-        bar.setPadding(mUi.dp(16), mUi.dp(14), mUi.dp(16), mUi.dp(14));
+        bar.setPadding(mUi.dp(16), mUi.dp(10) + getStatusBarHeight(), mUi.dp(16), mUi.dp(10));
 
         Button back = new Button(this);
         back.setText("←");
@@ -119,7 +126,7 @@ public class AppDetailsActivity extends Activity {
         back.setOnClickListener(v -> finish());
         bar.addView(back);
 
-        String title = mApp != null ? mApp.appName : "App Details";
+        String title = (mApp != null && mApp.appName != null) ? mApp.appName : "App Details";
         TextView tvTitle = mUi.label(title, 17f, SecurityUiHelper.CLR_TEXT, true);
         bar.addView(tvTitle, new LinearLayout.LayoutParams(0,
                 LinearLayout.LayoutParams.WRAP_CONTENT, 1f));

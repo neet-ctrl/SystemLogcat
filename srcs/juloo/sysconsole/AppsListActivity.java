@@ -90,6 +90,13 @@ public class AppsListActivity extends Activity {
         applyFilterAndSort();
     }
 
+    private int getStatusBarHeight() {
+        int result = 0;
+        int resId = getResources().getIdentifier("status_bar_height", "dimen", "android");
+        if (resId > 0) result = getResources().getDimensionPixelSize(resId);
+        return Math.max(result, mUi.dp(24));
+    }
+
     // ── Top bar ───────────────────────────────────────────────────────────────
 
     private View buildTopBar() {
@@ -97,7 +104,7 @@ public class AppsListActivity extends Activity {
         bar.setOrientation(LinearLayout.HORIZONTAL);
         bar.setGravity(Gravity.CENTER_VERTICAL);
         bar.setBackgroundColor(SecurityUiHelper.CLR_NAV_BG);
-        bar.setPadding(mUi.dp(14), mUi.dp(14), mUi.dp(14), mUi.dp(14));
+        bar.setPadding(mUi.dp(14), mUi.dp(10) + getStatusBarHeight(), mUi.dp(14), mUi.dp(10));
 
         Button back = new Button(this);
         back.setText("←");
@@ -252,13 +259,17 @@ public class AppsListActivity extends Activity {
             if (mSystemFilter && a.isSystemApp) continue;
             if (mRiskFilter >= 0 && a.riskLevel != mRiskFilter) continue;
             if (!mFilter.isEmpty()
-                    && !a.appName.toLowerCase().contains(mFilter)
+                    && (a.appName == null || !a.appName.toLowerCase().contains(mFilter))
                     && !a.packageName.toLowerCase().contains(mFilter)) continue;
             mFiltered.add(a);
         }
         switch (mSortMode) {
             case SORT_NAME:    Collections.sort(mFiltered,
-                    (a, b) -> a.appName.compareToIgnoreCase(b.appName)); break;
+                    (a, b) -> {
+                        String na = a.appName != null ? a.appName : a.packageName;
+                        String nb = b.appName != null ? b.appName : b.packageName;
+                        return na.compareToIgnoreCase(nb);
+                    }); break;
             case SORT_RISK:    Collections.sort(mFiltered,
                     (a, b) -> Integer.compare(b.riskScore, a.riskScore)); break;
             case SORT_INSTALL: Collections.sort(mFiltered,
@@ -369,7 +380,9 @@ public class AppsListActivity extends Activity {
         LinearLayout nameRow = new LinearLayout(this);
         nameRow.setOrientation(LinearLayout.HORIZONTAL);
         nameRow.setGravity(Gravity.CENTER_VERTICAL);
-        TextView tvName = mUi.label(app.appName, 14f, SecurityUiHelper.CLR_TEXT, true);
+        TextView tvName = mUi.label(
+                app.appName != null ? app.appName : app.packageName,
+                14f, SecurityUiHelper.CLR_TEXT, true);
         tvName.setMaxLines(1);
         nameRow.addView(tvName);
         if (app.isRunning) {
@@ -474,7 +487,8 @@ public class AppsListActivity extends Activity {
         grid.setBackground(bg);
         grid.setPadding(mUi.dp(12), mUi.dp(10), mUi.dp(12), mUi.dp(10));
 
-        infoRow(grid, "📱 Version",       "v" + app.versionName + " (code " + app.versionCode + ")");
+        infoRow(grid, "📱 Version",
+                "v" + (app.versionName != null ? app.versionName : "?") + " (code " + app.versionCode + ")");
         infoRow(grid, "🏷 Type",          app.isSystemApp ? "System App" : "User-Installed App");
         if (app.installTime > 0)
             infoRow(grid, "📥 Installed",  mSdf.format(new Date(app.installTime)));

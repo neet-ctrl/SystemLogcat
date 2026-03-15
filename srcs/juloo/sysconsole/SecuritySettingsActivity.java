@@ -56,12 +56,19 @@ public class SecuritySettingsActivity extends Activity {
         setContentView(root);
     }
 
+    private int getStatusBarHeight() {
+        int result = 0;
+        int resId = getResources().getIdentifier("status_bar_height", "dimen", "android");
+        if (resId > 0) result = getResources().getDimensionPixelSize(resId);
+        return Math.max(result, mUi.dp(24));
+    }
+
     private View buildTopBar() {
         LinearLayout bar = new LinearLayout(this);
         bar.setOrientation(LinearLayout.HORIZONTAL);
         bar.setGravity(Gravity.CENTER_VERTICAL);
         bar.setBackgroundColor(SecurityUiHelper.CLR_NAV_BG);
-        bar.setPadding(mUi.dp(16), mUi.dp(14), mUi.dp(16), mUi.dp(14));
+        bar.setPadding(mUi.dp(16), mUi.dp(10) + getStatusBarHeight(), mUi.dp(16), mUi.dp(10));
 
         Button back = new Button(this);
         back.setText("←");

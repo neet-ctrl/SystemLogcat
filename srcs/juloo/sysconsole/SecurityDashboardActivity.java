@@ -178,11 +178,18 @@ public class SecurityDashboardActivity extends Activity {
         setContentView(frame);
     }
 
+    private int getStatusBarHeight() {
+        int result = 0;
+        int resId = getResources().getIdentifier("status_bar_height", "dimen", "android");
+        if (resId > 0) result = getResources().getDimensionPixelSize(resId);
+        return Math.max(result, mUi.dp(24));
+    }
+
     private View buildTopBar() {
         LinearLayout bar = new LinearLayout(this);
         bar.setOrientation(LinearLayout.HORIZONTAL);
         bar.setGravity(Gravity.CENTER_VERTICAL);
-        bar.setPadding(0, mUi.dp(16), 0, mUi.dp(4));
+        bar.setPadding(0, mUi.dp(12) + getStatusBarHeight(), 0, mUi.dp(4));
 
         LinearLayout titlePart = new LinearLayout(this);
         titlePart.setOrientation(LinearLayout.VERTICAL);
@@ -786,8 +793,12 @@ public class SecurityDashboardActivity extends Activity {
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0,
                 LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
         textCol.setLayoutParams(lp);
-        textCol.addView(mUi.label(a.appName, 13f, SecurityUiHelper.CLR_TEXT, true));
-        textCol.addView(mUi.label(a.threatReason, 11f, SecurityUiHelper.CLR_SECONDARY, false));
+        textCol.addView(mUi.label(
+                a.appName != null ? a.appName : a.packageName,
+                13f, SecurityUiHelper.CLR_TEXT, true));
+        textCol.addView(mUi.label(
+                a.threatReason != null ? a.threatReason : "",
+                11f, SecurityUiHelper.CLR_SECONDARY, false));
         row.addView(textCol);
 
         row.addView(mUi.badge(SpyDetectionEngine.threatLevelName(a.threatLevel),
