@@ -1,0 +1,57 @@
+Skip to content
+SystemLogcat
+Repository navigation
+Code
+Issues
+Actions
+Make Apk CI
+Saved progress at the end of the loop #7
+Annotations
+1 error and 1 warning
+Build-Apk
+failed now in 29s
+3s
+1s
+0s
+0s
+4s
+17s
+Run ./gradlew assembleDebug
+Starting a Gradle Daemon (subsequent builds will be faster)
+> Task :preBuild UP-TO-DATE
+> Task :preDebugBuild UP-TO-DATE
+> Task :mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :javaPreCompileDebug
+> Task :checkDebugAarMetadata FAILED
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run_2-1773585103145.json
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+2 actionable tasks: 2 executed
+Execution failed for task ':checkDebugAarMetadata'.
+> Configuration `:debugRuntimeClasspath` contains AndroidX dependencies, but the `android.useAndroidX` property is not enabled, which may cause runtime issues.
+  Set `android.useAndroidX=true` in the `gradle.properties` file and retry.
+  The following AndroidX dependencies are detected:
+  :debugRuntimeClasspath -> androidx.core:core:1.16.0
+  :debugRuntimeClasspath -> androidx.core:core:1.16.0 -> androidx.annotation:annotation:1.8.1
+  :debugRuntimeClasspath -> androidx.core:core:1.16.0 -> androidx.annotation:annotation:1.8.1 -> androidx.annotation:annotation-jvm:1.8.1
+  :debugRuntimeClasspath -> androidx.core:core:1.16.0 -> androidx.annotation:annotation-experimental:1.4.1
+  :debugRuntimeClasspath -> androidx.core:core:1.16.0 -> androidx.collection:collection:1.4.2
+  :debugRuntimeClasspath -> androidx.core:core:1.16.0 -> androidx.collection:collection:1.4.2 -> androidx.collection:collection-jvm:1.4.2
+  :debugRuntimeClasspath -> androidx.core:core:1.16.0 -> androidx.concurrent:concurrent-futures:1.1.0
+  :debugRuntimeClasspath -> androidx.core:core:1.16.0 -> androidx.core:core-viewtree:1.0.0
+  :debugRuntimeClasspath -> androidx.core:core:1.16.0 -> androidx.interpolator:interpolator:1.0.0
+  :debugRuntimeClasspath -> androidx.core:core:1.16.0 -> androidx.lifecycle:lifecycle-runtime:2.6.2
+  :debugRuntimeClasspath -> androidx.core:core:1.16.0 -> androidx.lifecycle:lifecycle-runtime:2.6.2 -> androidx.arch.core:core-common:2.2.0
+  :debugRuntimeClasspath -> androidx.core:core:1.16.0 -> androidx.lifecycle:lifecycle-runtime:2.6.2 -> androidx.arch.core:core-runtime:2.2.0
+  :debugRuntimeClasspath -> androidx.core:core:1.16.0 -> androidx.lifecycle:lifecycle-runtime:2.6.2 -> androidx.lifecycle:lifecycle-common:2.6.2
+  :debugRuntimeClasspath -> androidx.core:core:1.16.0 -> androidx.lifecycle:lifecycle-runtime:2.6.2 -> androidx.profileinstaller:profileinstaller:1.3.0
+  :debugRuntimeClasspath -> androidx.core:core:1.16.0 -> androidx.lifecycle:lifecycle-runtime:2.6.2 -> androidx.profileinstaller:profileinstaller:1.3.0 -> androidx.startup:startup-runtime:1.1.1
+  :debugRuntimeClasspath -> androidx.core:core:1.16.0 -> androidx.tracing:tracing:1.2.0
+0s
+0s
+1s
+0s
+0s
+0s
