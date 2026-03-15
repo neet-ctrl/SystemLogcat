@@ -6,6 +6,7 @@
   <uses-permission android:name="android.permission.READ_LOGS"/>
   <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
       android:maxSdkVersion="28"/>
+  <uses-permission android:name="moe.shizuku.manager.permission.API_V23"/>
 
   <application android:label="@string/app_name" android:allowBackup="true" android:icon="@mipmap/ic_launcher" android:hardwareAccelerated="false">
     <service android:name="juloo.keyboard2.Keyboard2" android:label="@string/app_name" android:permission="android.permission.BIND_INPUT_METHOD" android:exported="true" android:directBootAware="true">
@@ -40,6 +41,12 @@
               android:exported="true">
     </activity>
 
+    <activity android:name="juloo.keyboard2.devconsole.ShizukuPermissionActivity"
+              android:label="System Console"
+              android:theme="@android:style/Theme.Material.Light.Dialog.Alert"
+              android:exported="false">
+    </activity>
+
     <receiver android:name="juloo.keyboard2.widget.ClipboardWidgetProvider"
               android:label="Clipboard History"
               android:exported="true">
@@ -64,16 +71,28 @@
             android:name="android.support.FILE_PROVIDER_PATHS"
             android:resource="@xml/file_paths" />
     </provider>
+
+    <provider
+        android:name="rikka.shizuku.ShizukuProvider"
+        android:authorities="${applicationId}.shizuku"
+        android:multiprocess="false"
+        android:enabled="true"
+        android:exported="true"
+        android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
+
     <service android:name="juloo.keyboard2.widget.FloatingWidgetService" android:exported="false"/>
 
     <service android:name="juloo.keyboard2.devconsole.DevConsoleService"
              android:exported="false"/>
+
+    <service android:name="juloo.keyboard2.devconsole.SystemConsoleService"
+             android:exported="false"/>
   </application>
 
-  <!-- To query enabled input methods for voice IME detection -->
   <queries>
     <intent>
       <action android:name="android.view.InputMethod" />
     </intent>
+    <package android:name="moe.shizuku.privileged.api" />
   </queries>
 </manifest>

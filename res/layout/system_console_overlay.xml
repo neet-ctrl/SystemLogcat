@@ -1,0 +1,452 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/sysconsole_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!-- ═══════════════════════════════════════════════════════════
+         FULL CONSOLE CONTAINER
+         ═══════════════════════════════════════════════════════════ -->
+    <LinearLayout
+        android:id="@+id/console_full_container"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:background="#FFFFFF"
+        android:elevation="16dp">
+
+        <!-- ════════════════════════════════════════════════════════════
+             HEADER
+             ════════════════════════════════════════════════════════════ -->
+        <LinearLayout
+            android:id="@+id/console_header"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="#0F172A"
+            android:orientation="vertical">
+
+            <!-- Row 1 : identity / status -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="36dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp">
+
+                <!-- Shizuku connectivity dot -->
+                <View
+                    android:id="@+id/shizuku_status_dot"
+                    android:layout_width="8dp"
+                    android:layout_height="8dp"
+                    android:background="@drawable/dev_console_dot"
+                    android:layout_marginEnd="4dp"/>
+
+                <!-- Connection/stream dot -->
+                <View
+                    android:id="@+id/connection_dot"
+                    android:layout_width="8dp"
+                    android:layout_height="8dp"
+                    android:background="@drawable/dev_console_dot"
+                    android:layout_marginEnd="6dp"/>
+
+                <!-- Title -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="System Console"
+                    android:textColor="#F8FAFC"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:layout_marginEnd="6dp"/>
+
+                <!-- Source toggle  Server/System -->
+                <TextView
+                    android:id="@+id/btn_toggle_source"
+                    android:layout_width="wrap_content"
+                    android:layout_height="24dp"
+                    android:text="🌐 System"
+                    android:textSize="10sp"
+                    android:textColor="#94A3B8"
+                    android:background="@drawable/dev_console_badge_outline"
+                    android:paddingStart="6dp"
+                    android:paddingEnd="6dp"
+                    android:gravity="center"
+                    android:layout_marginEnd="6dp"/>
+
+                <!-- Status text -->
+                <TextView
+                    android:id="@+id/tv_status_info"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="0 logs • Live"
+                    android:textColor="#64748B"
+                    android:textSize="10sp"
+                    android:ellipsize="end"
+                    android:maxLines="1"/>
+
+                <!-- Selection badge (hidden by default) -->
+                <TextView
+                    android:id="@+id/tv_selection_badge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="20dp"
+                    android:text="0 selected"
+                    android:textSize="9sp"
+                    android:textColor="#1D4ED8"
+                    android:background="@drawable/dev_console_badge_blue"
+                    android:paddingStart="6dp"
+                    android:paddingEnd="6dp"
+                    android:gravity="center"
+                    android:visibility="gone"/>
+
+            </LinearLayout>
+
+            <!-- Row 2 : scrollable action buttons -->
+            <HorizontalScrollView
+                android:layout_width="match_parent"
+                android:layout_height="38dp"
+                android:scrollbars="none"
+                android:fillViewport="false"
+                android:paddingStart="4dp"
+                android:paddingEnd="4dp"
+                android:background="#1E293B">
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <!-- Level filter -->
+                    <TextView
+                        android:id="@+id/btn_filter"
+                        android:layout_width="wrap_content"
+                        android:layout_height="28dp"
+                        android:text="⊡ ALL"
+                        android:textSize="9sp"
+                        android:textColor="#CBD5E1"
+                        android:background="@drawable/dev_console_badge_outline"
+                        android:paddingStart="6dp"
+                        android:paddingEnd="6dp"
+                        android:gravity="center"
+                        android:layout_marginEnd="2dp"/>
+
+                    <!-- APK / App filter -->
+                    <TextView
+                        android:id="@+id/btn_apk_filter"
+                        android:layout_width="wrap_content"
+                        android:layout_height="28dp"
+                        android:text="📦 APP"
+                        android:textSize="9sp"
+                        android:textColor="#CBD5E1"
+                        android:background="@drawable/dev_console_badge_outline"
+                        android:paddingStart="6dp"
+                        android:paddingEnd="6dp"
+                        android:gravity="center"
+                        android:layout_marginEnd="4dp"/>
+
+                    <!-- Pause / Resume -->
+                    <TextView
+                        android:id="@+id/btn_pause"
+                        android:layout_width="30dp"
+                        android:layout_height="30dp"
+                        android:text="⏸"
+                        android:textSize="14sp"
+                        android:textColor="#CBD5E1"
+                        android:gravity="center"
+                        android:background="@drawable/dev_console_icon_btn"/>
+
+                    <!-- Refresh -->
+                    <TextView
+                        android:id="@+id/btn_refresh"
+                        android:layout_width="30dp"
+                        android:layout_height="30dp"
+                        android:text="↺"
+                        android:textSize="15sp"
+                        android:textColor="#CBD5E1"
+                        android:gravity="center"
+                        android:background="@drawable/dev_console_icon_btn"/>
+
+                    <!-- Errors / Warnings -->
+                    <TextView
+                        android:id="@+id/btn_errors"
+                        android:layout_width="30dp"
+                        android:layout_height="30dp"
+                        android:text="⚠"
+                        android:textSize="14sp"
+                        android:textColor="#64748B"
+                        android:gravity="center"
+                        android:background="@drawable/dev_console_icon_btn"/>
+
+                    <!-- Copy -->
+                    <TextView
+                        android:id="@+id/btn_copy"
+                        android:layout_width="30dp"
+                        android:layout_height="30dp"
+                        android:text="⎘"
+                        android:textSize="15sp"
+                        android:textColor="#CBD5E1"
+                        android:gravity="center"
+                        android:background="@drawable/dev_console_icon_btn"/>
+
+                    <!-- Save -->
+                    <TextView
+                        android:id="@+id/btn_save"
+                        android:layout_width="30dp"
+                        android:layout_height="30dp"
+                        android:text="🗄"
+                        android:textSize="13sp"
+                        android:textColor="#CBD5E1"
+                        android:gravity="center"
+                        android:background="@drawable/dev_console_icon_btn"/>
+
+                    <!-- Saved Logs -->
+                    <TextView
+                        android:id="@+id/btn_saved"
+                        android:layout_width="30dp"
+                        android:layout_height="30dp"
+                        android:text="🕐"
+                        android:textSize="13sp"
+                        android:textColor="#CBD5E1"
+                        android:gravity="center"
+                        android:background="@drawable/dev_console_icon_btn"/>
+
+                    <!-- Maximize / Restore -->
+                    <TextView
+                        android:id="@+id/btn_maximize"
+                        android:layout_width="30dp"
+                        android:layout_height="30dp"
+                        android:text="⤢"
+                        android:textSize="14sp"
+                        android:textColor="#CBD5E1"
+                        android:gravity="center"
+                        android:background="@drawable/dev_console_icon_btn"/>
+
+                    <!-- Collapse to icon -->
+                    <TextView
+                        android:id="@+id/btn_collapse"
+                        android:layout_width="30dp"
+                        android:layout_height="30dp"
+                        android:text="⊖"
+                        android:textSize="14sp"
+                        android:textColor="#CBD5E1"
+                        android:gravity="center"
+                        android:background="@drawable/dev_console_icon_btn"/>
+
+                    <!-- Close -->
+                    <TextView
+                        android:id="@+id/btn_close"
+                        android:layout_width="30dp"
+                        android:layout_height="30dp"
+                        android:text="✕"
+                        android:textSize="14sp"
+                        android:textColor="#F87171"
+                        android:gravity="center"
+                        android:background="@drawable/dev_console_icon_btn"/>
+
+                </LinearLayout>
+            </HorizontalScrollView>
+
+        </LinearLayout>
+
+        <!-- ════════════════════════════════════════════════════════════
+             SELECTION MODE BAR
+             ════════════════════════════════════════════════════════════ -->
+        <LinearLayout
+            android:id="@+id/selection_bar"
+            android:layout_width="match_parent"
+            android:layout_height="40dp"
+            android:background="#EFF6FF"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:visibility="gone">
+
+            <Button
+                android:id="@+id/btn_select_all"
+                android:layout_width="wrap_content"
+                android:layout_height="30dp"
+                android:text="Select All"
+                android:textSize="11sp"
+                android:textColor="#374151"
+                android:background="@drawable/dev_console_outline_btn"
+                android:paddingStart="10dp"
+                android:paddingEnd="10dp"
+                android:layout_marginEnd="8dp"/>
+
+            <Button
+                android:id="@+id/btn_clear_selection"
+                android:layout_width="wrap_content"
+                android:layout_height="30dp"
+                android:text="Clear"
+                android:textSize="11sp"
+                android:textColor="#374151"
+                android:background="@drawable/dev_console_outline_btn"
+                android:paddingStart="10dp"
+                android:paddingEnd="10dp"/>
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1"/>
+
+            <Button
+                android:id="@+id/btn_copy_selected"
+                android:layout_width="wrap_content"
+                android:layout_height="30dp"
+                android:text="Copy Selected (0)"
+                android:textSize="11sp"
+                android:textColor="#FFFFFF"
+                android:background="@drawable/dev_console_primary_btn"
+                android:paddingStart="10dp"
+                android:paddingEnd="10dp"
+                android:layout_marginEnd="8dp"
+                android:visibility="gone"/>
+
+            <Button
+                android:id="@+id/btn_exit_selection"
+                android:layout_width="wrap_content"
+                android:layout_height="30dp"
+                android:text="Exit Selection"
+                android:textSize="11sp"
+                android:textColor="#374151"
+                android:background="@android:color/transparent"
+                android:paddingStart="10dp"
+                android:paddingEnd="10dp"/>
+
+        </LinearLayout>
+
+        <!-- Thin separator -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#1E293B"/>
+
+        <!-- ════════════════════════════════════════════════════════════
+             LOG AREA
+             ════════════════════════════════════════════════════════════ -->
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:background="#FFFFFF">
+
+            <ListView
+                android:id="@+id/console_log_list"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_marginEnd="28dp"
+                android:background="#FFFFFF"
+                android:divider="#F3F4F6"
+                android:dividerHeight="4dp"
+                android:scrollbars="vertical"
+                android:fastScrollEnabled="true"/>
+
+            <LinearLayout
+                android:id="@+id/empty_state"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_centerInParent="true"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="No system logs yet"
+                    android:textSize="16sp"
+                    android:textColor="#9CA3AF"
+                    android:layout_marginBottom="4dp"/>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Waiting for device-wide logs…"
+                    android:textSize="12sp"
+                    android:textColor="#D1D5DB"/>
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentTop="true"
+                android:layout_alignParentEnd="true"
+                android:layout_marginTop="8dp"
+                android:layout_marginEnd="4dp"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/btn_scroll_top"
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:text="↑"
+                    android:textSize="14sp"
+                    android:textColor="#374151"
+                    android:gravity="center"
+                    android:background="@drawable/dev_console_scroll_btn"
+                    android:layout_marginBottom="4dp"/>
+
+                <TextView
+                    android:id="@+id/btn_scroll_bottom"
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:text="↓"
+                    android:textSize="14sp"
+                    android:textColor="#374151"
+                    android:gravity="center"
+                    android:background="@drawable/dev_console_scroll_btn"/>
+
+            </LinearLayout>
+
+        </RelativeLayout>
+
+        <!-- ════════════════════════════════════════════════════════════
+             RESIZE HANDLE
+             ════════════════════════════════════════════════════════════ -->
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="16dp"
+            android:background="#0F172A">
+
+            <TextView
+                android:id="@+id/resize_handle"
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:layout_alignParentEnd="true"
+                android:layout_alignParentBottom="true"
+                android:text="◢"
+                android:textSize="11sp"
+                android:textColor="#475569"
+                android:gravity="center"/>
+
+        </RelativeLayout>
+
+    </LinearLayout>
+
+    <!-- ═══════════════════════════════════════════════════════════
+         COLLAPSED ICON — shown when console is collapsed
+         A small draggable circle that snaps to edges
+         ═══════════════════════════════════════════════════════════ -->
+    <FrameLayout
+        android:id="@+id/console_collapsed_icon"
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:visibility="gone"
+        android:elevation="20dp">
+
+        <TextView
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:text="🖥"
+            android:textSize="26sp"
+            android:gravity="center"
+            android:background="#0F172A"
+            android:elevation="20dp"/>
+
+    </FrameLayout>
+
+</FrameLayout>

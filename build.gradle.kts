@@ -6,9 +6,10 @@ plugins {
 }
 
 dependencies {
-  // Following versions of androidx.window require sdk version 23
   implementation("androidx.window:window-java:1.4.0")
-  implementation("androidx.core:core:1.16.0") // Version 1.17.0 available with sdk 36
+  implementation("androidx.core:core:1.16.0")
+  implementation("dev.rikka.shizuku:api:13.1.5")
+  implementation("dev.rikka.shizuku:provider:13.1.5")
   testImplementation("junit:junit:4.13.2")
 }
 

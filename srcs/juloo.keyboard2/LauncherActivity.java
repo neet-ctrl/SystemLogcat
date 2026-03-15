@@ -2,7 +2,8 @@ package juloo.keyboard2;
 
 import android.app.Activity;
 import android.content.Intent;
-import android.graphics.drawable.Animatable;
+import android.content.pm.PackageManager;
+import android.graphics.drawable.GradientDrawable;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.net.Uri;
@@ -20,18 +21,23 @@ import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.os.Build;
+import android.graphics.drawable.Animatable;
 import java.util.ArrayList;
 import java.util.List;
 import juloo.keyboard2.devconsole.DevConsoleHelper;
+import juloo.keyboard2.devconsole.ShizukuPermissionActivity;
+import rikka.shizuku.Shizuku;
 
 public class LauncherActivity extends Activity implements Handler.Callback
 {
-  /** Text is replaced when receiving key events. */
   TextView _tryhere_text;
   EditText _tryhere_area;
-  /** Periodically restart the animations. */
   List<Animatable> _animations;
   Handler _handler;
+
+  // Shizuku status views
+  private View     _shizukuDot;
+  private TextView _shizukuStatusText;
 
   @Override
   public void onCreate(Bundle savedInstanceState)
@@ -44,6 +50,11 @@ public class LauncherActivity extends Activity implements Handler.Callback
       _tryhere_area.addOnUnhandledKeyEventListener(
           this.new Tryhere_OnUnhandledKeyEventListener());
     _handler = new Handler(getMainLooper(), this);
+
+    // Shizuku status indicator views
+    _shizukuDot        = findViewById(R.id.shizuku_launcher_dot);
+    _shizukuStatusText = (TextView) findViewById(R.id.shizuku_status_text);
+
     View btnClipboard = findViewById(R.id.btn_clipboard_history);
     if (btnClipboard != null) {
         btnClipboard.setOnClickListener(v -> {
@@ -61,6 +72,12 @@ public class LauncherActivity extends Activity implements Handler.Callback
     View btnDevConsole = findViewById(R.id.btn_dev_console);
     if (btnDevConsole != null) {
         btnDevConsole.setOnClickListener(v -> DevConsoleHelper.show(this));
+    }
+
+    // 4th option: System Console (Shizuku-backed device-wide logcat)
+    View btnSystemConsole = findViewById(R.id.btn_system_console);
+    if (btnSystemConsole != null) {
+        btnSystemConsole.setOnClickListener(v -> openSystemConsole());
     }
 
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -82,6 +99,13 @@ public class LauncherActivity extends Activity implements Handler.Callback
     _animations.add(find_anim(R.id.launcher_anim_circle));
     _handler.removeMessages(0);
     _handler.sendEmptyMessageDelayed(0, 500);
+  }
+
+  @Override
+  public void onResume()
+  {
+    super.onResume();
+    refreshShizukuStatus();
   }
 
   @Override
@@ -124,6 +148,49 @@ public class LauncherActivity extends Activity implements Handler.Callback
     imm.showInputMethodPicker();
   }
 
+  // ── System Console ──────────────────────────────────────────────────────────
+
+  private void openSystemConsole() {
+    Intent intent = new Intent(this, ShizukuPermissionActivity.class);
+    startActivity(intent);
+  }
+
+  // ── Shizuku status ──────────────────────────────────────────────────────────
+
+  private void refreshShizukuStatus() {
+    if (_shizukuDot == null || _shizukuStatusText == null) return;
+    boolean binderAlive = false;
+    boolean permGranted = false;
+    try {
+        binderAlive = Shizuku.pingBinder();
+        if (binderAlive) {
+            permGranted = Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED;
+        }
+    } catch (Exception ignored) {}
+
+    int dotColor;
+    String statusMsg;
+    if (binderAlive && permGranted) {
+        dotColor  = 0xFF22C55E; // green
+        statusMsg = "Shizuku: Authorized ✓ — System Console ready";
+    } else if (binderAlive) {
+        dotColor  = 0xFFF59E0B; // amber
+        statusMsg = "Shizuku: Running — tap System Console to authorize";
+    } else {
+        dotColor  = 0xFFEF4444; // red
+        statusMsg = "Shizuku: Not running — install & start Shizuku for System Console";
+    }
+
+    if (_shizukuDot.getBackground() instanceof GradientDrawable) {
+        ((GradientDrawable) _shizukuDot.getBackground()).setColor(dotColor);
+    }
+    _shizukuStatusText.setTextColor(binderAlive && permGranted ? 0xFF16A34A
+            : binderAlive ? 0xFFD97706 : 0xFF6B7280);
+    _shizukuStatusText.setText(statusMsg);
+  }
+
+  // ── Animations ──────────────────────────────────────────────────────────────
+
   Animatable find_anim(int id)
   {
     ImageView img = (ImageView)findViewById(id);
@@ -134,10 +201,8 @@ public class LauncherActivity extends Activity implements Handler.Callback
   {
     public boolean onUnhandledKeyEvent(View v, KeyEvent ev)
     {
-      // Don't handle the back key
       if (ev.getKeyCode() == KeyEvent.KEYCODE_BACK)
         return false;
-      // Key release of modifiers would erase interesting data
       if (KeyEvent.isModifierKey(ev.getKeyCode()))
         return false;
       StringBuilder s = new StringBuilder();
@@ -145,7 +210,6 @@ public class LauncherActivity extends Activity implements Handler.Callback
       if (ev.isShiftPressed()) s.append("Shift+");
       if (ev.isCtrlPressed()) s.append("Ctrl+");
       if (ev.isMetaPressed()) s.append("Meta+");
-      // s.append(ev.getDisplayLabel());
       String kc = KeyEvent.keyCodeToString(ev.getKeyCode());
       s.append(kc.replaceFirst("^KEYCODE_", ""));
       _tryhere_text.setText(s.toString());

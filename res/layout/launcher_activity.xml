@@ -21,6 +21,39 @@
     <Button android:id="@+id/btn_clipboard_history" style="@style/paragraph" android:text="Open Clipboard History" android:layout_width="wrap_content" android:layout_gravity="center"/>
     <Button android:id="@+id/btn_typing_master" style="@style/paragraph" android:text="Typing Master (Open-Typer)" android:layout_width="wrap_content" android:layout_gravity="center"/>
     <Button android:id="@+id/btn_dev_console" style="@style/paragraph" android:text="Open Dev Console" android:layout_width="wrap_content" android:layout_gravity="center"/>
+
+    <!-- Shizuku connectivity status row -->
+    <LinearLayout
+        android:id="@+id/shizuku_status_row"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingTop="4dp"
+        android:paddingBottom="4dp">
+
+        <View
+            android:id="@+id/shizuku_launcher_dot"
+            android:layout_width="10dp"
+            android:layout_height="10dp"
+            android:background="@drawable/dev_console_dot"
+            android:layout_marginEnd="8dp"/>
+
+        <TextView
+            android:id="@+id/shizuku_status_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Shizuku: Checking…"
+            android:textSize="12sp"
+            android:textColor="#6B7280"/>
+
+    </LinearLayout>
+
+    <Button android:id="@+id/btn_system_console" style="@style/paragraph" android:text="System Console (Device-wide Logcat)" android:layout_width="wrap_content" android:layout_gravity="center"/>
+
     <TextView style="@style/paragraph" android:text="@string/launcher_sourcecode"/>
     <TextView style="@style/paragraph" android:text="@string/launcher_repo_url" android:autoLink="web" android:linksClickable="true"/>
   </LinearLayout>
