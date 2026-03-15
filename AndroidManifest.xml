@@ -1,99 +1,59 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" android:hardwareAccelerated="false">
-  <uses-permission android:name="android.permission.VIBRATE"/>
-  <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
   <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
   <uses-permission android:name="android.permission.READ_LOGS"/>
-  <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
-      android:maxSdkVersion="28"/>
-  <uses-permission android:name="moe.shizuku.manager.permission.API_V23"/>
   <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"/>
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+  <uses-permission android:name="moe.shizuku.manager.permission.API_V23"/>
 
-  <application android:label="@string/app_name" android:allowBackup="true" android:icon="@mipmap/ic_launcher" android:hardwareAccelerated="false">
-    <service android:name="juloo.keyboard2.Keyboard2" android:label="@string/app_name" android:permission="android.permission.BIND_INPUT_METHOD" android:exported="true" android:directBootAware="true">
-      <intent-filter>
-        <action android:name="android.view.InputMethod"/>
-      </intent-filter>
-      <meta-data android:name="android.view.im" android:resource="@xml/method"/>
-    </service>
+  <queries>
+    <package android:name="moe.shizuku.privileged.api" />
+  </queries>
 
-    <activity android:name="juloo.keyboard2.SettingsActivity" android:icon="@mipmap/ic_launcher" android:theme="@style/settingsTheme" android:exported="true" android:directBootAware="true">
-      <intent-filter>
-        <action android:name="android.intent.action.MAIN"/>
-      </intent-filter>
-    </activity>
+  <application
+      android:label="@string/app_name"
+      android:allowBackup="true"
+      android:icon="@mipmap/ic_launcher"
+      android:hardwareAccelerated="true">
 
-    <activity android:name="juloo.keyboard2.LauncherActivity" android:icon="@mipmap/ic_launcher" android:theme="@style/appTheme" android:exported="true" android:directBootAware="true">
+    <!-- Main launcher activity — Shizuku status + console launch -->
+    <activity
+        android:name="juloo.sysconsole.MainActivity"
+        android:label="@string/app_name"
+        android:exported="true">
       <intent-filter>
         <action android:name="android.intent.action.MAIN"/>
         <category android:name="android.intent.category.LAUNCHER"/>
       </intent-filter>
     </activity>
 
-    <activity android:name="juloo.keyboard2.ClipboardHistoryActivity"
-              android:label="Clipboard History"
-              android:theme="@android:style/Theme.DeviceDefault"
-              android:exported="true">
-    </activity>
-
-    <activity android:name="juloo.keyboard2.TypingMasterActivity"
-              android:label="Typing Master"
-              android:theme="@android:style/Theme.NoTitleBar"
-              android:exported="true">
-    </activity>
-
-    <activity android:name="juloo.keyboard2.devconsole.ShizukuPermissionActivity"
-              android:label="System Console"
-              android:theme="@android:style/Theme.Material.Light.Dialog.Alert"
-              android:exported="false">
-    </activity>
-
-    <receiver android:name="juloo.keyboard2.widget.ClipboardWidgetProvider"
-              android:label="Clipboard History"
-              android:exported="true">
-        <intent-filter>
-            <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            <action android:name="juloo.keyboard2.widget.ACTION_COPY" />
-        </intent-filter>
-        <meta-data android:name="android.appwidget.provider"
-                   android:resource="@xml/clipboard_widget_info" />
-    </receiver>
-
-    <service android:name="juloo.keyboard2.widget.ClipboardWidgetService"
-             android:permission="android.permission.BIND_REMOTEVIEWS"
-             android:exported="false" />
-
-    <provider
-        android:name="androidx.core.content.FileProvider"
-        android:authorities="${applicationId}.provider"
+    <!-- Floating overlay service -->
+    <service
+        android:name="juloo.sysconsole.SysConsoleService"
         android:exported="false"
-        android:grantUriPermissions="true">
-        <meta-data
-            android:name="android.support.FILE_PROVIDER_PATHS"
-            android:resource="@xml/file_paths" />
-    </provider>
+        android:stopWithTask="false"/>
 
+    <!-- Shizuku provider (required by Shizuku SDK) -->
     <provider
         android:name="rikka.shizuku.ShizukuProvider"
         android:authorities="${applicationId}.shizuku"
         android:multiprocess="false"
         android:enabled="true"
         android:exported="true"
-        android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
+        android:permission="android.permission.INTERACT_ACROSS_USERS_FULL"/>
 
-    <service android:name="juloo.keyboard2.widget.FloatingWidgetService" android:exported="false"/>
+    <!-- FileProvider for PDF export sharing -->
+    <provider
+        android:name="androidx.core.content.FileProvider"
+        android:authorities="${applicationId}.provider"
+        android:exported="false"
+        android:grantUriPermissions="true">
+      <meta-data
+          android:name="android.support.FILE_PROVIDER_PATHS"
+          android:resource="@xml/provider_paths"/>
+    </provider>
 
-    <service android:name="juloo.keyboard2.devconsole.DevConsoleService"
-             android:exported="false"/>
-
-    <service android:name="juloo.keyboard2.devconsole.SystemConsoleService"
-             android:exported="false"/>
   </application>
 
-  <queries>
-    <intent>
-      <action android:name="android.view.InputMethod" />
-    </intent>
-    <package android:name="moe.shizuku.privileged.api" />
-  </queries>
 </manifest>

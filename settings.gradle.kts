@@ -15,4 +15,4 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "Unexpected-Keyboard"
+rootProject.name = "SystemConsole"
