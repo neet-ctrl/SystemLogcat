@@ -1,9 +1,14 @@
 package juloo.sysconsole;
 
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.app.AlarmManager;
+import android.app.PendingIntent;
+import android.content.Context;
 import android.content.Intent;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -45,6 +50,7 @@ public class SecurityDashboardActivity extends Activity {
     private LinearLayout mStatsRow;
     private LinearLayout mScanOverlay;
     private TextView     mScanPhaseText;
+    private TextView     mScanPercentText;
     private ProgressBar  mScanProgress;
 
     private final Handler mHandler = new Handler(Looper.getMainLooper());
@@ -57,6 +63,10 @@ public class SecurityDashboardActivity extends Activity {
         buildUi();
         registerInstallReceiver();
         loadCachedData();
+        if (mMgr.getCachedApps().isEmpty()) {
+            // Auto-scan on first open so the user immediately sees data
+            mHandler.postDelayed(this::startScan, 400);
+        }
     }
 
     @Override
@@ -167,12 +177,72 @@ public class SecurityDashboardActivity extends Activity {
                 false));
         bar.addView(titlePart);
 
+        // Schedule button
+        Button schedule = new Button(this);
+        schedule.setText("⏰");
+        schedule.setTextSize(16f);
+        schedule.setBackground(null);
+        schedule.setAllCaps(false);
+        schedule.setPadding(mUi.dp(6), mUi.dp(6), mUi.dp(6), mUi.dp(6));
+        schedule.setOnClickListener(v -> showScheduleScanDialog());
+        bar.addView(schedule);
+
+        // Scan now button
         Button refresh = mUi.primaryButton("⟳ Deep Scan", SecurityUiHelper.CLR_TEAL);
         refresh.setTextSize(12f);
         refresh.setPadding(mUi.dp(14), mUi.dp(8), mUi.dp(14), mUi.dp(8));
         refresh.setOnClickListener(v -> startScan());
         bar.addView(refresh);
         return bar;
+    }
+
+    private void showScheduleScanDialog() {
+        String[] options = {
+            "Scan in 15 minutes",
+            "Scan in 30 minutes",
+            "Scan in 1 hour",
+            "Scan in 2 hours",
+            "Scan in 6 hours",
+            "Scan in 12 hours"
+        };
+        long[] delayMs = { 15 * 60_000L, 30 * 60_000L, 60 * 60_000L,
+                2 * 3600_000L, 6 * 3600_000L, 12 * 3600_000L };
+
+        new AlertDialog.Builder(this)
+            .setTitle("⏰  Schedule Deep Scan")
+            .setMessage("Choose when to run the next deep scan automatically:")
+            .setItems(options, (d, which) -> {
+                scheduleScan(delayMs[which], options[which]);
+            })
+            .setNegativeButton("Cancel", null)
+            .show();
+    }
+
+    private void scheduleScan(long delayMs, String label) {
+        // Use AlarmManager to trigger a broadcast that will start the scan
+        AlarmManager am = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+        Intent intent = new Intent(this, ScheduledScanReceiver.class);
+        int flags = Build.VERSION.SDK_INT >= 23
+                ? PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+                : PendingIntent.FLAG_UPDATE_CURRENT;
+        PendingIntent pi = PendingIntent.getBroadcast(this, 0, intent, flags);
+        if (am != null) {
+            long triggerAt = System.currentTimeMillis() + delayMs;
+            if (Build.VERSION.SDK_INT >= 23) {
+                am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pi);
+            } else {
+                am.setExact(AlarmManager.RTC_WAKEUP, triggerAt, pi);
+            }
+        }
+        // Update status card to reflect upcoming scan
+        if (mTvLastScan != null) {
+            SimpleDateFormat sdf = new SimpleDateFormat("h:mm a", Locale.getDefault());
+            long triggerAt = System.currentTimeMillis() + delayMs;
+            mTvLastScan.setText("Scan scheduled: " + sdf.format(new Date(triggerAt)));
+            mTvLastScan.setTextColor(SecurityUiHelper.CLR_TEAL);
+        }
+        android.widget.Toast.makeText(this, "✓ " + label + " scheduled", 
+                android.widget.Toast.LENGTH_SHORT).show();
     }
 
     private View buildStatusCard() {
@@ -399,59 +469,152 @@ public class SecurityDashboardActivity extends Activity {
         LinearLayout overlay = new LinearLayout(this);
         overlay.setOrientation(LinearLayout.VERTICAL);
         overlay.setGravity(Gravity.CENTER);
-        overlay.setBackgroundColor(0xDD0F1E2D);
+        overlay.setBackgroundColor(0xF00A1622);
 
-        overlay.addView(mUi.label("🔍", 48f, SecurityUiHelper.CLR_TEAL, false));
-        overlay.addView(mUi.spacer(16));
-        overlay.addView(mUi.label("Deep Security Scan", 20f,
-                SecurityUiHelper.CLR_TEXT, true));
-        overlay.addView(mUi.spacer(6));
+        // Center card
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setGravity(Gravity.CENTER);
+        card.setPadding(mUi.dp(32), mUi.dp(32), mUi.dp(32), mUi.dp(32));
+        GradientDrawable cardBg = new GradientDrawable();
+        cardBg.setColor(0xFF0F1E2D);
+        cardBg.setCornerRadius(mUi.dp(20));
+        cardBg.setStroke(mUi.dp(1), SecurityUiHelper.CLR_TEAL & 0x55FFFFFF | 0xFF000000);
+        card.setBackground(cardBg);
 
+        TextView icon = mUi.label("🔍", 44f, SecurityUiHelper.CLR_TEAL, false);
+        icon.setGravity(Gravity.CENTER);
+        card.addView(icon);
+        card.addView(mUi.spacer(14));
+
+        TextView title = mUi.label("Deep Security Scan", 20f, SecurityUiHelper.CLR_TEXT, true);
+        title.setGravity(Gravity.CENTER);
+        card.addView(title);
+        card.addView(mUi.spacer(4));
+
+        // Phase description
         mScanPhaseText = mUi.label("Initializing…", 13f, SecurityUiHelper.CLR_SECONDARY, false);
         mScanPhaseText.setGravity(Gravity.CENTER);
-        overlay.addView(mScanPhaseText);
+        card.addView(mScanPhaseText);
+        card.addView(mUi.spacer(20));
+
+        // Progress bar + percentage row
+        LinearLayout progressRow = mUi.row(true);
+        progressRow.setGravity(Gravity.CENTER_VERTICAL);
 
         mScanProgress = new ProgressBar(this, null,
                 android.R.attr.progressBarStyleHorizontal);
         mScanProgress.setIndeterminate(false);
         mScanProgress.setMax(100);
         mScanProgress.setProgress(0);
-        LinearLayout.LayoutParams pblp = new LinearLayout.LayoutParams(mUi.dp(240), mUi.dp(4));
-        pblp.topMargin = mUi.dp(16);
-        pblp.gravity   = Gravity.CENTER_HORIZONTAL;
-        overlay.addView(mScanProgress, pblp);
+        if (Build.VERSION.SDK_INT >= 21) {
+            mScanProgress.setProgressTintList(
+                    android.content.res.ColorStateList.valueOf(SecurityUiHelper.CLR_TEAL));
+            mScanProgress.setProgressBackgroundTintList(
+                    android.content.res.ColorStateList.valueOf(0xFF1E3A5F));
+        }
+        LinearLayout.LayoutParams pblp = new LinearLayout.LayoutParams(0, mUi.dp(8), 1f);
+        mScanProgress.setLayoutParams(pblp);
+        progressRow.addView(mScanProgress);
 
-        overlay.addView(mUi.spacer(10));
+        mScanPercentText = mUi.label("  0%", 13f, SecurityUiHelper.CLR_TEAL, true);
+        progressRow.addView(mScanPercentText);
+        card.addView(progressRow);
+        card.addView(mUi.spacer(16));
 
+        // 9-stage scan phases reference
+        LinearLayout stagesGrid = new LinearLayout(this);
+        stagesGrid.setOrientation(LinearLayout.VERTICAL);
+        String[][] phases = {
+            {"📦", "Package List"},    {"🔑", "AppOps Usage"},
+            {"📊", "Usage Stats"},     {"⚙",  "Processes"},
+            {"🌐", "Network Data"},    {"🛡",  "Shizuku Deep Scan"},
+            {"🕵", "Spy Detection"},   {"🏦",  "Banking Risk"},
+            {"⬆",  "Privilege Check"}
+        };
+        LinearLayout row1 = mUi.row(false); row1.setGravity(Gravity.CENTER);
+        LinearLayout row2 = mUi.row(false); row2.setGravity(Gravity.CENTER);
+        LinearLayout row3 = mUi.row(false); row3.setGravity(Gravity.CENTER);
+        for (int i = 0; i < phases.length; i++) {
+            LinearLayout ph = buildPhaseChip(phases[i][0], phases[i][1]);
+            if (i < 3)      row1.addView(ph);
+            else if (i < 6) row2.addView(ph);
+            else            row3.addView(ph);
+        }
+        stagesGrid.addView(row1);
+        stagesGrid.addView(mUi.spacer(6));
+        stagesGrid.addView(row2);
+        stagesGrid.addView(mUi.spacer(6));
+        stagesGrid.addView(row3);
+        card.addView(stagesGrid);
+        card.addView(mUi.spacer(18));
+
+        // Mode label
         boolean shizukuOk = ShizukuCommandHelper.isAvailable();
         String modeText = shizukuOk
                 ? "✓ Shizuku: Full depth — AppOps, processes, granted permissions"
                 : "⚠ Basic mode — connect Shizuku for deeper analysis";
-        overlay.addView(mUi.label(modeText, 11f,
-                shizukuOk ? SecurityUiHelper.CLR_TEAL : SecurityUiHelper.CLR_ORANGE, false));
+        TextView modeLbl = mUi.label(modeText, 11f,
+                shizukuOk ? SecurityUiHelper.CLR_TEAL : SecurityUiHelper.CLR_ORANGE, false);
+        modeLbl.setGravity(Gravity.CENTER);
+        card.addView(modeLbl);
+
+        LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(
+                mUi.dp(300), LinearLayout.LayoutParams.WRAP_CONTENT);
+        cardLp.gravity = Gravity.CENTER;
+        overlay.addView(card, cardLp);
         return overlay;
+    }
+
+    private LinearLayout buildPhaseChip(String emoji, String label) {
+        LinearLayout chip = new LinearLayout(this);
+        chip.setOrientation(LinearLayout.VERTICAL);
+        chip.setGravity(Gravity.CENTER);
+        chip.setPadding(mUi.dp(8), mUi.dp(6), mUi.dp(8), mUi.dp(6));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        lp.rightMargin = mUi.dp(6);
+        chip.setLayoutParams(lp);
+
+        TextView te = mUi.label(emoji, 14f, SecurityUiHelper.CLR_SECONDARY, false);
+        te.setGravity(Gravity.CENTER);
+        chip.addView(te);
+
+        TextView tl = mUi.label(label, 8f, 0xFF475569, false);
+        tl.setGravity(Gravity.CENTER);
+        chip.addView(tl);
+        return chip;
     }
 
     // ── Scan ──────────────────────────────────────────────────────────────────
 
     private void startScan() {
         mScanOverlay.setVisibility(View.VISIBLE);
-        if (mScanPhaseText != null) mScanPhaseText.setText("Initializing…");
-        if (mScanProgress  != null) mScanProgress.setProgress(0);
+        if (mScanPhaseText    != null) mScanPhaseText.setText("Initializing…");
+        if (mScanProgress     != null) mScanProgress.setProgress(0);
+        if (mScanPercentText  != null) mScanPercentText.setText("  0%");
 
         mMgr.scanAsync(new SecurityScanManager.ScanCallback() {
             @Override
             public void onProgress(int current, int total, String phase) {
                 mHandler.post(() -> {
-                    if (mScanPhaseText != null) mScanPhaseText.setText(phase);
-                    if (mScanProgress  != null) mScanProgress.setProgress(current);
+                    if (mScanPhaseText   != null) mScanPhaseText.setText(phase);
+                    if (mScanProgress    != null) mScanProgress.setProgress(current);
+                    if (mScanPercentText != null)
+                        mScanPercentText.setText("  " + current + "%");
                 });
             }
             @Override
             public void onComplete(List<AppSecurityInfo> apps, List<SecurityAlert> alerts) {
                 mHandler.post(() -> {
-                    mScanOverlay.setVisibility(View.GONE);
-                    refreshWithData(apps, alerts);
+                    if (mScanProgress    != null) mScanProgress.setProgress(100);
+                    if (mScanPercentText != null) mScanPercentText.setText("  100%");
+                    mHandler.postDelayed(() -> {
+                        mScanOverlay.setVisibility(View.GONE);
+                        if (mTvLastScan != null) mTvLastScan.setTextColor(
+                                SecurityUiHelper.CLR_SECONDARY);
+                        refreshWithData(apps, alerts);
+                    }, 400);
                 });
             }
         });

@@ -307,6 +307,150 @@ public class ShizukuCommandHelper {
         return pkgs;
     }
 
+    // ── Live sensor event feed ────────────────────────────────────────────────
+
+    public static class SensorEvent {
+        public final String packageName;
+        public final String sensorType; // "CAMERA", "MIC", "LOCATION", "SMS", "CONTACTS"
+        public final String emoji;
+        public final long   timestamp;  // epoch ms
+        public SensorEvent(String pkg, String type, String emoji, long ts) {
+            this.packageName = pkg;
+            this.sensorType  = type;
+            this.emoji       = emoji;
+            this.timestamp   = ts;
+        }
+    }
+
+    /**
+     * Parses the full AppOps dump to extract recent sensor access events.
+     * Shizuku's elevated access lets us read events for ALL packages, not just our own.
+     *
+     * @param windowMs  Only return events within this time window (e.g. 60 minutes)
+     * @return Sorted list (most recent first) of sensor access events
+     */
+    public static List<SensorEvent> getRecentSensorEvents(long windowMs) {
+        String dump = dumpAllAppOps();
+        List<SensorEvent> events = new ArrayList<>();
+        if (dump == null || dump.isEmpty()) return events;
+
+        long threshold = System.currentTimeMillis() - windowMs;
+        String currentPkg = null;
+        String currentOp  = null;
+
+        for (String line : dump.split("\n")) {
+            String t = line.trim();
+
+            // Package header: "  Package com.example.app:"
+            if (t.startsWith("Package ")) {
+                currentPkg = t.replace("Package ", "").replace(":", "").trim();
+                currentOp  = null;
+                continue;
+            }
+
+            // Op line: "    CAMERA: allow; time=2025-03-15 14:32:11.123"
+            if (currentPkg != null && t.contains(":") && !t.startsWith("uid")
+                    && !t.startsWith("mode") && !t.startsWith("count")) {
+                String upper = t.toUpperCase();
+                if (upper.startsWith("CAMERA"))        currentOp = "CAMERA";
+                else if (upper.startsWith("RECORD_AUDIO") || upper.startsWith("MICROPHONE"))
+                                                        currentOp = "MIC";
+                else if (upper.startsWith("FINE_LOCATION") || upper.startsWith("COARSE_LOCATION"))
+                                                        currentOp = "LOCATION";
+                else if (upper.startsWith("READ_SMS") || upper.startsWith("RECEIVE_SMS"))
+                                                        currentOp = "SMS";
+                else if (upper.startsWith("READ_CONTACTS"))
+                                                        currentOp = "CONTACTS";
+                else if (upper.startsWith("READ_CALL_LOG"))
+                                                        currentOp = "CALL_LOG";
+                else currentOp = null;
+            }
+
+            // Timestamp line within current op
+            if (currentPkg != null && currentOp != null
+                    && (t.contains("time=") || t.contains("lastAccess") || t.contains("Access="))) {
+                long ts = extractTimestamp(t);
+                if (ts > threshold) {
+                    String emoji;
+                    switch (currentOp) {
+                        case "CAMERA":   emoji = "📷"; break;
+                        case "MIC":      emoji = "🎙"; break;
+                        case "LOCATION": emoji = "📍"; break;
+                        case "SMS":      emoji = "💬"; break;
+                        case "CONTACTS": emoji = "👤"; break;
+                        case "CALL_LOG": emoji = "📞"; break;
+                        default:         emoji = "🔍"; break;
+                    }
+                    events.add(new SensorEvent(currentPkg, currentOp, emoji, ts));
+                }
+                currentOp = null;
+            }
+        }
+
+        // Sort most-recent first
+        events.sort((a, b) -> Long.compare(b.timestamp, a.timestamp));
+        // De-duplicate: keep only the most recent event per (pkg, sensorType) pair
+        List<SensorEvent> deduped = new ArrayList<>();
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        for (SensorEvent e : events) {
+            String key = e.packageName + "|" + e.sensorType;
+            if (seen.add(key)) deduped.add(e);
+        }
+        return deduped;
+    }
+
+    /**
+     * Get list of packages that currently have foreground services running.
+     * Parses: dumpsys activity services
+     */
+    public static List<String> getForegroundServicePackages() {
+        String dump = dumpRunningServices();
+        List<String> pkgs = new ArrayList<>();
+        if (dump == null || dump.isEmpty()) return pkgs;
+        for (String line : dump.split("\n")) {
+            String t = line.trim();
+            // Line like: "ServiceRecord{abc12 u0 com.example.app/.MyService}"
+            if (t.contains("ServiceRecord") && t.contains("u0")) {
+                int braceStart = t.indexOf('{');
+                int braceEnd   = t.indexOf('}');
+                if (braceStart >= 0 && braceEnd > braceStart) {
+                    String inner = t.substring(braceStart + 1, braceEnd);
+                    String[] parts = inner.trim().split("\\s+");
+                    // parts[2] is "pkg/ClassName"
+                    if (parts.length >= 3) {
+                        String pkgClass = parts[2];
+                        String pkg = pkgClass.contains("/")
+                                ? pkgClass.substring(0, pkgClass.indexOf('/'))
+                                : pkgClass;
+                        if (!pkg.isEmpty() && !pkgs.contains(pkg)) pkgs.add(pkg);
+                    }
+                }
+            }
+        }
+        return pkgs;
+    }
+
+    /**
+     * Returns the current foreground app package by parsing dumpsys activity.
+     */
+    public static String getForegroundApp() {
+        String dump = run("dumpsys", "activity", "top", "-1");
+        if (dump == null || dump.isEmpty()) return "";
+        for (String line : dump.split("\n")) {
+            String t = line.trim();
+            if (t.startsWith("ACTIVITY") && t.contains("/")) {
+                int space = t.indexOf(' ');
+                if (space >= 0) {
+                    String component = t.substring(space + 1).trim().split("\\s+")[0];
+                    if (component.contains("/")) {
+                        return component.substring(0, component.indexOf('/'));
+                    }
+                }
+            }
+        }
+        return "";
+    }
+
     private static long extractTimestamp(String line) {
         try {
             int eqIdx = line.indexOf('=');

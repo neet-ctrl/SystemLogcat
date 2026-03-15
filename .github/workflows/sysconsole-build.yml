@@ -1,4 +1,4 @@
-name: Build System Console APK
+name: Family Security Auditor — CI/CD
 
 on:
   push:
@@ -8,7 +8,9 @@ on:
   workflow_dispatch:
 
 jobs:
+  # ── 1. Build debug APK ────────────────────────────────────────────────────
   build:
+    name: Build Debug APK
     runs-on: ubuntu-latest
 
     steps:
@@ -63,13 +65,14 @@ jobs:
         if [ -z "$APK" ]; then echo "ERROR: no APK found!" && exit 1; fi
         echo "Built: $APK" && ls -lh "$APK"
 
-    - name: Upload APK
+    - name: Upload debug APK
       uses: actions/upload-artifact@v4
       with:
-        name: sysconsole-debug
+        name: family-security-auditor-debug
         path: build/outputs/apk/debug/*.apk
-        retention-days: 14
+        retention-days: 30
 
+  # ── 2. Lint ───────────────────────────────────────────────────────────────
   lint:
     name: Lint
     runs-on: ubuntu-latest
@@ -116,8 +119,9 @@ jobs:
         path: build/reports/lint-results-debug.html
         retention-days: 7
 
+  # ── 3. Security Auditor integrity checks ─────────────────────────────────
   security-audit:
-    name: Security Auditor File Check
+    name: Security Auditor Integrity
     runs-on: ubuntu-latest
     needs: build
 
@@ -134,13 +138,17 @@ jobs:
           "srcs/juloo/sysconsole/DeviceSecurityHelper.java"
           "srcs/juloo/sysconsole/AppInstallReceiver.java"
           "srcs/juloo/sysconsole/SecurityScanManager.java"
+          "srcs/juloo/sysconsole/SecurityHub.java"
           "srcs/juloo/sysconsole/SecurityDashboardActivity.java"
+          "srcs/juloo/sysconsole/AppsListActivity.java"
           "srcs/juloo/sysconsole/AppDetailsActivity.java"
           "srcs/juloo/sysconsole/MonitorActivity.java"
           "srcs/juloo/sysconsole/AlertsActivity.java"
           "srcs/juloo/sysconsole/SecuritySettingsActivity.java"
           "srcs/juloo/sysconsole/SecurityReportExporter.java"
           "srcs/juloo/sysconsole/AppSecurityInfo.java"
+          "srcs/juloo/sysconsole/SecurityAlert.java"
+          "srcs/juloo/sysconsole/SecurityUiHelper.java"
         )
         ALL_OK=true
         for f in "${FILES[@]}"; do
@@ -149,13 +157,22 @@ jobs:
         done
         $ALL_OK || exit 1
 
-    - name: Verify manifest has required permissions and activities
+    - name: Verify AndroidManifest permissions and activities
       run: |
+        echo "=== Permissions ==="
         REQUIRED_PERMS=(
           "android.permission.PACKAGE_USAGE_STATS"
           "android.permission.QUERY_ALL_PACKAGES"
           "android.permission.GET_TASKS"
+          "android.permission.FOREGROUND_SERVICE"
         )
+        ALL_OK=true
+        for p in "${REQUIRED_PERMS[@]}"; do
+          if grep -q "$p" AndroidManifest.xml; then echo "  ✓ $p"
+          else echo "  ✗ Missing: $p" && ALL_OK=false; fi
+        done
+        echo ""
+        echo "=== Activities ==="
         REQUIRED_ACTIVITIES=(
           "SecurityDashboardActivity"
           "AppsListActivity"
@@ -164,20 +181,130 @@ jobs:
           "AlertsActivity"
           "SecuritySettingsActivity"
         )
-        for p in "${REQUIRED_PERMS[@]}"; do
-          grep -q "$p" AndroidManifest.xml \
-            && echo "  ✓ $p" \
-            || echo "  ✗ Missing permission: $p"
-        done
         for a in "${REQUIRED_ACTIVITIES[@]}"; do
-          grep -q "$a" AndroidManifest.xml \
-            && echo "  ✓ $a" \
-            || echo "  ✗ Missing activity: $a"
+          if grep -q "$a" AndroidManifest.xml; then echo "  ✓ $a"
+          else echo "  ✗ Missing activity: $a" && ALL_OK=false; fi
         done
+        $ALL_OK || exit 1
 
-    - name: Check Shizuku API coverage
+    - name: Verify 5 core Shizuku feature coverage
       run: |
-        echo "ShizukuCommandHelper call sites : $(grep -rn 'ShizukuCommandHelper\.' srcs/ | wc -l)"
-        echo "Shizuku.newProcess() calls       : $(grep -rn 'Shizuku.newProcess'   srcs/ | wc -l)"
-        echo "SpyDetectionEngine usages        : $(grep -rn 'SpyDetectionEngine\.' srcs/ | wc -l)"
-        echo "BankingRiskAnalyzer usages       : $(grep -rn 'BankingRiskAnalyzer\.' srcs/ | wc -l)"
+        echo "=== Feature 1: Detect spying apps (camera/mic usage + background activity) ==="
+        grep -q "isSuspectedSpyware\|KNOWN_THREATS" srcs/juloo/sysconsole/SpyDetectionEngine.java \
+          && echo "  ✓ Known spyware database present" || echo "  ✗ Missing"
+        grep -q "cameraUsedRecently\|micUsedRecently" srcs/juloo/sysconsole/SecurityScanManager.java \
+          && echo "  ✓ Camera/mic usage tracking in scan" || echo "  ✗ Missing"
+        grep -q "dumpAllAppOps\|getAppOpsForPackage" srcs/juloo/sysconsole/ShizukuCommandHelper.java \
+          && echo "  ✓ Shizuku AppOps access implemented" || echo "  ✗ Missing"
+
+        echo ""
+        echo "=== Feature 2: See all active apps (running processes + foreground services) ==="
+        grep -q "getAllProcesses\|ps -A" srcs/juloo/sysconsole/ShizukuCommandHelper.java \
+          && echo "  ✓ Privileged process list (ps -A) implemented" || echo "  ✗ Missing"
+        grep -q "getForegroundServicePackages\|dumpRunningServices" srcs/juloo/sysconsole/ShizukuCommandHelper.java \
+          && echo "  ✓ Foreground service enumeration implemented" || echo "  ✗ Missing"
+        grep -q "getForegroundApp" srcs/juloo/sysconsole/ShizukuCommandHelper.java \
+          && echo "  ✓ Current foreground app detection implemented" || echo "  ✗ Missing"
+
+        echo ""
+        echo "=== Feature 3: Show all permissions taken (AppOps manager) ==="
+        grep -q "AppOpsManager\|appops" srcs/juloo/sysconsole/SecurityScanManager.java \
+          && echo "  ✓ AppOpsManager integrated in scan" || echo "  ✗ Missing"
+        grep -q "getRecentSensorEvents" srcs/juloo/sysconsole/ShizukuCommandHelper.java \
+          && echo "  ✓ Shizuku AppOps sensor event parser implemented" || echo "  ✗ Missing"
+        grep -q "SensorEvent" srcs/juloo/sysconsole/ShizukuCommandHelper.java \
+          && echo "  ✓ SensorEvent data model present" || echo "  ✗ Missing"
+
+        echo ""
+        echo "=== Feature 4: Flag risky banking permissions ==="
+        grep -q "BankingRiskAnalyzer" srcs/juloo/sysconsole/SecurityScanManager.java \
+          && echo "  ✓ BankingRiskAnalyzer integrated in scan pipeline" || echo "  ✗ Missing"
+        grep -q "OTP_INTERCEPTION\|OVERLAY_PHISHING\|isBankingApp\|bankingKeyword" \
+          srcs/juloo/sysconsole/BankingRiskAnalyzer.java \
+          && echo "  ✓ OTP interception and overlay phishing rules present" || echo "  ✗ Missing"
+
+        echo ""
+        echo "=== Feature 5: Real-time monitoring (app install events + live sensor feed) ==="
+        grep -q "AppInstallReceiver\|PACKAGE_ADDED" srcs/juloo/sysconsole/AppInstallReceiver.java \
+          && echo "  ✓ App install/update broadcast receiver implemented" || echo "  ✗ Missing"
+        grep -q "loadInitialFeed\|getRecentSensorEvents" srcs/juloo/sysconsole/MonitorActivity.java \
+          && echo "  ✓ Shizuku-powered live sensor feed in Monitor" || echo "  ✗ Missing"
+        grep -q "postDelayed.*30_000\|30_000.*postDelayed" srcs/juloo/sysconsole/MonitorActivity.java \
+          && echo "  ✓ Periodic polling for new events implemented" || echo "  ✗ Missing"
+
+    - name: Verify auto-scan on dashboard launch
+      run: |
+        grep -q "postDelayed.*startScan\|isEmpty.*startScan\|startScan.*isEmpty" \
+          srcs/juloo/sysconsole/SecurityDashboardActivity.java \
+          && echo "✓ Auto-scan on first launch is implemented" \
+          || echo "✗ Auto-scan on first launch is missing"
+
+    - name: Count implemented security rules
+      run: |
+        echo "=== Detection Engine Statistics ==="
+        echo "Known stalkerware signatures : $(grep -c 'putThreat' srcs/juloo/sysconsole/SpyDetectionEngine.java || echo 0)"
+        echo "ShizukuCommandHelper methods : $(grep -c 'public static' srcs/juloo/sysconsole/ShizukuCommandHelper.java || echo 0)"
+        echo "Sensor types tracked         : $(grep -c 'case \"CAMERA\"\|case \"MIC\"\|case \"LOCATION\"\|case \"SMS\"\|case \"CONTACTS\"' srcs/juloo/sysconsole/ShizukuCommandHelper.java || echo 0)"
+        echo ""
+        echo "=== Shizuku API Call Sites ==="
+        echo "ShizukuCommandHelper usages  : $(grep -rn 'ShizukuCommandHelper\.' srcs/ | wc -l)"
+        echo "Shizuku.newProcess/spawn     : $(grep -rn 'Shizuku.newProcess\|spawnProcess' srcs/ | wc -l)"
+        echo "SpyDetectionEngine usages    : $(grep -rn 'SpyDetectionEngine\.' srcs/ | wc -l)"
+        echo "BankingRiskAnalyzer usages   : $(grep -rn 'BankingRiskAnalyzer\.' srcs/ | wc -l)"
+
+  # ── 4. Release APK (on version tags only) ────────────────────────────────
+  release:
+    name: Build Release APK
+    runs-on: ubuntu-latest
+    needs: [ build, security-audit ]
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: gradle
+
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+
+    - name: Restore or generate release keystore
+      run: |
+        if [ -n "${{ secrets.RELEASE_KEYSTORE }}" ]; then
+          echo "${{ secrets.RELEASE_KEYSTORE }}" | base64 -d > release.keystore
+          echo "Using release keystore from secrets"
+        else
+          keytool -genkeypair -v \
+            -keystore release.keystore \
+            -alias release \
+            -keyalg RSA -keysize 2048 \
+            -validity 10000 \
+            -storepass "release0" \
+            -keypass "release0" \
+            -dname "CN=Family Security Auditor, O=Release, L=Unknown, S=Unknown, C=US"
+        fi
+
+    - name: Build release APK
+      run: ./gradlew assembleRelease --no-daemon --stacktrace
+      env:
+        RELEASE_KEYSTORE: "release.keystore"
+        RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD || 'release0' }}
+        RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS || 'release' }}
+        RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD || 'release0' }}
+
+    - name: Upload release APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: family-security-auditor-release-${{ github.ref_name }}
+        path: build/outputs/apk/release/*.apk
+        retention-days: 90
+
+    - name: Create GitHub Release with APK
+      uses: softprops/action-gh-release@v2
+      with:
+        files: build/outputs/apk/release/*.apk
+        generate_release_notes: true

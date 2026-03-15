@@ -12,12 +12,12 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import android.content.pm.PackageManager;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
-import java.util.Random;
 
 public class MonitorActivity extends Activity {
 
@@ -35,6 +35,8 @@ public class MonitorActivity extends Activity {
     private final Handler mHandler = new Handler(Looper.getMainLooper());
     private final SimpleDateFormat mSdf =
             new SimpleDateFormat("h:mm:ss a", Locale.getDefault());
+    private final SimpleDateFormat mSdfFull =
+            new SimpleDateFormat("h:mm a", Locale.getDefault());
 
     @Override
     protected void onCreate(Bundle s) {
@@ -43,7 +45,7 @@ public class MonitorActivity extends Activity {
         mUi  = new SecurityUiHelper(this);
         buildUi();
         populateRunningApps();
-        seedFeed();
+        loadInitialFeed();
         startPolling();
     }
 
@@ -223,10 +225,31 @@ public class MonitorActivity extends Activity {
             mRunningContainer.addView(buildRunningAppChip(a));
             shown++;
         }
-        if (shown == 0) {
+        final int shownFinal = shown;
+        if (shownFinal == 0) {
             mRunningContainer.addView(mUi.label(
-                    "No running app data available.", 12f,
-                    SecurityUiHelper.CLR_SECONDARY, false));
+                    "Loading…", 12f, SecurityUiHelper.CLR_SECONDARY, false));
+        }
+        // Supplement with Shizuku foreground service list in the background
+        if (ShizukuCommandHelper.isAvailable()) {
+            new Thread(() -> {
+                List<String> fgPkgs = ShizukuCommandHelper.getForegroundServicePackages();
+                if (!fgPkgs.isEmpty()) {
+                    mHandler.post(() -> updateRunningAppsFromShizuku(fgPkgs));
+                } else if (shownFinal == 0) {
+                    mHandler.post(() -> {
+                        mRunningContainer.removeAllViews();
+                        mRunningContainer.addView(mUi.label(
+                                "No foreground services detected.",
+                                12f, SecurityUiHelper.CLR_SECONDARY, false));
+                    });
+                }
+            }).start();
+        } else if (shown == 0) {
+            mRunningContainer.removeAllViews();
+            mRunningContainer.addView(mUi.label(
+                    "Run a scan to see running apps. Enable Shizuku for live list.",
+                    12f, SecurityUiHelper.CLR_SECONDARY, false));
         }
     }
 
@@ -270,29 +293,89 @@ public class MonitorActivity extends Activity {
         return chip;
     }
 
-    private void seedFeed() {
-        List<AppSecurityInfo> apps = mMgr.getCachedApps();
-        if (apps.isEmpty()) {
-            addFeedEntry("📱 System", "Monitoring started", SecurityUiHelper.CLR_TEAL);
-            return;
+    /**
+     * Loads real sensor events from Shizuku AppOps (privileged) or falls back
+     * to cached app data.  Runs on a background thread to avoid blocking UI.
+     */
+    private void loadInitialFeed() {
+        addFeedEntry("📡 Monitor", "Loading sensor history…", SecurityUiHelper.CLR_TEAL);
+        new Thread(() -> {
+            List<ShizukuCommandHelper.SensorEvent> events = new ArrayList<>();
+            if (ShizukuCommandHelper.isAvailable()) {
+                // 60-minute window via Shizuku AppOps dump
+                events = ShizukuCommandHelper.getRecentSensorEvents(60 * 60 * 1000L);
+            }
+            // Build fallback entries from cached app data if Shizuku is unavailable
+            if (events.isEmpty()) {
+                List<AppSecurityInfo> apps = mMgr.getCachedApps();
+                for (AppSecurityInfo a : apps) {
+                    if (a.cameraUsedRecently)
+                        events.add(new ShizukuCommandHelper.SensorEvent(
+                                a.packageName, "CAMERA", "📷", System.currentTimeMillis()));
+                    if (a.micUsedRecently)
+                        events.add(new ShizukuCommandHelper.SensorEvent(
+                                a.packageName, "MIC", "🎙", System.currentTimeMillis()));
+                    if (a.locationUsedRecently)
+                        events.add(new ShizukuCommandHelper.SensorEvent(
+                                a.packageName, "LOCATION", "📍", System.currentTimeMillis()));
+                }
+            }
+            final List<ShizukuCommandHelper.SensorEvent> finalEvents = events;
+            mHandler.post(() -> {
+                mFeedContainer.removeAllViews();
+                if (finalEvents.isEmpty()) {
+                    addFeedEntry("✅ Monitor",
+                            ShizukuCommandHelper.isAvailable()
+                                    ? "No sensor activity in last 60 minutes"
+                                    : "Run a scan first to see activity here",
+                            SecurityUiHelper.CLR_GREEN);
+                    return;
+                }
+                for (ShizukuCommandHelper.SensorEvent e : finalEvents) {
+                    String label = resolveAppName(e.packageName);
+                    String desc  = sensorDesc(e.sensorType);
+                    int color    = sensorColor(e.sensorType);
+                    addFeedEntryWithTime(e.emoji + " " + label, desc, color, e.timestamp);
+                }
+            });
+        }).start();
+    }
+
+    private String resolveAppName(String pkg) {
+        // Try to get a friendly name from cached apps first
+        for (AppSecurityInfo a : mMgr.getCachedApps()) {
+            if (a.packageName.equals(pkg)) return a.appName;
         }
-        for (AppSecurityInfo a : apps) {
-            if (a.cameraUsedRecently) {
-                addFeedEntry("📷 " + a.appName, "Camera accessed recently",
-                        SecurityUiHelper.CLR_ORANGE);
-            }
-            if (a.micUsedRecently) {
-                addFeedEntry("🎙 " + a.appName, "Microphone accessed recently",
-                        SecurityUiHelper.CLR_ORANGE);
-            }
-            if (a.locationUsedRecently) {
-                addFeedEntry("📍 " + a.appName, "Location accessed recently",
-                        SecurityUiHelper.CLR_SECONDARY);
-            }
+        // Fallback: try PackageManager
+        try {
+            return getPackageManager().getApplicationLabel(
+                    getPackageManager().getApplicationInfo(pkg, 0)).toString();
+        } catch (PackageManager.NameNotFoundException e) {
+            return pkg.contains(".") ? pkg.substring(pkg.lastIndexOf('.') + 1) : pkg;
         }
-        if (mFeedContainer.getChildCount() == 0) {
-            addFeedEntry("✅ Monitor", "No suspicious activity detected",
-                    SecurityUiHelper.CLR_GREEN);
+    }
+
+    private String sensorDesc(String type) {
+        switch (type) {
+            case "CAMERA":   return "Camera accessed";
+            case "MIC":      return "Microphone accessed";
+            case "LOCATION": return "Location accessed";
+            case "SMS":      return "SMS read";
+            case "CONTACTS": return "Contacts read";
+            case "CALL_LOG": return "Call log read";
+            default:         return "Sensor accessed";
+        }
+    }
+
+    private int sensorColor(String type) {
+        switch (type) {
+            case "CAMERA":   return SecurityUiHelper.CLR_ORANGE;
+            case "MIC":      return SecurityUiHelper.CLR_RED;
+            case "LOCATION": return SecurityUiHelper.CLR_SECONDARY;
+            case "SMS":
+            case "CONTACTS":
+            case "CALL_LOG": return 0xFFBB86FC;
+            default:         return SecurityUiHelper.CLR_TEAL;
         }
     }
 
@@ -325,7 +408,11 @@ public class MonitorActivity extends Activity {
         }
     }
 
+    // Track last seen events to only show NEW ones in the live feed
+    private long mLastPollTime = System.currentTimeMillis();
+
     private void startPolling() {
+        // Status update every 5s
         mHandler.postDelayed(new Runnable() {
             @Override
             public void run() {
@@ -334,25 +421,136 @@ public class MonitorActivity extends Activity {
                 mHandler.postDelayed(this, 5000);
             }
         }, 5000);
+
+        // Live feed refresh every 30s (Shizuku AppOps) on background thread
+        mHandler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                if (!mRunning) return;
+                final long since = mLastPollTime;
+                mLastPollTime = System.currentTimeMillis();
+                new Thread(() -> {
+                    List<ShizukuCommandHelper.SensorEvent> newEvents = new ArrayList<>();
+                    if (ShizukuCommandHelper.isAvailable()) {
+                        List<ShizukuCommandHelper.SensorEvent> all =
+                                ShizukuCommandHelper.getRecentSensorEvents(30 * 60 * 1000L);
+                        for (ShizukuCommandHelper.SensorEvent e : all) {
+                            if (e.timestamp > since) newEvents.add(e);
+                        }
+                    }
+                    // Also refresh running apps from Shizuku process list
+                    List<String> fgPkgs = ShizukuCommandHelper.isAvailable()
+                            ? ShizukuCommandHelper.getForegroundServicePackages()
+                            : new ArrayList<>();
+                    mHandler.post(() -> {
+                        for (ShizukuCommandHelper.SensorEvent e : newEvents) {
+                            String label = resolveAppName(e.packageName);
+                            addFeedEntryWithTime(e.emoji + " " + label,
+                                    sensorDesc(e.sensorType), sensorColor(e.sensorType),
+                                    e.timestamp);
+                        }
+                        if (!fgPkgs.isEmpty()) updateRunningAppsFromShizuku(fgPkgs);
+                    });
+                }).start();
+                mHandler.postDelayed(this, 30_000);
+            }
+        }, 30_000);
     }
 
     private void updateSensorStatus() {
-        List<AppSecurityInfo> apps = mMgr.getCachedApps();
-        boolean camActive = false, micActive = false, locActive = false;
-        String camApp = "", micApp = "", locApp = "";
+        new Thread(() -> {
+            boolean camActive = false, micActive = false, locActive = false;
+            String camApp = "", micApp = "", locApp = "";
 
-        for (AppSecurityInfo a : apps) {
-            if (a.isRunning && a.cameraUsedRecently)   { camActive = true; camApp = a.appName; }
-            if (a.isRunning && a.micUsedRecently)      { micActive = true; micApp = a.appName; }
-            if (a.isRunning && a.locationUsedRecently) { locActive = true; locApp = a.appName; }
+            if (ShizukuCommandHelper.isAvailable()) {
+                // Use real-time Shizuku AppOps (5-minute window = "currently in use")
+                List<ShizukuCommandHelper.SensorEvent> recent =
+                        ShizukuCommandHelper.getRecentSensorEvents(5 * 60 * 1000L);
+                for (ShizukuCommandHelper.SensorEvent e : recent) {
+                    String name = resolveAppName(e.packageName);
+                    switch (e.sensorType) {
+                        case "CAMERA":   camActive = true; if (camApp.isEmpty()) camApp = name; break;
+                        case "MIC":      micActive = true; if (micApp.isEmpty()) micApp = name; break;
+                        case "LOCATION": locActive = true; if (locApp.isEmpty()) locApp = name; break;
+                    }
+                }
+            } else {
+                // Fallback: use cached scan data
+                for (AppSecurityInfo a : mMgr.getCachedApps()) {
+                    if (a.isRunning && a.cameraUsedRecently)   { camActive = true; if (camApp.isEmpty()) camApp = a.appName; }
+                    if (a.isRunning && a.micUsedRecently)      { micActive = true; if (micApp.isEmpty()) micApp = a.appName; }
+                    if (a.isRunning && a.locationUsedRecently) { locActive = true; if (locApp.isEmpty()) locApp = a.appName; }
+                }
+            }
+
+            final boolean fc = camActive, fm = micActive, fl = locActive;
+            final String fca = camApp, fma = micApp, fla = locApp;
+            mHandler.post(() -> {
+                setSensorState(mCameraDot,   mCameraStatus,   fc, fc ? fca : "Idle");
+                setSensorState(mMicDot,      mMicStatus,      fm, fm ? fma : "Idle");
+                setSensorState(mLocationDot, mLocationStatus, fl, fl ? fla : "Idle");
+            });
+        }).start();
+    }
+
+    private void updateRunningAppsFromShizuku(List<String> fgPkgs) {
+        // Only update if Shizuku is providing new data beyond the cached scan
+        mRunningContainer.removeAllViews();
+        List<AppSecurityInfo> cached = mMgr.getCachedApps();
+        int shown = 0;
+        // Show Shizuku foreground service packages first
+        for (String pkg : fgPkgs) {
+            if (shown >= 10) break;
+            AppSecurityInfo match = null;
+            for (AppSecurityInfo a : cached) {
+                if (a.packageName.equals(pkg)) { match = a; break; }
+            }
+            if (match != null) {
+                mRunningContainer.addView(buildRunningAppChip(match));
+            } else {
+                mRunningContainer.addView(buildShizukuAppChip(pkg));
+            }
+            shown++;
         }
+        // Fill remaining from cached
+        for (AppSecurityInfo a : cached) {
+            if (shown >= 10) break;
+            if (!a.isRunning) continue;
+            boolean already = false;
+            for (String p : fgPkgs) { if (p.equals(a.packageName)) { already = true; break; } }
+            if (!already) { mRunningContainer.addView(buildRunningAppChip(a)); shown++; }
+        }
+        if (shown == 0) {
+            mRunningContainer.addView(mUi.label(
+                    "No running app data. Enable Shizuku for full process list.",
+                    12f, SecurityUiHelper.CLR_SECONDARY, false));
+        }
+    }
 
-        setSensorState(mCameraDot, mCameraStatus, camActive,
-                camActive ? camApp : "Idle");
-        setSensorState(mMicDot, mMicStatus, micActive,
-                micActive ? micApp : "Idle");
-        setSensorState(mLocationDot, mLocationStatus, locActive,
-                locActive ? locApp : "Idle");
+    private View buildShizukuAppChip(String pkg) {
+        LinearLayout chip = new LinearLayout(this);
+        chip.setOrientation(LinearLayout.VERTICAL);
+        chip.setGravity(Gravity.CENTER);
+        chip.setPadding(mUi.dp(8), mUi.dp(8), mUi.dp(8), mUi.dp(8));
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(SecurityUiHelper.CLR_CARD2);
+        bg.setCornerRadius(mUi.dp(10));
+        chip.setBackground(bg);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(mUi.dp(64),
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        lp.rightMargin = mUi.dp(8);
+        chip.setLayoutParams(lp);
+        chip.addView(mUi.label("📦", 22f, SecurityUiHelper.CLR_SECONDARY, false));
+        chip.addView(mUi.spacer(4));
+        String shortName = pkg.contains(".") ? pkg.substring(pkg.lastIndexOf('.') + 1) : pkg;
+        if (shortName.length() > 8) shortName = shortName.substring(0, 7) + "…";
+        TextView tvName = mUi.label(shortName, 9f, SecurityUiHelper.CLR_TEXT, false);
+        tvName.setGravity(Gravity.CENTER);
+        chip.addView(tvName);
+        chip.addView(mUi.spacer(3));
+        chip.addView(mUi.badge("Svc", SecurityUiHelper.CLR_TEAL & 0x33FFFFFF | 0xFF000000,
+                SecurityUiHelper.CLR_TEAL, 20));
+        return chip;
     }
 
     private void setSensorState(View dot, TextView label, boolean active, String text) {
@@ -361,5 +559,35 @@ public class MonitorActivity extends Activity {
         ((GradientDrawable) dot.getBackground()).setColor(color);
         label.setText(text.length() > 10 ? text.substring(0, 9) + "…" : text);
         label.setTextColor(color);
+    }
+
+    /** Adds a feed entry with a specific historical timestamp (not "now"). */
+    private void addFeedEntryWithTime(String source, String msg, int color, long epochMs) {
+        LinearLayout row = mUi.row(true);
+        row.setPadding(0, mUi.dp(6), 0, mUi.dp(6));
+
+        View dot = mUi.colorDot(color, 6);
+        row.addView(dot);
+
+        LinearLayout textCol = new LinearLayout(this);
+        textCol.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        textCol.setLayoutParams(lp);
+        textCol.addView(mUi.label(source, 12f, SecurityUiHelper.CLR_TEXT, true));
+        textCol.addView(mUi.label(msg, 11f, SecurityUiHelper.CLR_SECONDARY, false));
+        row.addView(textCol);
+
+        row.addView(mUi.label(mSdfFull.format(new Date(epochMs)), 10f,
+                SecurityUiHelper.CLR_SECONDARY, false));
+
+        if (mFeedContainer.getChildCount() > 0) {
+            mFeedContainer.addView(mUi.divider(), mFeedContainer.getChildCount());
+        }
+        mFeedContainer.addView(row);
+
+        while (mFeedContainer.getChildCount() > 60) {
+            mFeedContainer.removeViewAt(mFeedContainer.getChildCount() - 1);
+        }
     }
 }

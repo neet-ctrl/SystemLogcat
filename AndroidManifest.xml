@@ -35,6 +35,10 @@
       </intent-filter>
     </activity>
 
+    <!-- Scheduled scan via AlarmManager -->
+    <receiver android:name="juloo.sysconsole.ScheduledScanReceiver"
+        android:exported="false"/>
+
     <!-- Security Auditor: real-time install monitoring -->
     <receiver android:name="juloo.sysconsole.AppInstallReceiver"
         android:exported="false">
