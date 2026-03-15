@@ -60,7 +60,7 @@
 | **Target SDK** | 35 (Android 15) |
 | **Compile SDK** | android-35 |
 | **App Version** | 1.32.1 (versionCode 50) |
-| **Application ID** | `juloo.keyboard2` |
+| **Application ID** | `juloo.keyboard2` (debug builds use `juloo.keyboard2.debug`) |
 | **Key Dependencies** | `androidx.window:window-java:1.4.0`, `androidx.core:core:1.16.0` |
 | **Test Framework** | JUnit 4.13.2 |
 | **Database** | Android SQLite (via `SQLiteOpenHelper`) |
@@ -68,6 +68,7 @@
 | **Font** | Custom TTF font built from SVG sources via FontForge |
 | **Layout Assets** | Python-generated XML (`gen_layouts.py`, `gen_method_xml.py`) |
 | **Emoji Assets** | Python-generated raw text (`gen_emoji.py`) |
+| **File Sharing** | `androidx.core.content.FileProvider` with dynamic authority (`getPackageName() + ".provider"`) |
 
 ---
 
@@ -91,6 +92,8 @@ adb install app/build/outputs/apk/debug/app-debug.apk
 ```
 
 After installing, go to **Settings → System → Language & Input → On-screen keyboard** and enable **UnBelievable Keyboard**. Then select it as the active input method from the input method picker.
+
+> **Note on build variants:** Debug builds automatically use the `applicationIdSuffix = ".debug"` suffix (`juloo.keyboard2.debug`). All FileProvider authorities are resolved dynamically via `getPackageName() + ".provider"` and `${applicationId}.provider` in the manifest, so file sharing and PDF export work correctly in both debug and release builds without any code changes.
 
 ---
 
@@ -213,12 +216,17 @@ A full standalone screen (`ClipboardHistoryActivity.java`) accessible from the L
 
 - **Numbered list** of all clipboard entries (newest first)
 - **Alternating row colors** for easy scanning
+- **Multi-line preview** — each entry shows up to **3 lines** of content with `…` trailing ellipsis if truncated
+- **"▼ Show Full" button** — appears automatically on any clip longer than 80 characters; tapping it opens a scrollable dialog showing the complete text with a **Copy** button to copy the full content instantly
 - **Timestamps** shown for every entry
 - **Version labels** (e.g., "v2" for entries that have been edited)
 - **Real-time search** — filters entries by content or description as you type
 - **Tap to edit** — opens a dialog to edit content and description, save as version 2, delete, or share the entry
 - **Long-press to copy** — immediately copies the entry back to the system clipboard with a toast confirmation
-- **Share** — shares any entry as plain text via the Android share sheet
+- **Bulk delete** — remove the last N, oldest N, entries before a date, a date range, today's, this week's, or this month's entries
+- **Add new note** — manually add a note and choose to export it as `.txt`, `.pdf`, `.js`, `.java`, or `.html`
+- **Export history** — export all clipboard history to a `.txt` file via the system share sheet
+- **Clear all** — delete the entire history with a confirmation prompt
 
 ### Pin Entries
 
@@ -226,12 +234,30 @@ Entries can be **pinned** from the inline keyboard pane. Pinned entries always a
 
 ### Backup & Restore
 
-All clipboard history, settings, and learned words can be exported as a single **JSON backup file** (`BackupRestoreSystem.java`). Three export methods are available:
+All clipboard history, settings, and learned words can be exported using `BackupRestoreSystem.java`. When you tap **Backup**, a format selection dialog appears first:
+
+**PDF Backup:**
+- Generates a fully formatted, multi-page PDF containing:
+  - Dark blue title header with generation date and clip count
+  - Summary box showing entry counts for clipboard, settings, and learned words
+  - Full clipboard history — all entries with content, timestamp, description, and version
+  - Learned words listed in rows
+  - All settings as key-value pairs
+  - A footer note confirming the file can be used for restore
+- The full JSON backup data is embedded after the PDF content using a machine-readable marker (`%%KEYBOARD_BACKUP_JSON_START` / `%%KEYBOARD_BACKUP_JSON_END`), so the PDF file can be selected directly in the Restore dialog — no separate `.json` file needed
+
+**JSON Backup:**
+The existing three-option dialog is shown:
 - Copy raw JSON directly to clipboard
 - Share as a `.json` file via the Android share sheet
 - Download via browser
 
-Restoring is done by selecting a backup file from the device file picker. The restore process merges clipboard entries (skipping duplicates) and restores all settings and learned words.
+**Restore:**
+Tap Restore and select either a `.json` backup file **or** a `.pdf` backup file from the file picker. The restore system automatically detects the file type:
+- **JSON file** — restores directly from the JSON content
+- **PDF file** — extracts the embedded JSON block from the file and restores from it
+
+The restore process merges clipboard entries (skipping exact duplicates) and restores all settings and learned words.
 
 ---
 
@@ -460,8 +486,10 @@ All settings are accessible from the Launcher via the menu (top-right) → **Set
 
 | Setting | Description |
 |---|---|
-| **Backup Settings** | Creates a full JSON backup containing all app settings, the complete clipboard history (unlimited entries), and all learned words. Export options: copy JSON to clipboard, share as a `.json` file via share sheet, or download via browser. The backup dialog shows the number of clips being backed up in the title. |
-| **Restore Settings** | Opens the Android file picker to select a backup `.json` file. Merges clipboard entries (skipping exact duplicates), restores settings preferences, and restores the learned word dictionary. |
+| **Backup Settings** | Creates a full backup of all app settings, the complete clipboard history (unlimited entries), and all learned words. Tapping opens a **format selection dialog**: choose **PDF** or **JSON**. |
+| | **PDF format** — generates a formatted, multi-page PDF with a title header, summary box, full clipboard history, learned words, and settings. The raw backup data is also embedded inside the PDF so it can be selected directly in the Restore dialog. |
+| | **JSON format** — shows the three-option dialog: copy JSON to clipboard, share as a `.json` file via share sheet, or download via browser. |
+| **Restore Settings** | Opens the Android file picker. Accepts both `.json` and `.pdf` backup files. Automatically detects the file type: JSON files are restored directly; PDF files have their embedded JSON extracted first. Merges clipboard entries (skipping exact duplicates), restores settings preferences, and restores the learned word dictionary. |
 
 ---
 
@@ -519,7 +547,7 @@ UnBelievable Keyboard/
 │   ├── ComposeKeyData.java            Binary state machine data for all compose sequences
 │   │
 │   ├── ClipboardHistoryService.java   System clipboard monitor — stores and manages history
-│   ├── ClipboardHistoryActivity.java  Full clipboard history screen — search, edit, share, delete
+│   ├── ClipboardHistoryActivity.java  Full clipboard history screen — search, edit, expand, share, delete
 │   ├── ClipboardHistoryView.java      Inline clipboard pane rendered inside the keyboard
 │   ├── ClipboardHistoryCheckBox.java  Checkbox entry item for the clipboard pane
 │   ├── ClipboardPinView.java          Pinned clipboard entries display
@@ -527,11 +555,11 @@ UnBelievable Keyboard/
 │   ├── TypingMasterActivity.java      Typing practice screen with WPM scoring and audio feedback
 │   │
 │   ├── LauncherActivity.java          App launcher screen — entry point to all features
-│   ├── SettingsActivity.java          Settings screen — all preferences, backup, restore
+│   ├── SettingsActivity.java          Settings screen — preferences, backup (PDF+JSON), restore (PDF+JSON)
 │   │
 │   ├── Config.java                    Global configuration — loads and caches all preferences
 │   ├── Theme.java                     Theme color and border drawing attributes
-│   ├── BackupRestoreSystem.java       JSON backup and restore for settings + clipboard + words
+│   ├── BackupRestoreSystem.java       Backup and restore for settings + clipboard + words (JSON + PDF)
 │   ├── Suggestions.java               Word prediction and user-learned word dictionary
 │   ├── CandidatesView.java            Word suggestions bar displayed above the keyboard
 │   ├── Autocapitalisation.java        Auto-capitalize logic after sentence-ending punctuation
@@ -553,7 +581,7 @@ UnBelievable Keyboard/
 │   ├── Modmap.java                    Modifier-to-character mapping tables
 │   │
 │   ├── devconsole/
-│   │   ├── DevConsoleService.java         Floating console overlay — all UI, log display, actions
+│   │   ├── DevConsoleService.java         Floating console overlay — all UI, log display, PDF export
 │   │   ├── DevConsoleManager.java         Console service lifecycle and log listener registry
 │   │   ├── DevConsoleHelper.java          Log fetching helpers (server endpoint + Logcat reader)
 │   │   ├── DevConsoleDatabaseHelper.java  SQLite persistence for saved log collections
@@ -593,7 +621,7 @@ UnBelievable Keyboard/
 │   │   ├── settings.xml                   Preference screen definitions
 │   │   ├── method.xml                     IME subtypes (auto-generated by Python)
 │   │   ├── clipboard_widget_info.xml      App widget metadata and sizing
-│   │   └── file_paths.xml                 FileProvider paths for PDF file sharing
+│   │   └── file_paths.xml                 FileProvider paths for PDF and JSON file sharing
 │   │
 │   └── values/
 │       ├── strings.xml                    All user-visible strings (English base)
@@ -633,13 +661,14 @@ UnBelievable Keyboard/
 - **Open source** — fully auditable code, based on the juloo.keyboard2 engine
 - **Multi-script** — 60+ keyboard layouts covering Latin, Cyrillic, Arabic, Hebrew, Devanagari, Bengali, Greek, Georgian, Armenian, Hangul, Kannada, and more
 - **Swipe-based input** — access up to 9 characters per physical key via directional swipes, eliminating the need to switch layouts constantly for symbols and punctuation
-- **Clipboard history** — never lose copied text again; accessible inline from the keyboard without switching apps, with search, edit, pin, and share features
+- **Clipboard history** — never lose copied text again; accessible inline from the keyboard without switching apps, with search, edit, expand full content, pin, bulk delete, and share features
 - **Home-screen widget** — your clipboard is always one glance away on your home screen
 - **Floating clipboard widget** — a draggable overlay puts clipboard access above every app at any time
 - **Typing trainer** — built-in WPM-scored typing practice with real-time character validation and audio feedback
 - **Developer console** — a complete floating log monitor with filtering, selection, saving, and styled PDF export that works above any running app
-- **Backup & Restore** — all settings and clipboard history are portable via a single JSON file, exportable in three ways
+- **PDF & JSON backup** — all settings and clipboard history are portable; export as a formatted PDF (readable by humans, restorable by the app) or as a JSON file in three ways; restore accepts both formats automatically
 - **Foldable support** — separate layout, height, and margin configurations for folded and unfolded foldable device states
 - **Highly themeable** — 17 built-in themes including Monet dynamic color, ePaper, Rosé Pine, Everforest, Cobalt, and more
 - **Direct-boot aware** — keyboard is fully usable immediately after device boot, even before the device is unlocked
 - **Multi-language UI** — the app interface is translated into 21 languages
+- **Debug/release safe** — FileProvider authorities are resolved dynamically from the package name, so file sharing and PDF export work correctly in both debug and release build variants without any configuration
