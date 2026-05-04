@@ -2,7 +2,7 @@ name: Release APK Build
 
 on:
   push:
-    branches: [main, master,{keyboard+SystemConsole}]
+    branches: [main, master,"{keyboard+SystemConsole}"]
     tags: ['v*']
   workflow_dispatch:
 
