@@ -1,0 +1,143 @@
+name: Release APK Build
+
+on:
+  push:
+    branches: [main, master]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build Signed Release APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Validate Gradle wrapper
+        uses: gradle/wrapper-validation-action@v3
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Decode and write release keystore
+        run: |
+          echo "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" | base64 -d > release.jks
+
+      - name: Build signed release APK
+        id: build
+        run: ./gradlew assembleRelease --no-daemon --stacktrace
+        env:
+          RELEASE_KEYSTORE: release.jks
+          RELEASE_KEYSTORE_PASSWORD: "Sh@090609"
+          RELEASE_KEY_ALIAS: my-key
+          RELEASE_KEY_PASSWORD: "Sh@090609"
+
+      - name: Locate APK
+        id: apk
+        run: |
+          APK_PATH=$(find build/outputs/apk/release -name "*.apk" ! -name "*-unsigned*" | head -n 1)
+          echo "Found APK at $APK_PATH"
+          echo "path=$APK_PATH" >> "$GITHUB_OUTPUT"
+          echo "name=$(basename "$APK_PATH")" >> "$GITHUB_OUTPUT"
+
+      - name: Upload release APK as workflow artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: keyboard2-release-apk
+          path: ${{ steps.apk.outputs.path }}
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Get APK info
+        id: apk-info
+        run: |
+          APK_PATH="${{ steps.apk.outputs.path }}"
+          APK_SIZE=$(stat -c%s "$APK_PATH")
+          APK_SIZE_MB=$(echo "scale=2; $APK_SIZE / 1048576" | bc)
+          echo "apk_size=$APK_SIZE_MB MB" >> $GITHUB_OUTPUT
+
+      - name: Generate release notes
+        id: release-notes
+        run: |
+          DATE=$(date +'%B %d, %Y')
+          VERSION=$(grep -oP 'versionName\s*=\s*"\K[^"]+' build.gradle.kts)
+
+          RELEASE_BODY="## 📱 Unexpected Keyboard v$VERSION
+
+          **Release Date:** $DATE
+
+          ### 📱 What's New
+          - Latest signed production build
+          - Includes all recent features, fixes and improvements
+          - Optimized and ready for everyday use
+
+          ### 📦 Package Details
+          - **Version:** $VERSION
+          - **Build Type:** Release (signed)
+          - **File Size:** ${{ steps.apk-info.outputs.apk_size }}
+          - **Platform:** Android 7.0+ (API 24+)
+          - **Commit:** \`${{ github.sha }}\`
+
+          ### 🚀 Features
+          - Highly customizable keyboard for Android
+          - Support for many layouts and languages
+          - Extra keys, symbols and special characters
+          - Compose key sequences support
+          - Emoji support
+          - Open source and privacy-friendly
+
+          ### ⚠️ Important Notes
+          - Signed release build — safe to install over previous releases
+          - Enable \"Install from Unknown Sources\" on your device
+          - Grant any requested permissions when prompted
+
+          ### 📥 Installation
+          1. Download the APK file below
+          2. Enable installation from unknown sources for your browser/file manager
+          3. Install and open the keyboard; finish the in-app setup
+
+          ---
+          **Repository:** [GitHub](https://github.com/${{ github.repository }})"
+
+          echo "body<<EOF" >> $GITHUB_OUTPUT
+          echo "$RELEASE_BODY" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        if: success()
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.run_number }}-release
+          name: Release Build ${{ github.run_number }}
+          body: ${{ steps.release-notes.outputs.body }}
+          files: |
+            ${{ steps.apk.outputs.path }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
