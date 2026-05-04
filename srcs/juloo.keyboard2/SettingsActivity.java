@@ -119,18 +119,28 @@ public class SettingsActivity extends PreferenceActivity
       Uri uri = data.getData();
       if (uri != null) {
         boolean isPdf = isUriPdf(uri);
-        boolean ok;
-        if (isPdf) {
-          ok = restoreFromPdfUri(uri);
-        } else {
-          ok = BackupRestoreSystem.restoreBackupFromUri(this, uri);
-        }
-        if (ok) {
-          Toast.makeText(this, R.string.restore_success, Toast.LENGTH_LONG).show();
-          recreate();
-        } else {
-          Toast.makeText(this, R.string.restore_failed, Toast.LENGTH_SHORT).show();
-        }
+        android.app.ProgressDialog prog = new android.app.ProgressDialog(this);
+        prog.setMessage("Restoring backup…");
+        prog.setCancelable(false);
+        prog.show();
+        new Thread(() -> {
+          boolean ok;
+          if (isPdf) {
+            ok = restoreFromPdfUri(uri);
+          } else {
+            ok = BackupRestoreSystem.restoreBackupFromUri(this, uri);
+          }
+          final boolean finalOk = ok;
+          runOnUiThread(() -> {
+            try { prog.dismiss(); } catch (Exception ignored) {}
+            if (finalOk) {
+              Toast.makeText(this, R.string.restore_success, Toast.LENGTH_LONG).show();
+              recreate();
+            } else {
+              Toast.makeText(this, R.string.restore_failed, Toast.LENGTH_SHORT).show();
+            }
+          });
+        }).start();
       }
     }
   }
@@ -149,6 +159,8 @@ public class SettingsActivity extends PreferenceActivity
   /**
    * Read the PDF file, find the embedded JSON block appended after %%EOF,
    * and restore from it.
+   * Searches for markers directly in the raw bytes — converting the full binary
+   * PDF to a UTF-8 String corrupts the data and makes indexOf() unreliable.
    */
   private boolean restoreFromPdfUri(Uri uri) {
     try {
@@ -156,14 +168,18 @@ public class SettingsActivity extends PreferenceActivity
       if (is == null) return false;
       byte[] bytes = readAllBytes(is);
       is.close();
-      String raw = new String(bytes, "UTF-8");
-      int start = raw.indexOf("%%KEYBOARD_BACKUP_JSON_START\n");
-      int end   = raw.indexOf("\n%%KEYBOARD_BACKUP_JSON_END");
-      if (start < 0 || end < 0 || end <= start) return false;
-      String json = raw.substring(start + "%%KEYBOARD_BACKUP_JSON_START\n".length(), end);
+      byte[] startMarker = "%%KEYBOARD_BACKUP_JSON_START\n".getBytes("UTF-8");
+      byte[] endMarker   = "\n%%KEYBOARD_BACKUP_JSON_END".getBytes("UTF-8");
+      int start = indexOfBytes(bytes, startMarker, 0);
+      if (start < 0) return false;
+      int jsonStart = start + startMarker.length;
+      int end = indexOfBytes(bytes, endMarker, jsonStart);
+      if (end < 0) return false;
+      String json = new String(bytes, jsonStart, end - jsonStart, "UTF-8");
       return BackupRestoreSystem.restoreBackup(this, json.trim());
     } catch (Exception e) {
-      Toast.makeText(this, "PDF restore failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+      runOnUiThread(() ->
+          Toast.makeText(this, "PDF restore failed: " + e.getMessage(), Toast.LENGTH_LONG).show());
       return false;
     }
   }
@@ -174,6 +190,18 @@ public class SettingsActivity extends PreferenceActivity
     int n;
     while ((n = is.read(chunk)) != -1) buffer.write(chunk, 0, n);
     return buffer.toByteArray();
+  }
+
+  /** Boyer-Moore-style byte search — finds [needle] in [haystack] starting at [from]. */
+  private int indexOfBytes(byte[] haystack, byte[] needle, int from) {
+    outer:
+    for (int i = from; i <= haystack.length - needle.length; i++) {
+      for (int j = 0; j < needle.length; j++) {
+        if (haystack[i + j] != needle[j]) continue outer;
+      }
+      return i;
+    }
+    return -1;
   }
 
   // ── BACKUP HELPERS ────────────────────────────────────────────────────────

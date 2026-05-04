@@ -139,6 +139,7 @@ public class BackupRestoreSystem {
                     else if (value instanceof Integer)        editor.putInt(key, (Integer) value);
                     else if (value instanceof Long)           editor.putLong(key, (Long) value);
                     else if (value instanceof Float)          editor.putFloat(key, (Float) value);
+                    else if (value instanceof Double)         editor.putFloat(key, ((Double) value).floatValue());
                     else if (value instanceof String)         editor.putString(key, (String) value);
                     else if (value instanceof org.json.JSONArray) {
                         org.json.JSONArray array = (org.json.JSONArray) value;
