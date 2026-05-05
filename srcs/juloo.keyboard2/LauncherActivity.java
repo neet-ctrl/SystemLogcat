@@ -106,6 +106,15 @@ public class LauncherActivity extends Activity implements Handler.Callback
       btnTutorial.setOnClickListener(v ->
           startActivity(new Intent(this, TutorialActivity.class)));
 
+    View btnGithub = findViewById(R.id.btn_github);
+    if (btnGithub != null)
+      btnGithub.setOnClickListener(v -> {
+        try {
+          startActivity(new Intent(Intent.ACTION_VIEW,
+              Uri.parse("https://github.com/neet-ctrl/FullKeyboard-SystemConsole")));
+        } catch (Exception ignored) {}
+      });
+
     // First-run: show tutorial automatically
     TutorialActivity.showIfFirstLaunch(this);
 

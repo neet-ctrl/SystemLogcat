@@ -392,17 +392,21 @@
             android:layout_height="wrap_content"
             android:layout_gravity="center"
             android:text="@string/launcher_sourcecode"
-            android:textSize="11sp"/>
+            android:textSize="11sp"
+            android:gravity="center"/>
 
-        <TextView
+        <Button
+            android:id="@+id/btn_github"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center"
-            android:text="@string/launcher_repo_url"
-            android:autoLink="web"
-            android:linksClickable="true"
-            android:textSize="11sp"
-            android:layout_marginTop="4dp"/>
+            android:layout_marginTop="10dp"
+            android:text="@string/launcher_github_btn"
+            android:textSize="13sp"
+            android:paddingStart="24dp"
+            android:paddingEnd="24dp"
+            android:paddingTop="10dp"
+            android:paddingBottom="10dp"/>
 
       </LinearLayout>
 
