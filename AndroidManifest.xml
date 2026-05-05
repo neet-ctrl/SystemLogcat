@@ -32,7 +32,13 @@
 
     <activity android:name="juloo.keyboard2.ClipboardHistoryActivity"
               android:label="Clipboard History"
-              android:theme="@android:style/Theme.DeviceDefault"
+              android:theme="@android:style/Theme.Material.Light.NoActionBar"
+              android:exported="true">
+    </activity>
+
+    <activity android:name="juloo.keyboard2.AppSettingsActivity"
+              android:label="App Settings"
+              android:theme="@android:style/Theme.Material.Light.NoActionBar"
               android:exported="true">
     </activity>
 

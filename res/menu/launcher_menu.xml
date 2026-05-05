@@ -3,8 +3,15 @@
     tools:context=".LauncherActivity">
 
     <item
-        android:id="@+id/btnLaunchSettingsActivity"
-        android:title=""
+        android:id="@+id/menu_keyboard_settings"
+        android:title="Keyboard Settings"
         android:icon="@drawable/cog_outline"
         android:showAsAction="always" />
+
+    <item
+        android:id="@+id/menu_app_settings"
+        android:title="App Settings"
+        android:icon="@drawable/ic_tune"
+        android:showAsAction="always" />
+
 </menu>

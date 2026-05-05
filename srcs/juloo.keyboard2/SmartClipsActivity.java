@@ -3,8 +3,9 @@ package juloo.keyboard2;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
-import android.content.SharedPreferences;
 import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.text.InputType;
@@ -19,189 +20,280 @@ public class SmartClipsActivity extends Activity
         implements SmartClipsService.OnSmartClipsChangeListener {
 
     private SmartClipsService _service;
-    private ListView _listView;
-    private GridView _gridView;
-    private EditText _searchBar;
-    private ClipAdapter _adapter;
-    private GridClipAdapter _gridAdapter;
-    private boolean _isGridView = false;
-    private List<SmartClipsService.SmartClip> _allClips = new ArrayList<>();
+    private ListView          _listView;
+    private GridView          _gridView;
+    private EditText          _searchBar;
+    private ClipAdapter       _adapter;
+    private GridClipAdapter   _gridAdapter;
+    private boolean           _isGridView = false;
+    private List<SmartClipsService.SmartClip> _allClips      = new ArrayList<>();
     private List<SmartClipsService.SmartClip> _filteredClips = new ArrayList<>();
-    private Handler _handler = new Handler();
+    private Handler  _handler = new Handler();
     private Runnable _unlockCountdown;
     private TextView _unlockTimer;
 
+    // Theme
+    private ThemeManager.ThemeColors C;
+    private float D;
+    private String _createdWithSig;
+    private boolean _isMatrix;
+
+    // ── Lifecycle ─────────────────────────────────────────────────────────────
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        ThemeManager.applyActivityTheme(this);
         super.onCreate(savedInstanceState);
-        setTheme(android.R.style.Theme_Material_Light_NoActionBar);
-
+        _createdWithSig = ThemeManager.signature(this);
+        C = ThemeManager.colors(this);
+        D = getResources().getDisplayMetrics().density;
+        _isMatrix = ThemeManager.isMatrixMode(this);
         _service = SmartClipsService.getInstance(this);
 
         if (_service.isLockEnabled() && !_service.isUnlocked()) {
-            if (!_service.isPinSetup()) {
-                showFirstTimePinSetup();
-            } else {
-                showPinDialog(true);
-            }
+            if (!_service.isPinSetup()) showFirstTimePinSetup();
+            else                        showPinDialog(true);
             return;
         }
-
         buildUI();
     }
 
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (!ThemeManager.signature(this).equals(_createdWithSig)) {
+            recreate();
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        _service.removeListener(this);
+        if (_unlockCountdown != null) _handler.removeCallbacks(_unlockCountdown);
+    }
+
+    @Override
+    public void onSmartClipsChanged() {
+        runOnUiThread(this::refreshClips);
+    }
+
+    // ── UI construction ───────────────────────────────────────────────────────
+
     private void buildUI() {
+        C = ThemeManager.colors(this);
+        _isMatrix = ThemeManager.isMatrixMode(this);
+
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(0xFFF5F5F5);
+        root.setBackgroundColor(C.background);
 
-        LinearLayout header = buildHeader();
-        root.addView(header);
+        root.addView(buildHeader());
+
+        // Search bar
+        FrameLayout searchWrap = new FrameLayout(this);
+        GradientDrawable searchBg = new GradientDrawable();
+        searchBg.setColor(C.surface);
+        searchBg.setCornerRadius(dp(12));
+        if (_isMatrix) searchBg.setStroke((int)(1.5f * D), C.primary);
+        searchWrap.setBackground(searchBg);
+        LinearLayout.LayoutParams swLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        swLp.setMargins(dp(16), dp(10), dp(16), dp(6));
+        searchWrap.setLayoutParams(swLp);
 
         _searchBar = new EditText(this);
-        _searchBar.setHint("Search clips...");
-        _searchBar.setPadding(32, 20, 32, 20);
-        _searchBar.setBackgroundColor(0xFFFFFFFF);
+        _searchBar.setHint("  🔍  Search clips…");
+        _searchBar.setHintTextColor(C.textHint);
+        _searchBar.setPadding(dp(16), dp(14), dp(16), dp(14));
+        _searchBar.setBackground(null);
+        _searchBar.setTextColor(C.textPrimary);
+        _searchBar.setTextSize(14);
+        if (_isMatrix) _searchBar.setTypeface(Typeface.MONOSPACE);
         _searchBar.addTextChangedListener(new android.text.TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int st, int c, int a) {}
             @Override public void onTextChanged(CharSequence s, int st, int b, int c) { filterClips(s.toString()); }
             @Override public void afterTextChanged(android.text.Editable s) {}
         });
-        LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        searchParams.setMargins(16, 8, 16, 4);
-        root.addView(_searchBar, searchParams);
+        searchWrap.addView(_searchBar);
+        if (Build.VERSION.SDK_INT >= 21) searchWrap.setElevation(dp(2));
+        root.addView(searchWrap);
 
+        // List / Grid views
         _listView = new ListView(this);
         _listView.setDivider(null);
-        _listView.setDividerHeight(8);
-        _listView.setPadding(16, 8, 16, 8);
+        _listView.setDividerHeight(dp(8));
+        _listView.setPadding(dp(16), dp(8), dp(16), dp(8));
+        _listView.setClipToPadding(false);
+        _listView.setBackgroundColor(0x00000000);
 
         _gridView = new GridView(this);
         _gridView.setNumColumns(2);
-        _gridView.setHorizontalSpacing(8);
-        _gridView.setVerticalSpacing(8);
-        _gridView.setPadding(16, 8, 16, 8);
+        _gridView.setHorizontalSpacing(dp(10));
+        _gridView.setVerticalSpacing(dp(10));
+        _gridView.setPadding(dp(16), dp(8), dp(16), dp(8));
+        _gridView.setClipToPadding(false);
         _gridView.setVisibility(View.GONE);
+        _gridView.setBackgroundColor(0x00000000);
 
-        LinearLayout.LayoutParams listParams = new LinearLayout.LayoutParams(
+        LinearLayout.LayoutParams listLp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f);
-        root.addView(_listView, listParams);
-        root.addView(_gridView, listParams);
+        root.addView(_listView, listLp);
+        root.addView(_gridView, listLp);
 
-        root.addView(buildFooter());
-
+        // Auto-unlock timer
         if (_service.isLockEnabled() && _service.isUnlocked()) {
             _unlockTimer = new TextView(this);
-            _unlockTimer.setPadding(16, 4, 16, 4);
+            _unlockTimer.setPadding(dp(16), dp(4), dp(16), dp(4));
             _unlockTimer.setTextSize(11);
-            _unlockTimer.setTextColor(0xFF4CAF50);
+            _unlockTimer.setTextColor(C.green);
             _unlockTimer.setGravity(Gravity.CENTER);
+            if (_isMatrix) _unlockTimer.setTypeface(Typeface.MONOSPACE);
             root.addView(_unlockTimer);
             startUnlockCountdown();
         }
 
+        root.addView(buildFooter());
+
         setContentView(root);
+        ThemeManager.attachMatrixOverlay(this);
         _service.addListener(this);
         refreshClips();
     }
 
+    // ── Header ────────────────────────────────────────────────────────────────
+
     private LinearLayout buildHeader() {
         LinearLayout header = new LinearLayout(this);
         header.setOrientation(LinearLayout.HORIZONTAL);
-        header.setBackgroundColor(0xFF1565C0);
-        header.setPadding(16, 16, 16, 16);
+        header.setBackgroundColor(C.headerBg);
+        header.setPadding(dp(18), dp(16), dp(12), dp(16));
         header.setGravity(Gravity.CENTER_VERTICAL);
 
-        TextView title = new TextView(this);
-        title.setText("Smart Clips");
-        title.setTextSize(20);
-        title.setTextColor(0xFFFFFFFF);
-        title.setTypeface(Typeface.DEFAULT_BOLD);
-        LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(0,
-                LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
-        header.addView(title, titleParams);
+        // Back arrow
+        Button backBtn = new Button(this);
+        backBtn.setText("←");
+        backBtn.setTextColor(C.headerText);
+        backBtn.setTextSize(18);
+        backBtn.setBackground(null);
+        backBtn.setPadding(0, 0, dp(6), 0);
+        backBtn.setOnClickListener(v -> finish());
+        header.addView(backBtn);
 
-        Button toggleViewBtn = new Button(this);
-        toggleViewBtn.setText("Grid");
-        toggleViewBtn.setTextColor(0xFFFFFFFF);
-        toggleViewBtn.setBackgroundColor(0x33FFFFFF);
-        toggleViewBtn.setTextSize(12);
-        toggleViewBtn.setPadding(16, 8, 16, 8);
+        // Title
+        LinearLayout titleCol = new LinearLayout(this);
+        titleCol.setOrientation(LinearLayout.VERTICAL);
+        titleCol.setLayoutParams(new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
+        TextView title = new TextView(this);
+        title.setText(_isMatrix ? "[SMART_CLIPS]" : "Smart Clips");
+        title.setTextSize(18);
+        title.setTextColor(C.headerText);
+        title.setTypeface(_isMatrix ? Typeface.MONOSPACE : Typeface.DEFAULT_BOLD);
+        titleCol.addView(title);
+
+        // Clip count badge
+        int count = _service.getClips().size();
+        TextView badge = new TextView(this);
+        badge.setText(count + " clip" + (count != 1 ? "s" : ""));
+        badge.setTextSize(10);
+        badge.setTextColor(_isMatrix ? C.primary : 0xCCFFFFFF);
+        badge.setTypeface(_isMatrix ? Typeface.MONOSPACE : Typeface.DEFAULT);
+        titleCol.addView(badge);
+
+        header.addView(titleCol);
+
+        // View toggle (List/Grid)
+        Button toggleViewBtn = makeHeaderBtn(_isGridView ? "≡ List" : "⊞ Grid");
         toggleViewBtn.setOnClickListener(v -> {
             _isGridView = !_isGridView;
-            toggleViewBtn.setText(_isGridView ? "List" : "Grid");
-            _listView.setVisibility(_isGridView ? View.GONE : View.VISIBLE);
+            toggleViewBtn.setText(_isGridView ? "≡ List" : "⊞ Grid");
+            _listView.setVisibility(_isGridView ? View.GONE  : View.VISIBLE);
             _gridView.setVisibility(_isGridView ? View.VISIBLE : View.GONE);
             refreshAdapters();
         });
         header.addView(toggleViewBtn);
 
+        // Lock / PIN buttons
         if (_service.isPinSetup()) {
-            Button lockBtn = new Button(this);
-            lockBtn.setText(_service.isLockEnabled() ? "Lock: ON" : "Lock: OFF");
-            lockBtn.setTextColor(0xFFFFFFFF);
-            lockBtn.setBackgroundColor(0x33FFFFFF);
-            lockBtn.setTextSize(12);
-            lockBtn.setPadding(16, 8, 16, 8);
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-            lp.setMargins(8, 0, 0, 0);
-            lockBtn.setLayoutParams(lp);
+            Button lockBtn = makeHeaderBtn(_service.isLockEnabled() ? "🔒" : "🔓");
             lockBtn.setOnClickListener(v -> {
                 boolean newState = !_service.isLockEnabled();
                 _service.setLockEnabled(newState);
-                lockBtn.setText(newState ? "Lock: ON" : "Lock: OFF");
+                lockBtn.setText(newState ? "🔒" : "🔓");
             });
-            header.addView(lockBtn);
-
-            Button changePinBtn = new Button(this);
-            changePinBtn.setText("PIN");
-            changePinBtn.setTextColor(0xFFFFFFFF);
-            changePinBtn.setBackgroundColor(0x33FFFFFF);
-            changePinBtn.setTextSize(12);
-            changePinBtn.setPadding(12, 8, 12, 8);
-            LinearLayout.LayoutParams lp2 = new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-            lp2.setMargins(8, 0, 0, 0);
-            changePinBtn.setLayoutParams(lp2);
-            changePinBtn.setOnClickListener(v -> showChangePinDialog());
-            header.addView(changePinBtn);
-        } else {
-            Button setupPinBtn = new Button(this);
-            setupPinBtn.setText("Setup PIN");
-            setupPinBtn.setTextColor(0xFFFFFFFF);
-            setupPinBtn.setBackgroundColor(0x33FFFFFF);
-            setupPinBtn.setTextSize(12);
-            setupPinBtn.setPadding(16, 8, 16, 8);
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-            lp.setMargins(8, 0, 0, 0);
-            setupPinBtn.setLayoutParams(lp);
+            lp.setMargins(dp(6), 0, 0, 0);
+            lockBtn.setLayoutParams(lp);
+            header.addView(lockBtn);
+
+            Button pinBtn = makeHeaderBtn("✱ PIN");
+            pinBtn.setOnClickListener(v -> showChangePinDialog());
+            LinearLayout.LayoutParams lp2 = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            lp2.setMargins(dp(6), 0, 0, 0);
+            pinBtn.setLayoutParams(lp2);
+            header.addView(pinBtn);
+        } else {
+            Button setupPinBtn = makeHeaderBtn("+ PIN");
             setupPinBtn.setOnClickListener(v -> showFirstTimePinSetup());
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            lp.setMargins(dp(6), 0, 0, 0);
+            setupPinBtn.setLayoutParams(lp);
             header.addView(setupPinBtn);
         }
 
         return header;
     }
 
+    private Button makeHeaderBtn(String text) {
+        Button b = new Button(this);
+        b.setText(text);
+        b.setTextColor(C.headerText);
+        b.setTextSize(12);
+        b.setPadding(dp(12), dp(6), dp(12), dp(6));
+        b.setMinWidth(0);
+        b.setMinHeight(0);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(_isMatrix ? 0x33000000 : 0x30FFFFFF);
+        bg.setCornerRadius(dp(20));
+        b.setBackground(bg);
+        if (_isMatrix) b.setTypeface(Typeface.MONOSPACE);
+        return b;
+    }
+
+    // ── Footer ────────────────────────────────────────────────────────────────
+
     private LinearLayout buildFooter() {
         LinearLayout footer = new LinearLayout(this);
         footer.setOrientation(LinearLayout.HORIZONTAL);
-        footer.setBackgroundColor(0xFFFFFFFF);
-        footer.setPadding(16, 8, 16, 8);
+        footer.setBackgroundColor(C.surface);
+        footer.setPadding(dp(20), dp(10), dp(20), dp(10));
         footer.setGravity(Gravity.CENTER);
 
         Button addBtn = new Button(this);
-        addBtn.setText("+ Add Clip");
-        addBtn.setBackgroundColor(0xFF1565C0);
-        addBtn.setTextColor(0xFFFFFFFF);
-        addBtn.setPadding(32, 16, 32, 16);
+        addBtn.setText(_isMatrix ? "[+] ADD CLIP" : "+ Add Clip");
+        addBtn.setTextColor(_isMatrix ? C.headerText : 0xFFFFFFFF);
+        addBtn.setTextSize(14);
+        addBtn.setPadding(dp(40), dp(14), dp(40), dp(14));
+        addBtn.setMinWidth(0);
+        addBtn.setMinHeight(0);
+        GradientDrawable addBg = new GradientDrawable();
+        addBg.setColor(C.primary);
+        addBg.setCornerRadius(dp(24));
+        addBtn.setBackground(addBg);
+        if (_isMatrix) addBtn.setTypeface(Typeface.MONOSPACE);
+        if (Build.VERSION.SDK_INT >= 21) addBtn.setElevation(dp(4));
         addBtn.setOnClickListener(v -> showAddDialog());
         footer.addView(addBtn);
 
         return footer;
     }
+
+    // ── Data ──────────────────────────────────────────────────────────────────
 
     private void refreshClips() {
         _allClips = _service.getClips();
@@ -238,52 +330,40 @@ public class SmartClipsActivity extends Activity
         }
     }
 
-    @Override
-    public void onSmartClipsChanged() {
-        runOnUiThread(this::refreshClips);
-    }
-
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        _service.removeListener(this);
-        if (_unlockCountdown != null) _handler.removeCallbacks(_unlockCountdown);
-    }
+    // ── Auto-unlock countdown ─────────────────────────────────────────────────
 
     private void startUnlockCountdown() {
         if (_unlockTimer == null) return;
         _unlockCountdown = new Runnable() {
-            @Override
-            public void run() {
+            @Override public void run() {
                 if (_unlockTimer == null) return;
                 long rem = _service.getUnlockRemainingMs();
-                if (rem <= 0) {
-                    _unlockTimer.setText("Auto-locked");
-                    return;
-                }
+                if (rem <= 0) { _unlockTimer.setText("🔒 Auto-locked"); return; }
                 long mins = rem / 60000;
                 long secs = (rem % 60000) / 1000;
-                _unlockTimer.setText(String.format("Auto-lock in %d:%02d", mins, secs));
+                _unlockTimer.setText(String.format(
+                        _isMatrix ? "[LOCK_IN %d:%02d]" : "🔓 Auto-lock in %d:%02d", mins, secs));
                 _handler.postDelayed(this, 1000);
             }
         };
         _handler.post(_unlockCountdown);
     }
 
+    // ── PIN dialogs ───────────────────────────────────────────────────────────
+
     private void showFirstTimePinSetup() {
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
-        layout.setPadding(48, 32, 48, 32);
+        layout.setPadding(dp(24), dp(20), dp(24), dp(20));
 
         TextView info = new TextView(this);
-        info.setText("Set up a PIN to protect your Smart Clips tab.");
-        info.setTextSize(14);
-        info.setTextColor(0xFF555555);
-        info.setPadding(0, 0, 0, 16);
+        info.setText("Set a PIN to protect your Smart Clips.\nMinimum 4 digits.");
+        info.setTextSize(13);
+        info.setPadding(0, 0, 0, dp(16));
         layout.addView(info);
 
         EditText pin1 = new EditText(this);
-        pin1.setHint("Enter PIN (4-8 digits)");
+        pin1.setHint("New PIN  (4–8 digits)");
         pin1.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_VARIATION_PASSWORD);
         layout.addView(pin1);
 
@@ -292,7 +372,7 @@ public class SmartClipsActivity extends Activity
         pin2.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_VARIATION_PASSWORD);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        lp.setMargins(0, 16, 0, 0);
+        lp.setMargins(0, dp(12), 0, 0);
         pin2.setLayoutParams(lp);
         layout.addView(pin2);
 
@@ -313,7 +393,7 @@ public class SmartClipsActivity extends Activity
                     }
                     _service.setupPin(p1);
                     _service.unlock10Min();
-                    Toast.makeText(this, "PIN setup! Smart Clips unlocked for 10 minutes.", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, "PIN set! Smart Clips unlocked for 10 minutes.", Toast.LENGTH_SHORT).show();
                     buildUI();
                 })
                 .setNegativeButton("Skip", (d, w) -> buildUI())
@@ -323,7 +403,7 @@ public class SmartClipsActivity extends Activity
     private void showPinDialog(boolean required) {
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
-        layout.setPadding(48, 32, 48, 32);
+        layout.setPadding(dp(24), dp(20), dp(24), dp(20));
 
         EditText pinInput = new EditText(this);
         pinInput.setHint("Enter PIN");
@@ -335,20 +415,18 @@ public class SmartClipsActivity extends Activity
         keep10.setChecked(true);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        lp.setMargins(0, 16, 0, 0);
+        lp.setMargins(0, dp(14), 0, 0);
         keep10.setLayoutParams(lp);
         layout.addView(keep10);
 
         new AlertDialog.Builder(this)
-                .setTitle("Smart Clips - Enter PIN")
+                .setTitle("🔐 Smart Clips — Enter PIN")
                 .setView(layout)
                 .setCancelable(!required)
                 .setPositiveButton("Unlock", (d, w) -> {
                     String pin = pinInput.getText().toString().trim();
                     if (_service.verifyPin(pin)) {
-                        if (keep10.isChecked()) {
-                            _service.unlock10Min();
-                        }
+                        if (keep10.isChecked()) _service.unlock10Min();
                         buildUI();
                     } else {
                         Toast.makeText(this, "Incorrect PIN", Toast.LENGTH_SHORT).show();
@@ -362,7 +440,7 @@ public class SmartClipsActivity extends Activity
     private void showChangePinDialog() {
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
-        layout.setPadding(48, 32, 48, 32);
+        layout.setPadding(dp(24), dp(20), dp(24), dp(20));
 
         EditText oldPin = new EditText(this);
         oldPin.setHint("Current PIN");
@@ -370,11 +448,11 @@ public class SmartClipsActivity extends Activity
         layout.addView(oldPin);
 
         EditText newPin = new EditText(this);
-        newPin.setHint("New PIN (4-8 digits)");
+        newPin.setHint("New PIN  (4–8 digits)");
         newPin.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_VARIATION_PASSWORD);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        lp.setMargins(0, 16, 0, 0);
+        lp.setMargins(0, dp(12), 0, 0);
         newPin.setLayoutParams(lp);
         layout.addView(newPin);
 
@@ -383,7 +461,7 @@ public class SmartClipsActivity extends Activity
         confPin.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_VARIATION_PASSWORD);
         LinearLayout.LayoutParams lp2 = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        lp2.setMargins(0, 16, 0, 0);
+        lp2.setMargins(0, dp(12), 0, 0);
         confPin.setLayoutParams(lp2);
         layout.addView(confPin);
 
@@ -412,34 +490,36 @@ public class SmartClipsActivity extends Activity
                 .show();
     }
 
+    // ── Clip CRUD dialogs ─────────────────────────────────────────────────────
+
     private void showAddDialog() {
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
-        layout.setPadding(48, 32, 48, 32);
+        layout.setPadding(dp(24), dp(20), dp(24), dp(20));
 
         EditText content = new EditText(this);
-        content.setHint("Content (text, password, token…)");
+        content.setHint("Content  (text, password, token…)");
         content.setMinLines(2);
         layout.addView(content);
 
         EditText desc = new EditText(this);
-        desc.setHint("Description");
+        desc.setHint("Description  (optional label)");
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        lp.setMargins(0, 12, 0, 0);
+        lp.setMargins(0, dp(10), 0, 0);
         desc.setLayoutParams(lp);
         layout.addView(desc);
 
         EditText keyword = new EditText(this);
-        keyword.setHint("Keyword (optional, use in {keyword})");
+        keyword.setHint("Keyword  (use in {keyword} formula)");
         LinearLayout.LayoutParams lp2 = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        lp2.setMargins(0, 12, 0, 0);
+        lp2.setMargins(0, dp(10), 0, 0);
         keyword.setLayoutParams(lp2);
         layout.addView(keyword);
 
         new AlertDialog.Builder(this)
-                .setTitle("Add Smart Clip")
+                .setTitle("✦  Add Smart Clip")
                 .setView(layout)
                 .setPositiveButton("Save", (d, w) -> {
                     String c = content.getText().toString();
@@ -457,7 +537,7 @@ public class SmartClipsActivity extends Activity
     private void showEditDialog(SmartClipsService.SmartClip clip) {
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
-        layout.setPadding(48, 32, 48, 32);
+        layout.setPadding(dp(24), dp(20), dp(24), dp(20));
 
         EditText content = new EditText(this);
         content.setHint("Content");
@@ -470,16 +550,16 @@ public class SmartClipsActivity extends Activity
         desc.setText(clip.description);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        lp.setMargins(0, 12, 0, 0);
+        lp.setMargins(0, dp(10), 0, 0);
         desc.setLayoutParams(lp);
         layout.addView(desc);
 
         EditText keyword = new EditText(this);
-        keyword.setHint("Keyword (optional)");
+        keyword.setHint("Keyword  (optional)");
         keyword.setText(clip.keyword);
         LinearLayout.LayoutParams lp2 = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        lp2.setMargins(0, 12, 0, 0);
+        lp2.setMargins(0, dp(10), 0, 0);
         keyword.setLayoutParams(lp2);
         layout.addView(keyword);
 
@@ -495,26 +575,23 @@ public class SmartClipsActivity extends Activity
                     _service.updateClip(clip.withContent(c, desc.getText().toString(), keyword.getText().toString()));
                 })
                 .setNegativeButton("Cancel", null)
-                .setNeutralButton("Delete", (d, w) -> {
-                    new AlertDialog.Builder(this)
-                            .setTitle("Delete Clip #" + clip.serial)
-                            .setMessage("Are you sure?")
-                            .setPositiveButton("Delete", (d2, w2) -> _service.deleteClip(clip.serial))
-                            .setNegativeButton("Cancel", null)
-                            .show();
-                })
+                .setNeutralButton("Delete", (d, w) -> new AlertDialog.Builder(this)
+                        .setTitle("Delete Clip #" + clip.serial)
+                        .setMessage("Are you sure?")
+                        .setPositiveButton("Delete", (d2, w2) -> _service.deleteClip(clip.serial))
+                        .setNegativeButton("Cancel", null)
+                        .show())
                 .show();
     }
 
     private void showLockedClipDialog(SmartClipsService.SmartClip clip) {
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
-        layout.setPadding(48, 32, 48, 32);
+        layout.setPadding(dp(24), dp(20), dp(24), dp(20));
 
         TextView info = new TextView(this);
-        info.setText("This clip is locked. Enter PIN to view.");
+        info.setText("🔒  This clip is locked. Enter PIN to view or copy it.");
         info.setTextSize(13);
-        info.setTextColor(0xFF666666);
         layout.addView(info);
 
         EditText pinInput = new EditText(this);
@@ -522,7 +599,7 @@ public class SmartClipsActivity extends Activity
         pinInput.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_VARIATION_PASSWORD);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        lp.setMargins(0, 16, 0, 0);
+        lp.setMargins(0, dp(14), 0, 0);
         pinInput.setLayoutParams(lp);
         layout.addView(pinInput);
 
@@ -530,11 +607,10 @@ public class SmartClipsActivity extends Activity
                 .setTitle("Unlock Clip #" + clip.serial)
                 .setView(layout)
                 .setPositiveButton("Show", (d, w) -> {
-                    if (_service.verifyPin(pinInput.getText().toString().trim())) {
+                    if (_service.verifyPin(pinInput.getText().toString().trim()))
                         showClipContent(clip);
-                    } else {
+                    else
                         Toast.makeText(this, "Incorrect PIN", Toast.LENGTH_SHORT).show();
-                    }
                 })
                 .setNegativeButton("Cancel", null)
                 .show();
@@ -545,132 +621,177 @@ public class SmartClipsActivity extends Activity
         TextView tv = new TextView(this);
         tv.setText(clip.content);
         tv.setTextSize(15);
-        tv.setTextColor(0xFF212121);
-        tv.setPadding(48, 32, 48, 32);
+        tv.setTextColor(C.textPrimary);
+        tv.setPadding(dp(24), dp(20), dp(24), dp(20));
         tv.setTextIsSelectable(true);
+        if (_isMatrix) tv.setTypeface(Typeface.MONOSPACE);
         sv.addView(tv);
 
         new AlertDialog.Builder(this)
-                .setTitle("Clip #" + clip.serial + (clip.description.isEmpty() ? "" : " - " + clip.description))
+                .setTitle("Clip #" + clip.serial
+                        + (clip.description.isEmpty() ? "" : "  —  " + clip.description))
                 .setView(sv)
                 .setPositiveButton("Copy", (d, w) -> {
-                    android.content.ClipboardManager cm = (android.content.ClipboardManager)
-                            getSystemService(CLIPBOARD_SERVICE);
-                    if (cm != null) cm.setPrimaryClip(android.content.ClipData.newPlainText("Clip", clip.content));
+                    android.content.ClipboardManager cm =
+                            (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                    if (cm != null)
+                        cm.setPrimaryClip(android.content.ClipData.newPlainText("Clip", clip.content));
                     Toast.makeText(this, "Copied!", Toast.LENGTH_SHORT).show();
                 })
                 .setNegativeButton("Close", null)
                 .show();
     }
 
+    private void showUnlockClipDialog(SmartClipsService.SmartClip clip) {
+        EditText pinInput = new EditText(this);
+        pinInput.setHint("Enter PIN to unlock clip");
+        pinInput.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_VARIATION_PASSWORD);
+        pinInput.setPadding(dp(24), dp(20), dp(24), dp(20));
+
+        new AlertDialog.Builder(this)
+                .setTitle("Unlock Clip #" + clip.serial)
+                .setView(pinInput)
+                .setPositiveButton("Unlock", (d, w) -> {
+                    if (_service.verifyPin(pinInput.getText().toString().trim()))
+                        _service.updateClip(clip.withLocked(false));
+                    else
+                        Toast.makeText(this, "Incorrect PIN", Toast.LENGTH_SHORT).show();
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    // ── Clip item view ────────────────────────────────────────────────────────
+
     private View buildClipItemView(SmartClipsService.SmartClip clip, int position) {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(24, 20, 24, 16);
-        card.setBackgroundColor(position % 2 == 0 ? 0xFFFFFFFF : 0xFFF9F9F9);
+        card.setPadding(dp(16), dp(14), dp(16), dp(12));
+        GradientDrawable cardBg = new GradientDrawable();
+        // Alternate subtle surface tint
+        cardBg.setColor(position % 2 == 0 ? C.surface : C.surfaceVariant);
+        cardBg.setCornerRadius(dp(12));
+        card.setBackground(cardBg);
+        if (Build.VERSION.SDK_INT >= 21) card.setElevation(dp(2));
 
+        // ── Row 1: serial + content ────────────────────────────────────────
         LinearLayout row1 = new LinearLayout(this);
         row1.setOrientation(LinearLayout.HORIZONTAL);
         row1.setGravity(Gravity.CENTER_VERTICAL);
 
         TextView serial = new TextView(this);
         serial.setText("#" + clip.serial);
-        serial.setTextSize(13);
-        serial.setTextColor(0xFF1565C0);
-        serial.setTypeface(Typeface.DEFAULT_BOLD);
-        serial.setPadding(0, 0, 12, 0);
+        serial.setTextSize(11);
+        serial.setTextColor(C.primary);
+        serial.setTypeface(_isMatrix ? Typeface.MONOSPACE : Typeface.DEFAULT_BOLD);
+        serial.setPadding(0, 0, dp(10), 0);
+        GradientDrawable serialBg = new GradientDrawable();
+        serialBg.setColor(C.surfaceVariant);
+        serialBg.setCornerRadius(dp(6));
+        serial.setBackground(serialBg);
+        serial.setPadding(dp(6), dp(2), dp(6), dp(2));
         row1.addView(serial);
 
         TextView contentView = new TextView(this);
         boolean isLocked = clip.locked;
         if (isLocked) {
-            contentView.setText("●●●●●●●● (Locked)");
-            contentView.setTextColor(0xFFAAAAAA);
+            contentView.setText("⬛⬛⬛⬛⬛⬛⬛⬛  (Locked)");
+            contentView.setTextColor(C.textHint);
             contentView.setAlpha(0.7f);
         } else {
             contentView.setText(clip.content);
-            contentView.setTextColor(0xFF212121);
+            contentView.setTextColor(C.textPrimary);
         }
         contentView.setTextSize(14);
         contentView.setMaxLines(2);
         contentView.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        if (_isMatrix) contentView.setTypeface(Typeface.MONOSPACE);
         LinearLayout.LayoutParams cvp = new LinearLayout.LayoutParams(0,
                 LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        cvp.setMargins(dp(8), 0, 0, 0);
         row1.addView(contentView, cvp);
         card.addView(row1);
 
+        // ── Row 2: meta (description + keyword) ───────────────────────────
         if (!clip.description.isEmpty() || !clip.keyword.isEmpty()) {
             TextView meta = new TextView(this);
-            String metaText = "";
-            if (!clip.description.isEmpty()) metaText += clip.description;
-            if (!clip.keyword.isEmpty()) metaText += (metaText.isEmpty() ? "" : " | ") + "{" + clip.keyword + "}";
-            meta.setText(metaText);
+            String mt = "";
+            if (!clip.description.isEmpty()) mt += clip.description;
+            if (!clip.keyword.isEmpty())
+                mt += (mt.isEmpty() ? "" : "  ·  ") + "{" + clip.keyword + "}";
+            meta.setText(mt);
             meta.setTextSize(11);
-            meta.setTextColor(0xFF888888);
-            meta.setPadding(0, 4, 0, 0);
+            meta.setTextColor(C.textSecondary);
+            LinearLayout.LayoutParams mlp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            mlp.setMargins(0, dp(4), 0, 0);
+            meta.setLayoutParams(mlp);
             card.addView(meta);
         }
 
-        TextView tsView = new TextView(this);
-        tsView.setText(clip.timestamp);
-        tsView.setTextSize(10);
-        tsView.setTextColor(0xFFAAAAAA);
-        tsView.setPadding(0, 2, 0, 0);
-        card.addView(tsView);
+        // ── Row 3: timestamp ──────────────────────────────────────────────
+        TextView ts = new TextView(this);
+        ts.setText(clip.timestamp);
+        ts.setTextSize(9);
+        ts.setTextColor(C.textHint);
+        LinearLayout.LayoutParams tslp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        tslp.setMargins(0, dp(2), 0, dp(6));
+        ts.setLayoutParams(tslp);
+        card.addView(ts);
+
+        // ── Button row ────────────────────────────────────────────────────
+        // Divider
+        View div = new View(this);
+        div.setBackgroundColor(C.divider);
+        LinearLayout.LayoutParams dlp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 1);
+        dlp.setMargins(0, 0, 0, dp(8));
+        div.setLayoutParams(dlp);
+        card.addView(div);
 
         LinearLayout btnRow = new LinearLayout(this);
         btnRow.setOrientation(LinearLayout.HORIZONTAL);
         btnRow.setGravity(Gravity.END);
-        LinearLayout.LayoutParams btnRowp = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        btnRowp.setMargins(0, 8, 0, 0);
-        btnRow.setLayoutParams(btnRowp);
 
-        Button copyBtn = makeSmallBtn("Copy", 0xFF43A047);
+        Button copyBtn = makePillBtn("⊕ Copy", C.green);
         copyBtn.setOnClickListener(v -> {
-            if (clip.locked) {
-                showLockedClipDialog(clip);
-            } else {
-                android.content.ClipboardManager cm = (android.content.ClipboardManager)
-                        getSystemService(CLIPBOARD_SERVICE);
-                if (cm != null) cm.setPrimaryClip(android.content.ClipData.newPlainText("Clip", clip.content));
-                Toast.makeText(this, "Copied!", Toast.LENGTH_SHORT).show();
-            }
+            if (clip.locked) { showLockedClipDialog(clip); return; }
+            android.content.ClipboardManager cm =
+                    (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+            if (cm != null)
+                cm.setPrimaryClip(android.content.ClipData.newPlainText("Clip", clip.content));
+            Toast.makeText(this, "Copied!", Toast.LENGTH_SHORT).show();
         });
         btnRow.addView(copyBtn);
 
-        Button editBtn = makeSmallBtn("Edit", 0xFF1565C0);
+        Button editBtn = makePillBtn("✎ Edit", C.blue);
         editBtn.setOnClickListener(v -> {
-            if (clip.locked) {
-                showLockedClipDialog(clip);
-            } else {
-                showEditDialog(clip);
-            }
+            if (clip.locked) { showLockedClipDialog(clip); return; }
+            showEditDialog(clip);
         });
         LinearLayout.LayoutParams ebp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        ebp.setMargins(8, 0, 0, 0);
+        ebp.setMargins(dp(6), 0, 0, 0);
         editBtn.setLayoutParams(ebp);
         btnRow.addView(editBtn);
 
-        Button hideBtn = makeSmallBtn(clip.hidden ? "Show" : "Hide", 0xFFFF6F00);
-        hideBtn.setOnClickListener(v -> {
-            _service.updateClip(clip.withHidden(!clip.hidden));
-        });
+        Button hideBtn = makePillBtn(clip.hidden ? "◎ Show" : "◉ Hide", C.orange);
+        hideBtn.setOnClickListener(v -> _service.updateClip(clip.withHidden(!clip.hidden)));
         LinearLayout.LayoutParams hbp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        hbp.setMargins(8, 0, 0, 0);
+        hbp.setMargins(dp(6), 0, 0, 0);
         hideBtn.setLayoutParams(hbp);
         btnRow.addView(hideBtn);
 
-        Button lockBtn = makeSmallBtn(clip.locked ? "Unlock" : "Lock", 0xFFAA00FF);
+        Button lockBtn = makePillBtn(clip.locked ? "🔓 Unlock" : "🔒 Lock", C.purple);
         lockBtn.setOnClickListener(v -> {
             if (clip.locked) {
                 showUnlockClipDialog(clip);
             } else {
                 new AlertDialog.Builder(this)
                         .setTitle("Lock Clip #" + clip.serial)
-                        .setMessage("Lock this clip? You'll need PIN to view/copy it.")
+                        .setMessage("Lock this clip? PIN required to view or copy.")
                         .setPositiveButton("Lock", (d, w) -> _service.updateClip(clip.withLocked(true)))
                         .setNegativeButton("Cancel", null)
                         .show();
@@ -678,7 +799,7 @@ public class SmartClipsActivity extends Activity
         });
         LinearLayout.LayoutParams lbp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        lbp.setMargins(8, 0, 0, 0);
+        lbp.setMargins(dp(6), 0, 0, 0);
         lockBtn.setLayoutParams(lbp);
         btnRow.addView(lockBtn);
 
@@ -686,110 +807,120 @@ public class SmartClipsActivity extends Activity
         return card;
     }
 
-    private void showUnlockClipDialog(SmartClipsService.SmartClip clip) {
-        EditText pinInput = new EditText(this);
-        pinInput.setHint("Enter PIN to unlock");
-        pinInput.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_VARIATION_PASSWORD);
-        pinInput.setPadding(48, 24, 48, 24);
+    // ── Button factory ────────────────────────────────────────────────────────
 
-        new AlertDialog.Builder(this)
-                .setTitle("Unlock Clip #" + clip.serial)
-                .setView(pinInput)
-                .setPositiveButton("Unlock", (d, w) -> {
-                    if (_service.verifyPin(pinInput.getText().toString().trim())) {
-                        _service.updateClip(clip.withLocked(false));
-                    } else {
-                        Toast.makeText(this, "Incorrect PIN", Toast.LENGTH_SHORT).show();
-                    }
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
-    }
-
-    private Button makeSmallBtn(String text, int color) {
+    private Button makePillBtn(String text, int color) {
         Button btn = new Button(this);
         btn.setText(text);
-        btn.setTextColor(0xFFFFFFFF);
-        btn.setBackgroundColor(color);
+        btn.setTextColor(_isMatrix ? C.headerText : 0xFFFFFFFF);
         btn.setTextSize(11);
-        btn.setPadding(16, 8, 16, 8);
+        btn.setPadding(dp(14), dp(6), dp(14), dp(6));
         btn.setMinWidth(0);
         btn.setMinHeight(0);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(color);
+        bg.setCornerRadius(dp(16));
+        btn.setBackground(bg);
+        if (_isMatrix) btn.setTypeface(Typeface.MONOSPACE);
         return btn;
     }
 
+    // ── Adapters ──────────────────────────────────────────────────────────────
+
     class ClipAdapter extends BaseAdapter {
-        @Override public int getCount() { return _filteredClips.size(); }
-        @Override public Object getItem(int p) { return _filteredClips.get(p); }
-        @Override public long getItemId(int p) { return _filteredClips.get(p).serial; }
-        @Override public View getView(int p, View v, ViewGroup parent) {
+        @Override public int   getCount()                  { return _filteredClips.size(); }
+        @Override public Object getItem(int p)             { return _filteredClips.get(p); }
+        @Override public long  getItemId(int p)            { return _filteredClips.get(p).serial; }
+        @Override public View  getView(int p, View v, ViewGroup parent) {
             return buildClipItemView(_filteredClips.get(p), p);
         }
     }
 
     class GridClipAdapter extends BaseAdapter {
-        @Override public int getCount() { return _filteredClips.size(); }
-        @Override public Object getItem(int p) { return _filteredClips.get(p); }
-        @Override public long getItemId(int p) { return _filteredClips.get(p).serial; }
-        @Override public View getView(int p, View v, ViewGroup parent) {
+        @Override public int    getCount()               { return _filteredClips.size(); }
+        @Override public Object getItem(int p)           { return _filteredClips.get(p); }
+        @Override public long   getItemId(int p)         { return _filteredClips.get(p).serial; }
+
+        @Override
+        public View getView(int p, View v, ViewGroup parent) {
             SmartClipsService.SmartClip clip = _filteredClips.get(p);
+
             LinearLayout card = new LinearLayout(SmartClipsActivity.this);
             card.setOrientation(LinearLayout.VERTICAL);
-            card.setPadding(16, 16, 16, 12);
-            card.setBackgroundColor(0xFFFFFFFF);
+            card.setPadding(dp(14), dp(14), dp(14), dp(12));
+            GradientDrawable cardBg = new GradientDrawable();
+            cardBg.setColor(p % 2 == 0 ? C.surface : C.surfaceVariant);
+            cardBg.setCornerRadius(dp(12));
+            card.setBackground(cardBg);
+            if (Build.VERSION.SDK_INT >= 21) card.setElevation(dp(2));
 
+            // Serial badge
             TextView serial = new TextView(SmartClipsActivity.this);
             serial.setText("#" + clip.serial);
-            serial.setTextSize(12);
-            serial.setTextColor(0xFF1565C0);
-            serial.setTypeface(Typeface.DEFAULT_BOLD);
+            serial.setTextSize(10);
+            serial.setTextColor(C.primary);
+            serial.setTypeface(_isMatrix ? Typeface.MONOSPACE : Typeface.DEFAULT_BOLD);
+            GradientDrawable sBg = new GradientDrawable();
+            sBg.setColor(C.surfaceVariant);
+            sBg.setCornerRadius(dp(5));
+            serial.setBackground(sBg);
+            serial.setPadding(dp(5), dp(2), dp(5), dp(2));
             card.addView(serial);
 
+            // Content
             TextView contentView = new TextView(SmartClipsActivity.this);
             if (clip.locked) {
-                contentView.setText("●●●● Locked");
-                contentView.setTextColor(0xFFAAAAAA);
+                contentView.setText("⬛⬛⬛⬛ Locked");
+                contentView.setTextColor(C.textHint);
             } else {
                 contentView.setText(clip.content);
-                contentView.setTextColor(0xFF212121);
+                contentView.setTextColor(C.textPrimary);
             }
-            contentView.setTextSize(13);
+            contentView.setTextSize(12);
             contentView.setMaxLines(3);
             contentView.setEllipsize(android.text.TextUtils.TruncateAt.END);
-            LinearLayout.LayoutParams cvp = new LinearLayout.LayoutParams(
+            if (_isMatrix) contentView.setTypeface(Typeface.MONOSPACE);
+            LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f);
-            card.addView(contentView, cvp);
+            clp.setMargins(0, dp(6), 0, 0);
+            contentView.setLayoutParams(clp);
+            card.addView(contentView);
 
             if (!clip.description.isEmpty()) {
                 TextView descV = new TextView(SmartClipsActivity.this);
                 descV.setText(clip.description);
-                descV.setTextSize(10);
-                descV.setTextColor(0xFF888888);
-                descV.setPadding(0, 4, 0, 0);
+                descV.setTextSize(9);
+                descV.setTextColor(C.textSecondary);
+                descV.setPadding(0, dp(4), 0, 0);
                 card.addView(descV);
             }
 
+            // Button row
             LinearLayout btnRow = new LinearLayout(SmartClipsActivity.this);
             btnRow.setOrientation(LinearLayout.HORIZONTAL);
             LinearLayout.LayoutParams brp = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-            brp.setMargins(0, 8, 0, 0);
+            brp.setMargins(0, dp(8), 0, 0);
             btnRow.setLayoutParams(brp);
 
-            Button copyBtn = makeSmallBtn("Copy", 0xFF43A047);
+            Button copyBtn = makePillBtn("Copy", C.green);
+            copyBtn.setTextSize(10);
             copyBtn.setOnClickListener(vv -> {
                 if (clip.locked) { showLockedClipDialog(clip); return; }
-                android.content.ClipboardManager cm = (android.content.ClipboardManager)
-                        getSystemService(CLIPBOARD_SERVICE);
-                if (cm != null) cm.setPrimaryClip(android.content.ClipData.newPlainText("Clip", clip.content));
+                android.content.ClipboardManager cm =
+                        (android.content.ClipboardManager)
+                                SmartClipsActivity.this.getSystemService(CLIPBOARD_SERVICE);
+                if (cm != null)
+                    cm.setPrimaryClip(android.content.ClipData.newPlainText("Clip", clip.content));
                 Toast.makeText(SmartClipsActivity.this, "Copied!", Toast.LENGTH_SHORT).show();
             });
             btnRow.addView(copyBtn);
 
-            Button editBtn = makeSmallBtn("Edit", 0xFF1565C0);
+            Button editBtn = makePillBtn("Edit", C.blue);
+            editBtn.setTextSize(10);
             LinearLayout.LayoutParams ep = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-            ep.setMargins(6, 0, 0, 0);
+            ep.setMargins(dp(5), 0, 0, 0);
             editBtn.setLayoutParams(ep);
             editBtn.setOnClickListener(vv -> {
                 if (clip.locked) { showLockedClipDialog(clip); return; }
@@ -802,11 +933,13 @@ public class SmartClipsActivity extends Activity
         }
     }
 
+    // ── Static helper ─────────────────────────────────────────────────────────
+
     public static void openWithPinCheck(Context ctx, SmartClipsService service) {
-        if (service.isLockEnabled() && !service.isUnlocked() && service.isPinSetup()) {
-        }
         android.content.Intent intent = new android.content.Intent(ctx, SmartClipsActivity.class);
         intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
         ctx.startActivity(intent);
     }
+
+    private int dp(int v) { return (int)(v * D); }
 }
