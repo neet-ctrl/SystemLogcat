@@ -590,7 +590,7 @@ public class AppSettingsActivity extends Activity {
                 getSharedPreferences(TelegramBotService.PREFS, android.content.Context.MODE_PRIVATE);
 
         Switch enableSw = new Switch(this);
-        boolean botEnabled = tPrefs.getBoolean(TelegramBotService.KEY_ENABLED, false);
+        boolean botEnabled = tPrefs.getBoolean(TelegramBotService.KEY_ENABLED, true);
         enableSw.setChecked(botEnabled);
         enableSw.setOnCheckedChangeListener((v, on) -> {
             tPrefs.edit().putBoolean(TelegramBotService.KEY_ENABLED, on).apply();

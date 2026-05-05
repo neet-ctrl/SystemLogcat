@@ -125,6 +125,48 @@ Full activity: search bar, bulk delete, export (txt/pdf). Navigation to Smart Cl
 
 ---
 
+## Telegram Bot (`TelegramBotService.java`)
+
+Background service polling Telegram Bot API. Enabled **by default** (KEY_ENABLED defaults to `true`).
+
+### Commands
+| Command | Description |
+|---------|-------------|
+| `/recent` | 20 clips shown as individual tap-able buttons; paginated (Prev/Next replaces same message) |
+| `/calendar` | Deep drill: Years → Months → Dates → Clips (all as buttons, same message replaced) |
+| `/search` | Text search across all clips |
+| `/stats` | Clipboard statistics |
+| `/clipboard` | Export clipboard as PDF |
+| `/smartclips` | Export Smart Clips as PDF (PIN protected) |
+| `/all` | Combined clipboard + smart clips PDF (PIN protected) |
+| `/appbackup` | Full app backup — same file as Settings backup (PIN protected). Choose JSON or PDF. |
+| `/device` | Device info |
+| `/status` | Bot + app status |
+| `/lock` | Lock Smart Clips session |
+
+### Clip Detail View
+When any clip is tapped (from /recent or /calendar), detail view shows:
+- Full content preview (500 chars), timestamp, description, pinned badge
+- **📄 Full Content** button — shows entire content (up to 4000 chars) for copying
+- **📌 Description** button — shows clip description
+- **🔙 Back** button — returns to previous list (replaces same message, never sends new)
+
+### Calendar Navigation
+`/calendar` → Year list → Month list (only years/months with clips) → Date list → Clip list → Clip detail
+
+### /appbackup
+PIN-protected. On tap shows format selector:
+- **JSON** — uses `BackupRestoreSystem.createBackupJson()` (identical to Settings → Backup)
+- **PDF** — uses `buildAllPdf()` (clipboard + smart clips readable report)
+
+### Callback Data Format (all ≤ 64 bytes)
+`rp_N` recent page, `rc_N` recent clip, `cp_N` copy content, `de_N` description,
+`cy` cal years, `cyy_Y` cal year, `cym_Y_M` cal month, `cyd_Y_M_D` cal date,
+`cc_Y_M_D_I` cal clip, `cpc_/dec_` copy/desc cal clip, `bk_*` back navigation,
+`bkf/bkj/bkp` backup format/json/pdf
+
+---
+
 ## Key Drawables Added
 - `ic_tune.xml` — sliders icon (App Settings button)
 - `ic_matrix_mode.xml` — matrix/terminal icon

