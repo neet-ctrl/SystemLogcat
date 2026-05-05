@@ -160,7 +160,7 @@ public class SmartClipsActivity extends Activity
         h.setOrientation(LinearLayout.HORIZONTAL);
         h.setGravity(Gravity.CENTER_VERTICAL);
         h.setBackgroundColor(C.headerBg);
-        h.setPadding(dp(14), dp(14), dp(10), dp(14));
+        h.setPadding(dp(12), dp(10), dp(10), dp(10));
 
         // Back
         Button backBtn = plainIconBtn("←", 18);
@@ -176,7 +176,7 @@ public class SmartClipsActivity extends Activity
 
         TextView title = new TextView(this);
         title.setText(_isMatrix ? "[SMART_CLIPS]" : "Smart Clips");
-        title.setTextSize(17);
+        title.setTextSize(16);
         title.setTextColor(C.headerText);
         title.setTypeface(_isMatrix ? Typeface.MONOSPACE : Typeface.DEFAULT_BOLD);
         titleCol.addView(title);
@@ -190,7 +190,7 @@ public class SmartClipsActivity extends Activity
         titleCol.addView(sub);
         h.addView(titleCol);
 
-        // ── ℹ Info button (explains icons) ────────────────────────
+        // ── ℹ Info button ─────────────────────────────────────────
         Button infoBtn = makeRoundHeaderBtn(ICO_INFO);
         infoBtn.setContentDescription("Icon Legend");
         infoBtn.setOnClickListener(v -> showIconLegend());
@@ -205,10 +205,7 @@ public class SmartClipsActivity extends Activity
             _gridView.setVisibility(_isGridView ? View.VISIBLE : View.GONE);
             refreshAdapters();
         });
-        LinearLayout.LayoutParams tvLp = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        tvLp.setMargins(dp(6), 0, 0, 0);
-        toggleBtn.setLayoutParams(tvLp);
+        addHeaderBtnMargin(toggleBtn);
         h.addView(toggleBtn);
 
         // ── 🔒/🔓 Lock toggle ─────────────────────────────────────
@@ -220,31 +217,30 @@ public class SmartClipsActivity extends Activity
                 _service.setLockEnabled(on);
                 lockToggle.setText(on ? ICO_LOCK : ICO_UNLOCK);
             });
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-            lp.setMargins(dp(6), 0, 0, 0);
-            lockToggle.setLayoutParams(lp);
+            addHeaderBtnMargin(lockToggle);
             h.addView(lockToggle);
 
             // ✱ Change PIN
             Button pinBtn = makeRoundHeaderBtn("✱");
             pinBtn.setOnClickListener(v -> showChangePinDialog());
-            LinearLayout.LayoutParams pp = new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-            pp.setMargins(dp(6), 0, 0, 0);
-            pinBtn.setLayoutParams(pp);
+            addHeaderBtnMargin(pinBtn);
             h.addView(pinBtn);
         } else {
             Button setupPin = makeRoundHeaderBtn("✱");
             setupPin.setOnClickListener(v -> showFirstTimePinSetup());
-            LinearLayout.LayoutParams pp = new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-            pp.setMargins(dp(6), 0, 0, 0);
-            setupPin.setLayoutParams(pp);
+            addHeaderBtnMargin(setupPin);
             h.addView(setupPin);
         }
 
         return h;
+    }
+
+    /** Apply left-margin to a header button without overriding its fixed size. */
+    private void addHeaderBtnMargin(View btn) {
+        LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) btn.getLayoutParams();
+        if (lp == null) lp = new LinearLayout.LayoutParams(dp(34), dp(34));
+        lp.setMargins(dp(6), 0, 0, 0);
+        btn.setLayoutParams(lp);
     }
 
     private void showIconLegend() {
@@ -1012,15 +1008,16 @@ public class SmartClipsActivity extends Activity
     private Button makeRoundHeaderBtn(String icon) {
         Button b = new Button(this);
         b.setText(icon);
-        b.setTextSize(15);
+        b.setTextSize(14);
         b.setTextColor(C.headerText);
         b.setPadding(0, 0, 0, 0);
         b.setMinWidth(0); b.setMinHeight(0);
-        int sz = dp(38);
-        b.setLayoutParams(new LinearLayout.LayoutParams(sz, sz));
+        int sz = dp(34);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(sz, sz);
+        b.setLayoutParams(lp);
         GradientDrawable bg = new GradientDrawable();
         bg.setShape(GradientDrawable.OVAL);
-        bg.setColor(_isMatrix ? 0x33000000 : 0x30FFFFFF);
+        bg.setColor(_isMatrix ? 0x33000000 : 0x28FFFFFF);
         b.setBackground(bg);
         return b;
     }
