@@ -482,7 +482,9 @@ public class FloatingWidgetService extends Service
             row.addView(serial);
 
             // Content text
-            String display = clip.locked ? "⬛  ⬛  ⬛   locked"
+            // Mask display when locked; content is still copyable via the 📋 button
+            String display = clip.locked
+                    ? "🔒  ●●●●  " + (clip.keyword.isEmpty() ? "#" + clip.serial : "{" + clip.keyword + "}")
                     : (clip.description.isEmpty() ? clip.content : clip.description);
             TextView tv = new TextView(ctx);
             tv.setText(display);
@@ -497,14 +499,10 @@ public class FloatingWidgetService extends Service
 
             // 📋 Copy button
             Button copy = makeCopyBtn(ctx, dp);
+            // 'locked' only masks display — always copy actual content
             copy.setOnClickListener(v -> {
-                if (clip.locked) {
-                    Toast.makeText(ctx, "Clip locked — open app to view",
-                            Toast.LENGTH_SHORT).show();
-                } else {
-                    ClipboardHistoryService.copyToClipboard(ctx, clip.content);
-                    Toast.makeText(ctx, "Copied!", Toast.LENGTH_SHORT).show();
-                }
+                ClipboardHistoryService.copyToClipboard(ctx, clip.content);
+                Toast.makeText(ctx, "Copied!", Toast.LENGTH_SHORT).show();
             });
             row.addView(copy);
             card.addView(row);
