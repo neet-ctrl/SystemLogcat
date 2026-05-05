@@ -9,4 +9,6 @@
   <dimen name="candidates_spacing">8dp</dimen>
   <!-- Will be overwritten automatically by Gradle for the debug build variant -->
   <bool name="debug_logs">false</bool>
+  <!-- View IDs referenced programmatically -->
+  <item type="id" name="clipboard_pin_view"/>
 </resources>
