@@ -855,7 +855,7 @@ public class SmartClipsActivity extends Activity
             serial.setBackground(sBg);
             serial.setPadding(dp(7), dp(2), dp(7), dp(2));
             serial.setClickable(true);
-            serial.setOnClickListener(v -> showEditSerialDialog(clip));
+            serial.setOnClickListener(btn -> showEditSerialDialog(clip));
             topRow.addView(serial);
             topRow.addView(spacer());
             if (clip.hidden) {
