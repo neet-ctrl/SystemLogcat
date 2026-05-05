@@ -172,6 +172,10 @@ public class FloatingWidgetService extends Service
                 showSmartClips = true;
                 refreshModeUI();
                 updateList();
+            } else {
+                showSmartClips = false;
+                refreshModeUI();
+                updateList();
             }
         });
 

@@ -114,7 +114,7 @@ public final class KeyboardClipboardPane extends LinearLayout
         _histService  = ClipboardHistoryService.get_service(ctx);
         _smartService = SmartClipsService.getInstance(ctx);
         if (_histService != null) _histService.set_on_clipboard_history_change(this);
-        _smartService.addListener(this);
+        if (_smartService != null) _smartService.addListener(this);
 
         refresh(ctx);
     }
@@ -493,6 +493,10 @@ public final class KeyboardClipboardPane extends LinearLayout
     // ── Smart clip cards ──────────────────────────────────────────────────────
 
     private void buildSmartCards(Context ctx) {
+        if (_smartService == null) {
+            showEmpty(ctx, "Smart Clips service is not available.");
+            return;
+        }
         List<SmartClipsService.SmartClip> clips = _smartService.getClipsForWidget();
 
         List<SmartClipsService.SmartClip> pinned = new ArrayList<>(), rest = new ArrayList<>();
@@ -681,6 +685,6 @@ public final class KeyboardClipboardPane extends LinearLayout
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
         if (_histService != null) _histService.set_on_clipboard_history_change(null);
-        _smartService.removeListener(this);
+        if (_smartService != null) _smartService.removeListener(this);
     }
 }
