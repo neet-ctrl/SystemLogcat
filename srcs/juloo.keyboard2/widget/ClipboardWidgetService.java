@@ -75,10 +75,10 @@ class ClipboardRemoteViewsFactory implements RemoteViewsService.RemoteViewsFacto
         // Serial chip
         rv.setTextViewText(R.id.tv_serial, "#" + clip.serial);
 
-        // Content — masked in widget when locked, but still copyable via formula
+        // Content — masked if locked
         String display;
         if (clip.locked) {
-            display = "🔒  ●●●●  " + (clip.keyword.isEmpty() ? "#" + clip.serial : "{" + clip.keyword + "}");
+            display = "⬛  ⬛  ⬛   locked";
         } else if (clip.description != null && !clip.description.isEmpty()) {
             display = clip.description;
         } else {
@@ -94,9 +94,10 @@ class ClipboardRemoteViewsFactory implements RemoteViewsService.RemoteViewsFacto
         rv.setInt(R.id.smart_clip_container, "setBackgroundResource",
                 ITEM_DRAWABLES[position % ITEM_DRAWABLES.length]);
 
-        // Copy tap → fill-in intent (locked clips still copy — 'locked' only masks display)
+        // Copy tap → fill-in intent
         Bundle extras = new Bundle();
-        extras.putString(ClipboardWidgetProvider.EXTRA_ITEM_TEXT, clip.content);
+        extras.putString(ClipboardWidgetProvider.EXTRA_ITEM_TEXT,
+                clip.locked ? "" : clip.content);
         Intent fillIn = new Intent();
         fillIn.putExtras(extras);
         rv.setOnClickFillInIntent(R.id.btn_copy, fillIn);

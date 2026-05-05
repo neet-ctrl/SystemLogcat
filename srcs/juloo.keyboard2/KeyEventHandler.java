@@ -244,65 +244,34 @@ public final class KeyEventHandler
         }
     }
     conn.commitText(text, 1);
-    // Formula expansion: detect {token} or *token* and replace with smart clip content
-    if (text.equals("}") || text.endsWith("}") || text.equals("*") || text.endsWith("*")) {
+    // Formula expansion: detect {token} and replace with smart clip
+    if (text.equals("}") || text.endsWith("}")) {
         try_expand_smart_clip_formula(conn);
     }
   }
 
-  /**
-   * After typing '}' or '*', look backwards for either:
-   *   {token}   — curly-brace formula
-   *   *token*   — asterisk formula
-   * and replace the whole token with the matching smart clip content.
-   * Locked clips paste normally — 'locked' only hides them in the widget.
-   */
+  /** After typing '}', look backwards for '{...}' and replace with the matching smart clip. */
   private void try_expand_smart_clip_formula(InputConnection conn) {
     try {
       CharSequence before = conn.getTextBeforeCursor(80, 0);
       if (before == null) return;
       String s = before.toString();
-
-      String token = null;
-      int removeLen = 0;
-
-      // ── Try {token} first ────────────────────────────────────────────────
-      int closeC = s.lastIndexOf('}');
-      if (closeC >= 0) {
-        int openC = s.lastIndexOf('{', closeC - 1);
-        if (openC >= 0) {
-          String t = s.substring(openC + 1, closeC);
-          if (!t.isEmpty()) {
-            token     = t;
-            removeLen = closeC - openC + 1;
-          }
-        }
-      }
-
-      // ── Try *token* if {token} not found ─────────────────────────────────
-      if (token == null) {
-        int closeA = s.lastIndexOf('*');
-        if (closeA >= 0) {
-          int openA = s.lastIndexOf('*', closeA - 1);
-          if (openA >= 0 && openA != closeA) {
-            String t = s.substring(openA + 1, closeA);
-            if (!t.isEmpty()) {
-              token     = t;
-              removeLen = closeA - openA + 1;
-            }
-          }
-        }
-      }
-
-      if (token == null) return;
-
+      int closeIdx = s.lastIndexOf('}');
+      if (closeIdx < 0) return;
+      int openIdx = s.lastIndexOf('{', closeIdx - 1);
+      if (openIdx < 0) return;
+      String token = s.substring(openIdx + 1, closeIdx);
+      if (token.isEmpty()) return;
       android.content.Context ctx = juloo.keyboard2.Config.globalConfig().getContext();
       if (ctx == null) return;
       juloo.keyboard2.SmartClipsService svc = juloo.keyboard2.SmartClipsService.getInstance(ctx);
       juloo.keyboard2.SmartClipsService.SmartClip clip = svc.resolveFormula(token);
       if (clip == null) return;
-
-      // 'locked' means hidden in widget — formula always pastes the content
+      if (clip.locked) {
+        android.widget.Toast.makeText(ctx, "Clip #" + clip.serial + " is locked", android.widget.Toast.LENGTH_SHORT).show();
+        return;
+      }
+      int removeLen = closeIdx - openIdx + 1;
       conn.beginBatchEdit();
       conn.deleteSurroundingText(removeLen, 0);
       conn.commitText(clip.content, 1);
