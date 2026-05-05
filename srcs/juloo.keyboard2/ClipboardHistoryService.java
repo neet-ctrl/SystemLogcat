@@ -56,6 +56,7 @@ public final class ClipboardHistoryService
   static ClipboardPasteCallback _paste_callback = null;
 
   ClipboardManager _cm;
+  Context _ctx;
   List<HistoryEntry> _history;
   OnClipboardHistoryChange _listener = null;
 
@@ -90,7 +91,7 @@ public final class ClipboardHistoryService
   public synchronized void clear_history()
   {
     _history.clear();
-    save_history_to_prefs(juloo.keyboard2.Config.globalConfig().getContext());
+    save_history_to_prefs(_ctx);
     if (_listener != null)
       _listener.on_clipboard_history_change();
   }
@@ -102,10 +103,11 @@ public final class ClipboardHistoryService
 
   ClipboardHistoryService(Context ctx)
   {
+    _ctx = ctx.getApplicationContext();
     _history = new ArrayList<HistoryEntry>();
     _cm = (ClipboardManager)ctx.getSystemService(Context.CLIPBOARD_SERVICE);
     _cm.addPrimaryClipChangedListener(new SystemListener());
-    load_history_from_prefs(ctx);
+    load_history_from_prefs(_ctx);
   }
 
   public synchronized List<HistoryEntry> get_history_entries() {
@@ -132,7 +134,7 @@ public final class ClipboardHistoryService
       _history.remove(_history.size() - 1);
     }
     if (toRemove > 0) {
-      save_history_to_prefs(juloo.keyboard2.Config.globalConfig().getContext());
+      save_history_to_prefs(_ctx);
       if (_listener != null) _listener.on_clipboard_history_change();
     }
     return toRemove;
@@ -152,7 +154,7 @@ public final class ClipboardHistoryService
         existing.add(e.content);
       }
     }
-    save_history_to_prefs(juloo.keyboard2.Config.globalConfig().getContext());
+    save_history_to_prefs(_ctx);
     if (_listener != null) _listener.on_clipboard_history_change();
   }
 
@@ -166,7 +168,7 @@ public final class ClipboardHistoryService
       _history.remove(0);
     }
     if (toRemove > 0) {
-      save_history_to_prefs(juloo.keyboard2.Config.globalConfig().getContext());
+      save_history_to_prefs(_ctx);
       if (_listener != null) _listener.on_clipboard_history_change();
     }
     return toRemove;
@@ -193,7 +195,7 @@ public final class ClipboardHistoryService
       } catch (Exception ignored) {}
     }
     if (removed > 0) {
-      save_history_to_prefs(juloo.keyboard2.Config.globalConfig().getContext());
+      save_history_to_prefs(_ctx);
       if (_listener != null) _listener.on_clipboard_history_change();
     }
     return removed;
@@ -219,7 +221,7 @@ public final class ClipboardHistoryService
       } catch (Exception ignored) {}
     }
     if (removed > 0) {
-      save_history_to_prefs(juloo.keyboard2.Config.globalConfig().getContext());
+      save_history_to_prefs(_ctx);
       if (_listener != null) _listener.on_clipboard_history_change();
     }
     return removed;
@@ -244,7 +246,7 @@ public final class ClipboardHistoryService
       else
         _cm.setText("");
     }
-    save_history_to_prefs(juloo.keyboard2.Config.globalConfig().getContext());
+    save_history_to_prefs(_ctx);
     if (_listener != null)
       _listener.on_clipboard_history_change();
   }
@@ -271,10 +273,10 @@ public final class ClipboardHistoryService
     String timestamp = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).format(new java.util.Date());
     _history.add(0, new HistoryEntry(clip, timestamp, description, version));
     
-    save_history_to_prefs(juloo.keyboard2.Config.globalConfig().getContext());
+    save_history_to_prefs(_ctx);
     if (_listener != null)
       _listener.on_clipboard_history_change();
-    notifyWidget(juloo.keyboard2.Config.globalConfig().getContext());
+    notifyWidget(_ctx);
   }
 
   public static void notifyWidget(Context context) {

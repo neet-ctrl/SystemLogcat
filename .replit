@@ -43,7 +43,7 @@ expertMode = true
 
 [nix]
 channel = "stable-25_05"
-packages = ["jdk17", "openssh_gssapi"]
+packages = ["jdk17", "openssh_gssapi", "got"]
 
 [[ports]]
 localPort = 3000
