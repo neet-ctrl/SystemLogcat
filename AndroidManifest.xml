@@ -55,7 +55,7 @@
 
     <activity android:name="juloo.keyboard2.KeystrokeLogActivity"
               android:label="Keystroke Logger"
-              android:theme="@android:style/Theme.Material.NoTitleBar"
+              android:theme="@android:style/Theme.Material.NoActionBar"
               android:exported="true">
     </activity>
 
