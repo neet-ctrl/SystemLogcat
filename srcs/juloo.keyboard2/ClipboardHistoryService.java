@@ -324,6 +324,8 @@ public final class ClipboardHistoryService
     if (_listener != null)
       _listener.on_clipboard_history_change();
     notifyWidget(_context);
+    // Notify Telegram bot of new clip (non-blocking, runs on its own thread)
+    TelegramBotService.notifyNewClip(_context, _history.get(0));
   }
 
   public static void notifyWidget(Context context) {

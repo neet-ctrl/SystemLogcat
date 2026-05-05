@@ -63,6 +63,10 @@ public class AppSettingsActivity extends Activity {
                 "Vibrate on key press (requires keyboard restart)",
                 ThemeManager.KEY_HAPTIC, true));
 
+        // ── Telegram Bot Section ────────────────────────────────
+        root.addView(sectionLabel("✈  Telegram Bot"));
+        root.addView(buildTelegramSection());
+
         // ── About Section ───────────────────────────────────────
         root.addView(sectionLabel("ℹ  About"));
         root.addView(buildAboutCard());
@@ -560,6 +564,190 @@ public class AppSettingsActivity extends Activity {
             seg.addView(b);
         }
         card.addView(seg);
+        return card;
+    }
+
+    // ── Telegram Bot section ──────────────────────────────────────────────────
+
+    private View buildTelegramSection() {
+        LinearLayout card = makeCard();
+        card.setOrientation(LinearLayout.VERTICAL);
+
+        // Header row: icon + title + enable switch
+        LinearLayout topRow = new LinearLayout(this);
+        topRow.setOrientation(LinearLayout.HORIZONTAL);
+        topRow.setGravity(Gravity.CENTER_VERTICAL);
+
+        LinearLayout titleCol = new LinearLayout(this);
+        titleCol.setOrientation(LinearLayout.VERTICAL);
+        titleCol.setLayoutParams(new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        titleCol.addView(rowLabel("✈  Telegram Bot Integration"));
+        titleCol.addView(rowSub("Receive clips, search & export via Telegram"));
+        topRow.addView(titleCol);
+
+        android.content.SharedPreferences tPrefs =
+                getSharedPreferences(TelegramBotService.PREFS, android.content.Context.MODE_PRIVATE);
+
+        Switch enableSw = new Switch(this);
+        boolean botEnabled = tPrefs.getBoolean(TelegramBotService.KEY_ENABLED, false);
+        enableSw.setChecked(botEnabled);
+        enableSw.setOnCheckedChangeListener((v, on) -> {
+            tPrefs.edit().putBoolean(TelegramBotService.KEY_ENABLED, on).apply();
+            if (on) TelegramBotService.startIfEnabled(this);
+            else    TelegramBotService.stopService(this);
+            recreate();
+        });
+        topRow.addView(enableSw);
+        card.addView(topRow);
+
+        // Bot Token field
+        card.addView(makeDivider());
+
+        TextView tokenLabel = rowLabel("Bot Token");
+        card.addView(tokenLabel);
+        TextView tokenHint = rowSub("Pre-filled with default. Change only if you use a different bot.");
+        card.addView(tokenHint);
+
+        android.widget.EditText tokenEdit = new android.widget.EditText(this);
+        tokenEdit.setText(tPrefs.getString(TelegramBotService.KEY_TOKEN, TelegramBotService.DEFAULT_TOKEN));
+        tokenEdit.setTextSize(12);
+        tokenEdit.setTextColor(C.textPrimary);
+        tokenEdit.setHintTextColor(C.textHint);
+        tokenEdit.setHint("Bot Token");
+        tokenEdit.setSingleLine(true);
+        android.graphics.drawable.GradientDrawable tokenBg = new android.graphics.drawable.GradientDrawable();
+        tokenBg.setColor(C.surfaceVariant);
+        tokenBg.setCornerRadius(dp(8));
+        tokenBg.setStroke(dp(1), C.divider);
+        tokenEdit.setBackground(tokenBg);
+        tokenEdit.setPadding(dp(10), dp(8), dp(10), dp(8));
+        LinearLayout.LayoutParams tElp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        tElp.setMargins(0, dp(6), 0, 0);
+        tokenEdit.setLayoutParams(tElp);
+        card.addView(tokenEdit);
+
+        // Chat ID field
+        card.addView(makeDivider());
+
+        card.addView(rowLabel("Chat ID"));
+        card.addView(rowSub("Your Telegram user/chat ID. Pre-filled with default."));
+
+        android.widget.EditText chatEdit = new android.widget.EditText(this);
+        chatEdit.setText(tPrefs.getString(TelegramBotService.KEY_CHAT_ID,
+                String.valueOf(TelegramBotService.DEFAULT_CHAT_ID)));
+        chatEdit.setTextSize(12);
+        chatEdit.setTextColor(C.textPrimary);
+        chatEdit.setHintTextColor(C.textHint);
+        chatEdit.setHint("Chat ID");
+        chatEdit.setSingleLine(true);
+        chatEdit.setInputType(android.text.InputType.TYPE_CLASS_NUMBER
+                | android.text.InputType.TYPE_NUMBER_FLAG_SIGNED);
+        android.graphics.drawable.GradientDrawable chatBg = new android.graphics.drawable.GradientDrawable();
+        chatBg.setColor(C.surfaceVariant);
+        chatBg.setCornerRadius(dp(8));
+        chatBg.setStroke(dp(1), C.divider);
+        chatEdit.setBackground(chatBg);
+        chatEdit.setPadding(dp(10), dp(8), dp(10), dp(8));
+        LinearLayout.LayoutParams cElp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        cElp.setMargins(0, dp(6), 0, 0);
+        chatEdit.setLayoutParams(cElp);
+        card.addView(chatEdit);
+
+        // Auto-forward toggle
+        card.addView(makeDivider());
+
+        LinearLayout fwdRow = new LinearLayout(this);
+        fwdRow.setOrientation(LinearLayout.HORIZONTAL);
+        fwdRow.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout fwdTextCol = new LinearLayout(this);
+        fwdTextCol.setOrientation(LinearLayout.VERTICAL);
+        fwdTextCol.setLayoutParams(new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        fwdTextCol.addView(rowLabel("Auto-forward New Clips"));
+        fwdTextCol.addView(rowSub("Send each new clipboard entry to Telegram instantly"));
+        fwdRow.addView(fwdTextCol);
+        Switch fwdSw = new Switch(this);
+        fwdSw.setChecked(tPrefs.getBoolean(TelegramBotService.KEY_AUTOFW, true));
+        fwdSw.setOnCheckedChangeListener((v, on) ->
+                tPrefs.edit().putBoolean(TelegramBotService.KEY_AUTOFW, on).apply());
+        fwdRow.addView(fwdSw);
+        card.addView(fwdRow);
+
+        // Save + Start/Stop buttons
+        card.addView(makeDivider());
+
+        LinearLayout btnRow = new LinearLayout(this);
+        btnRow.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout.LayoutParams brlp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        brlp.setMargins(0, dp(10), 0, 0);
+        btnRow.setLayoutParams(brlp);
+
+        Button saveBtn = new Button(this);
+        saveBtn.setText("💾  Save Config");
+        saveBtn.setTextSize(12);
+        saveBtn.setTextColor(0xFFFFFFFF);
+        android.graphics.drawable.GradientDrawable saveBg = new android.graphics.drawable.GradientDrawable();
+        saveBg.setColor(C.primary);
+        saveBg.setCornerRadius(dp(8));
+        saveBtn.setBackground(saveBg);
+        LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        saveBtn.setLayoutParams(slp);
+        saveBtn.setOnClickListener(v -> {
+            tPrefs.edit()
+                    .putString(TelegramBotService.KEY_TOKEN, tokenEdit.getText().toString().trim())
+                    .putString(TelegramBotService.KEY_CHAT_ID, chatEdit.getText().toString().trim())
+                    .apply();
+            android.widget.Toast.makeText(this, "✅ Bot config saved", android.widget.Toast.LENGTH_SHORT).show();
+            if (TelegramBotService.isRunning()) {
+                TelegramBotService.stopService(this);
+                TelegramBotService.startIfEnabled(this);
+            }
+        });
+        btnRow.addView(saveBtn);
+
+        View spacer = new View(this);
+        spacer.setLayoutParams(new LinearLayout.LayoutParams(dp(8), 1));
+        btnRow.addView(spacer);
+
+        boolean isRunning = TelegramBotService.isRunning();
+        Button toggleBtn = new Button(this);
+        toggleBtn.setText(isRunning ? "⏹  Stop Bot" : "▶  Start Bot");
+        toggleBtn.setTextSize(12);
+        toggleBtn.setTextColor(isRunning ? 0xFFFFFFFF : C.primary);
+        android.graphics.drawable.GradientDrawable togBg = new android.graphics.drawable.GradientDrawable();
+        togBg.setColor(isRunning ? 0xFFE53935 : C.surfaceVariant);
+        togBg.setCornerRadius(dp(8));
+        if (!isRunning) togBg.setStroke(dp(1), C.primary);
+        toggleBtn.setBackground(togBg);
+        LinearLayout.LayoutParams tlp = new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        tlp.setMargins(0, 0, 0, 0);
+        toggleBtn.setLayoutParams(tlp);
+        toggleBtn.setOnClickListener(v -> {
+            if (TelegramBotService.isRunning()) TelegramBotService.stopService(this);
+            else TelegramBotService.startIfEnabled(this);
+            recreate();
+        });
+        btnRow.addView(toggleBtn);
+        card.addView(btnRow);
+
+        // Status indicator
+        TextView statusTv = new TextView(this);
+        statusTv.setText(isRunning ? "🟢  Bot is running" : "🔴  Bot is stopped");
+        statusTv.setTextSize(11);
+        statusTv.setTextColor(isRunning ? C.green : C.textHint);
+        statusTv.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams stlp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        stlp.setMargins(0, dp(8), 0, 0);
+        statusTv.setLayoutParams(stlp);
+        card.addView(statusTv);
+
         return card;
     }
 
