@@ -67,7 +67,8 @@ public class Keyboard2 extends InputMethodService
   {
     if (_currentSpecialLayout != null)
       return _currentSpecialLayout;
-    return LayoutModifier.modify_layout(current_layout_unmodified());
+    KeyboardData kd = LayoutModifier.modify_layout(current_layout_unmodified());
+    return kd.patchWithSmartClipKeys(this, SmartClipsService.getInstance(this));
   }
 
   void setTextLayout(int l)

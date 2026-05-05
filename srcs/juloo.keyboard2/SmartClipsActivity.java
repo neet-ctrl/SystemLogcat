@@ -49,6 +49,7 @@ public class SmartClipsActivity extends Activity
     private static final String ICO_UNLOCK = "🔓";
     private static final String ICO_ADD    = "+";
     private static final String ICO_INFO   = "ℹ";
+    private static final String ICO_ASSIGN = "⌨";
 
     // ══════════════════════════════════════════════════════════════════════════
     // Lifecycle
@@ -605,6 +606,15 @@ public class SmartClipsActivity extends Activity
         // Spacer
         row.addView(spacer());
 
+        // ⌨ Assign to keyboard corner
+        Button assignBtn = makeActionIcon(ICO_ASSIGN, C.primary);
+        assignBtn.setContentDescription("Assign to keyboard key corner");
+        assignBtn.setOnClickListener(v -> showKeyboardAssignDialog(clip));
+        row.addView(withMargin(assignBtn, dp(8)));
+
+        // Spacer
+        row.addView(spacer());
+
         // View content button (text, so user knows what it does)
         if (!clip.locked) {
             Button viewBtn = makePillTextBtn("View", C.primary);
@@ -613,6 +623,187 @@ public class SmartClipsActivity extends Activity
         }
 
         return row;
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // Keyboard corner assignment — QWERTY picker dialog
+    // ══════════════════════════════════════════════════════════════════════════
+
+    private static final String[][] QWERTY_ROWS = {
+        {"q","w","e","r","t","y","u","i","o","p"},
+        {"a","s","d","f","g","h","j","k","l"},
+        {"z","x","c","v","b","n","m"}
+    };
+
+    /** Names for the 4 corner slots shown in the legend. */
+    private static final String[] SLOT_NAMES = {"", "↖NW", "↗NE", "↙SW", "↘SE"};
+
+    private void showKeyboardAssignDialog(SmartClipsService.SmartClip clip) {
+        final android.app.AlertDialog[] dlgRef = new android.app.AlertDialog[1];
+
+        // ── Scroll container ──────────────────────────────────────────────────
+        ScrollView sv = new ScrollView(this);
+        sv.setOverScrollMode(View.OVER_SCROLL_NEVER);
+
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(dp(16), dp(14), dp(16), dp(10));
+        sv.addView(root);
+
+        // Subtitle
+        TextView sub = new TextView(this);
+        sub.setText("Tap an empty corner (+) on any key to assign this clip.\nSwipe to that corner while typing to paste instantly.");
+        sub.setTextSize(12);
+        sub.setTextColor(C.textSecondary);
+        root.addView(sub);
+
+        // Thin divider
+        View topDiv = new View(this);
+        topDiv.setBackgroundColor(C.divider);
+        LinearLayout.LayoutParams divLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 1);
+        divLp.setMargins(0, dp(12), 0, dp(10));
+        topDiv.setLayoutParams(divLp);
+        root.addView(topDiv);
+
+        // ── QWERTY grid ───────────────────────────────────────────────────────
+        for (String[] keyRow : QWERTY_ROWS) {
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.CENTER_HORIZONTAL);
+            LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT);
+            rowLp.setMargins(0, dp(3), 0, 0);
+            row.setLayoutParams(rowLp);
+            for (String key : keyRow) {
+                row.addView(buildKeyAssignCell(clip, key, dlgRef));
+            }
+            root.addView(row);
+        }
+
+        // Legend
+        TextView legend = new TextView(this);
+        legend.setText("Corner slots: ↖NW  ↗NE  ↙SW  ↘SE\n"
+                + "Coloured = already assigned (tap to remove).");
+        legend.setTextSize(10);
+        legend.setTextColor(C.textHint);
+        LinearLayout.LayoutParams legLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        legLp.setMargins(0, dp(14), 0, dp(4));
+        legend.setLayoutParams(legLp);
+        root.addView(legend);
+
+        // ── Dialog ────────────────────────────────────────────────────────────
+        android.app.AlertDialog dlg = new android.app.AlertDialog.Builder(this)
+                .setTitle("⌨  Assign Clip #" + clip.serial
+                        + (clip.description.isEmpty() ? "" : " — " + clip.description))
+                .setView(sv)
+                .setNegativeButton("Done", null)
+                .create();
+        dlgRef[0] = dlg;
+        dlg.show();
+    }
+
+    /**
+     * One key cell in the QWERTY assignment grid.
+     * Shows the key letter in the centre and 4 corner dots (NW/NE/SW/SE).
+     * Empty corners show "+"; assigned corners show "#N" coloured.
+     */
+    private android.widget.FrameLayout buildKeyAssignCell(
+            final SmartClipsService.SmartClip clip,
+            final String keyName,
+            final android.app.AlertDialog[] dlgRef) {
+
+        int cellH   = dp(40);
+        int dotSize = dp(13);
+        int dotMar  = dp(1);
+
+        // ── Outer frame ───────────────────────────────────────────────────────
+        android.widget.FrameLayout cell = new android.widget.FrameLayout(this);
+        LinearLayout.LayoutParams cellLp = new LinearLayout.LayoutParams(0, cellH, 1f);
+        cellLp.setMargins(dp(2), 0, dp(2), 0);
+        cell.setLayoutParams(cellLp);
+
+        GradientDrawable cellBg = new GradientDrawable();
+        cellBg.setColor(C.surface);
+        cellBg.setCornerRadius(dp(6));
+        cellBg.setStroke(1, C.divider);
+        cell.setBackground(cellBg);
+
+        // ── Centre letter label ───────────────────────────────────────────────
+        TextView label = new TextView(this);
+        label.setText(keyName);
+        label.setTextSize(11);
+        label.setTextColor(C.textSecondary);
+        label.setGravity(Gravity.CENTER);
+        cell.addView(label, new android.widget.FrameLayout.LayoutParams(
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT));
+
+        // ── 4 corner dots ─────────────────────────────────────────────────────
+        // slot: 1=NW, 2=NE, 3=SW, 4=SE
+        int[] gravities = {
+            Gravity.TOP    | Gravity.START,   // 1 NW
+            Gravity.TOP    | Gravity.END,     // 2 NE
+            Gravity.BOTTOM | Gravity.START,   // 3 SW
+            Gravity.BOTTOM | Gravity.END      // 4 SE
+        };
+        for (int i = 0; i < 4; i++) {
+            final int slot = i + 1;
+            final int grav = gravities[i];
+
+            int existing = SmartClipKeyBinder.getSerial(this, keyName, slot);
+            boolean empty = existing < 0;
+
+            TextView dot = new TextView(this);
+            dot.setGravity(Gravity.CENTER);
+            dot.setTextSize(6);
+            dot.setPadding(0, 0, 0, 0);
+
+            GradientDrawable dotBg = new GradientDrawable();
+            dotBg.setShape(GradientDrawable.OVAL);
+
+            if (empty) {
+                dot.setText("+");
+                dot.setTextColor(C.textHint);
+                dotBg.setColor(C.surfaceVariant);
+                dotBg.setStroke(1, C.divider);
+                dot.setOnClickListener(v -> {
+                    SmartClipKeyBinder.assign(SmartClipsActivity.this, keyName, slot, clip.serial);
+                    toast("Clip #" + clip.serial + " → '" + keyName + "' " + SLOT_NAMES[slot]);
+                    if (dlgRef[0] != null) dlgRef[0].dismiss();
+                });
+            } else {
+                final int existingFinal = existing;
+                dot.setText("#" + existing);
+                dot.setTextColor(0xFFFFFFFF);
+                int dotColor = (existing == clip.serial) ? C.green : C.primary;
+                dotBg.setColor(dotColor);
+                dot.setOnClickListener(v ->
+                    new android.app.AlertDialog.Builder(SmartClipsActivity.this)
+                        .setTitle("Remove Assignment")
+                        .setMessage("Remove clip #" + existingFinal
+                                + " from '" + keyName + "' " + SLOT_NAMES[slot] + "?")
+                        .setPositiveButton("Remove", (d2, w) -> {
+                            SmartClipKeyBinder.remove(SmartClipsActivity.this, keyName, slot);
+                            toast("Removed from '" + keyName + "' " + SLOT_NAMES[slot]);
+                            if (dlgRef[0] != null) {
+                                dlgRef[0].dismiss();
+                                showKeyboardAssignDialog(clip);
+                            }
+                        })
+                        .setNegativeButton("Cancel", null)
+                        .show());
+            }
+            dot.setBackground(dotBg);
+            android.widget.FrameLayout.LayoutParams dotLp =
+                    new android.widget.FrameLayout.LayoutParams(dotSize, dotSize, grav);
+            dotLp.setMargins(dotMar, dotMar, dotMar, dotMar);
+            cell.addView(dot, dotLp);
+        }
+        return cell;
     }
 
     // ══════════════════════════════════════════════════════════════════════════

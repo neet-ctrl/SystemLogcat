@@ -700,4 +700,54 @@ public final class KeyboardData
   {
     return new Exception(message + " " + parser.getPositionDescription());
   }
+
+  // ── Smart clip corner injection ────────────────────────────────────────────
+
+  /**
+   * Returns a new KeyboardData with smart clip keys injected into empty corner
+   * slots (NW=1, NE=2, SW=3, SE=4) as defined by SmartClipKeyBinder.
+   *
+   * Each injected key is a Kind.String value with magic content:
+   *   "#<serial>\uE001<clip content>"
+   * Keyboard2View renders only the first 3 chars ("#N") as the sub-label.
+   * KeyEventHandler intercepts the U+E001 marker and sends the real content.
+   *
+   * Locked or missing clips are silently skipped.
+   */
+  public KeyboardData patchWithSmartClipKeys(android.content.Context ctx,
+                                              final SmartClipsService svc)
+  {
+    final Map<String, Map<Integer, Integer>> bindings = SmartClipKeyBinder.asMap(ctx);
+    if (bindings.isEmpty()) return this;
+    ArrayList<Row> newRows = new ArrayList<Row>(rows.size());
+    for (Row row : rows)
+    {
+      newRows.add(row.mapKeys(new MapKey()
+      {
+        public Key apply(Key k)
+        {
+          if (k.keys[0] == null) return k;
+          String name = k.keys[0].getString();
+          Map<Integer, Integer> slots = bindings.get(name);
+          if (slots == null) return k;
+          Key result = k;
+          for (Map.Entry<Integer, Integer> e : slots.entrySet())
+          {
+            int slot = e.getKey();
+            if (slot < 1 || slot > 4) continue;
+            if (result.getKeyValue(slot) != null) continue; // never overwrite real keys
+            int serial = e.getValue();
+            SmartClipsService.SmartClip clip = svc.getBySerial(serial);
+            if (clip == null || clip.locked) continue;
+            // "#N\uE001content" — first 3 chars shown on key, rest is the payload
+            String magic = "#" + serial + "\uE001" + clip.content;
+            KeyValue kv = KeyValue.makeStringKey(magic, KeyValue.FLAG_SMALLER_FONT);
+            result = result.withKeyValue(slot, kv);
+          }
+          return result;
+        }
+      }));
+    }
+    return new KeyboardData(this, newRows);
+  }
 }

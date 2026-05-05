@@ -101,7 +101,12 @@ public final class KeyEventHandler
     switch (key.getKind())
     {
       case Char: send_text(String.valueOf(key.getChar())); break;
-      case String: send_text(key.getString()); break;
+      case String:
+        String _ks = key.getString();
+        int _scIdx = _ks.indexOf('\uE001');
+        if (_scIdx >= 0) send_text(_ks.substring(_scIdx + 1)); // smart clip corner key
+        else             send_text(_ks);
+        break;
       case Event: _recv.handle_event_key(key.getEvent()); break;
       case Keyevent: send_key_down_up(key.getKeyevent()); break;
       case Modifier: break;
