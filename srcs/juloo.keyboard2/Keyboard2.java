@@ -138,6 +138,23 @@ public class Keyboard2 extends InputMethodService
     _container_view = (ViewGroup)inflate_view(R.layout.keyboard);
     _keyboardView = (Keyboard2View)_container_view.findViewById(R.id.keyboard_view);
     _candidates_view = (CandidatesView)_container_view.findViewById(R.id.candidates_view);
+    _container_view.findViewById(R.id.btn_candidates_clipboard)
+        .setOnClickListener(v -> openClipboardPane());
+    _container_view.findViewById(R.id.btn_candidates_widget)
+        .setOnClickListener(v -> openFloatingWidget());
+  }
+
+  void openClipboardPane()
+  {
+    if (_clipboard_pane == null)
+      _clipboard_pane = (ViewGroup)inflate_view(R.layout.clipboard_pane);
+    setInputView(_clipboard_pane);
+  }
+
+  void openFloatingWidget()
+  {
+    Intent intent = new Intent(Keyboard2.this, juloo.keyboard2.widget.FloatingWidgetService.class);
+    startService(intent);
   }
 
   private List<InputMethodSubtype> getEnabledSubtypes(InputMethodManager imm)
@@ -405,9 +422,7 @@ public class Keyboard2 extends InputMethodService
           break;
 
         case SWITCH_CLIPBOARD:
-          if (_clipboard_pane == null)
-            _clipboard_pane = (ViewGroup)inflate_view(R.layout.clipboard_pane);
-          setInputView(_clipboard_pane);
+          openClipboardPane();
           break;
 
         case SWITCH_BACK_EMOJI:
@@ -460,9 +475,7 @@ public class Keyboard2 extends InputMethodService
           break;
 
         case OPEN_FLOATING_WIDGET:
-          Intent floatingWidgetIntent = new Intent(Keyboard2.this,
-              juloo.keyboard2.widget.FloatingWidgetService.class);
-          startService(floatingWidgetIntent);
+          openFloatingWidget();
           break;
       }
     }

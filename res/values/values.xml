@@ -11,4 +11,6 @@
   <bool name="debug_logs">false</bool>
   <!-- View IDs referenced programmatically -->
   <item type="id" name="clipboard_pin_view"/>
+  <item type="id" name="btn_candidates_clipboard"/>
+  <item type="id" name="btn_candidates_widget"/>
 </resources>

@@ -4,6 +4,24 @@
     <TextView android:id="@+id/candidates_left" style="@style/candidates_item" android:layout_width="match_parent" android:layout_height="match_parent" android:layout_weight="1"/>
     <TextView android:id="@+id/candidates_middle" style="@style/candidates_item" android:layout_width="match_parent" android:layout_height="match_parent" android:layout_weight="1"/>
     <TextView android:id="@+id/candidates_right" style="@style/candidates_item" android:layout_width="match_parent" android:layout_height="match_parent" android:layout_weight="1"/>
+    <ImageButton
+        android:id="@+id/btn_candidates_clipboard"
+        android:layout_width="40dp"
+        android:layout_height="match_parent"
+        android:background="?android:attr/selectableItemBackgroundBorderless"
+        android:src="@drawable/ic_candidates_clipboard"
+        android:tint="?attr/colorLabel"
+        android:padding="10dp"
+        android:contentDescription="Open clipboard"/>
+    <ImageButton
+        android:id="@+id/btn_candidates_widget"
+        android:layout_width="40dp"
+        android:layout_height="match_parent"
+        android:background="?android:attr/selectableItemBackgroundBorderless"
+        android:src="@drawable/ic_candidates_widget"
+        android:tint="?attr/colorLabel"
+        android:padding="10dp"
+        android:contentDescription="Open floating widget"/>
   </juloo.keyboard2.CandidatesView>
   <juloo.keyboard2.Keyboard2View android:id="@+id/keyboard_view" android:layout_width="match_parent" android:layout_height="wrap_content"/>
 </LinearLayout>
