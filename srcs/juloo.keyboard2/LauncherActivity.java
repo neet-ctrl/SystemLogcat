@@ -91,7 +91,7 @@ public class LauncherActivity extends Activity implements Handler.Callback
     View btnKbSettings = findViewById(R.id.btnLaunchSettingsActivity);
     if (btnKbSettings != null)
       btnKbSettings.setOnClickListener(v -> {
-        Intent i = new Intent(this, AppSettingsActivity.class);
+        Intent i = new Intent(this, SettingsActivity.class);
         i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         startActivity(i);
       });

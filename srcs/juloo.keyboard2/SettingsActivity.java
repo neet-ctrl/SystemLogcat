@@ -2,10 +2,19 @@ package juloo.keyboard2;
 
 import android.content.SharedPreferences;
 import android.content.res.Configuration;
+import android.graphics.Color;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.os.Bundle;
 import android.preference.PreferenceActivity;
 import android.preference.PreferenceManager;
+import android.view.Gravity;
+import android.view.View;
+import android.widget.Button;
+import android.widget.LinearLayout;
+import android.widget.ListView;
+import android.widget.TextView;
 
 import android.preference.Preference;
 import android.widget.Toast;
@@ -15,17 +24,20 @@ import android.net.Uri;
 public class SettingsActivity extends PreferenceActivity
 {
   private static final int REQUEST_RESTORE_FILE = 1001;
+  private float _dp;
 
   @Override
   public void onCreate(Bundle savedInstanceState)
   {
     super.onCreate(savedInstanceState);
+    _dp = getResources().getDisplayMetrics().density;
     try
     {
       Config.migrate(getPreferenceManager().getSharedPreferences());
     }
     catch (Exception _e) { fallbackEncrypted(); return; }
     addPreferencesFromResource(R.xml.settings);
+    injectModernHeader();
 
     findPreference("learned_words_list").setOnPreferenceClickListener(p -> {
         Suggestions suggestions = new Suggestions(null);
@@ -576,6 +588,105 @@ public class SettingsActivity extends PreferenceActivity
     if (s == null) return "";
     return s.length() <= maxLen ? s : s.substring(0, maxLen - 1) + "…";
   }
+
+  // ──────────────────────────────────────────────────────────────────────────
+
+  // ── Modern header injected into the PreferenceActivity ListView ───────────
+
+  private void injectModernHeader()
+  {
+    ListView lv = getListView();
+    if (lv == null) return;
+
+    // ── Outer wrapper (dark background matching modern UI) ─────────────────
+    LinearLayout header = new LinearLayout(this);
+    header.setOrientation(LinearLayout.VERTICAL);
+    header.setLayoutParams(new ListView.LayoutParams(
+        ListView.LayoutParams.MATCH_PARENT,
+        ListView.LayoutParams.WRAP_CONTENT));
+
+    // ── Top header bar ─────────────────────────────────────────────────────
+    LinearLayout topBar = new LinearLayout(this);
+    topBar.setOrientation(LinearLayout.HORIZONTAL);
+    topBar.setGravity(Gravity.CENTER_VERTICAL);
+    topBar.setBackgroundColor(0xFF1A1A2E);
+    topBar.setPadding(dp(12), dp(16), dp(16), dp(16));
+
+    // Back button
+    Button backBtn = new Button(this);
+    backBtn.setText("←");
+    backBtn.setTextSize(18);
+    backBtn.setTextColor(0xFFE2E8F0);
+    backBtn.setBackground(null);
+    backBtn.setPadding(0, 0, dp(8), 0);
+    backBtn.setMinWidth(0); backBtn.setMinHeight(0);
+    backBtn.setOnClickListener(v -> finish());
+    topBar.addView(backBtn);
+
+    // Title column
+    LinearLayout titleCol = new LinearLayout(this);
+    titleCol.setOrientation(LinearLayout.VERTICAL);
+    titleCol.setLayoutParams(new LinearLayout.LayoutParams(0,
+        LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
+    TextView title = new TextView(this);
+    title.setText("⚙  Keyboard Settings");
+    title.setTextSize(18);
+    title.setTextColor(0xFFE2E8F0);
+    title.setTypeface(Typeface.DEFAULT_BOLD);
+    titleCol.addView(title);
+
+    TextView sub = new TextView(this);
+    sub.setText("Layout · Typing · Style · Behaviour");
+    sub.setTextSize(11);
+    sub.setTextColor(0xFF94A3B8);
+    LinearLayout.LayoutParams subLp = new LinearLayout.LayoutParams(
+        LinearLayout.LayoutParams.WRAP_CONTENT,
+        LinearLayout.LayoutParams.WRAP_CONTENT);
+    subLp.setMargins(0, dp(2), 0, 0);
+    sub.setLayoutParams(subLp);
+    titleCol.addView(sub);
+
+    topBar.addView(titleCol);
+
+    // Accent right badge
+    TextView badge = new TextView(this);
+    badge.setText("⚙");
+    badge.setTextSize(22);
+    badge.setTextColor(0x554F46E5);
+    topBar.addView(badge);
+
+    header.addView(topBar);
+
+    // ── Thin accent divider ────────────────────────────────────────────────
+    View accent = new View(this);
+    accent.setBackgroundColor(0xFF4F46E5);
+    accent.setLayoutParams(new LinearLayout.LayoutParams(
+        LinearLayout.LayoutParams.MATCH_PARENT, dp(2)));
+    header.addView(accent);
+
+    // ── Spacer below header before prefs list ─────────────────────────────
+    View spacer = new View(this);
+    spacer.setBackgroundColor(0xFF0F1117);
+    spacer.setLayoutParams(new LinearLayout.LayoutParams(
+        LinearLayout.LayoutParams.MATCH_PARENT, dp(6)));
+    header.addView(spacer);
+
+    lv.addHeaderView(header, null, false);
+
+    // Style the ListView itself — dark background
+    lv.setBackgroundColor(0xFF0F1117);
+    lv.setDivider(new android.graphics.drawable.ColorDrawable(0xFF1E2040));
+    lv.setDividerHeight(1);
+    lv.setCacheColorHint(Color.TRANSPARENT);
+
+    // Style the window background dark
+    if (getWindow() != null) {
+      getWindow().getDecorView().setBackgroundColor(0xFF0F1117);
+    }
+  }
+
+  private int dp(int v) { return (int)(v * _dp); }
 
   // ──────────────────────────────────────────────────────────────────────────
 

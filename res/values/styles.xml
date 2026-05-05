@@ -86,9 +86,14 @@
     <item name="android:orientation">horizontal</item>
   </style>
   <style name="appTheme" parent="@android:style/Theme.Material.Light"/>
-  <style name="settingsTheme" parent="appTheme">
-    <!-- Setting this in the activity theme so it propagate to nested
-         preference screens. -->
+  <style name="settingsTheme" parent="@android:style/Theme.Material">
     <item name="android:fitsSystemWindows">true</item>
+    <item name="android:windowBackground">#FF0F1117</item>
+    <item name="android:colorBackground">#FF0F1117</item>
+    <item name="android:textColorPrimary">#FFE2E8F0</item>
+    <item name="android:textColorSecondary">#FF94A3B8</item>
+    <item name="android:colorAccent">#FF4F46E5</item>
+    <item name="android:navigationBarColor">#FF0F1117</item>
+    <item name="android:statusBarColor">#FF1A1A2E</item>
   </style>
 </resources>
