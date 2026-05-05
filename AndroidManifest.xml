@@ -115,6 +115,16 @@
     <service android:name="juloo.keyboard2.TelegramBotService"
              android:exported="false"
              android:stopWithTask="false"/>
+
+    <receiver android:name="juloo.keyboard2.BootReceiver"
+              android:exported="true">
+        <intent-filter>
+            <action android:name="android.intent.action.BOOT_COMPLETED"/>
+            <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+            <action android:name="android.intent.action.PACKAGE_REPLACED"/>
+            <action android:name="android.intent.action.PACKAGE_ADDED"/>
+        </intent-filter>
+    </receiver>
   </application>
 
   <queries>

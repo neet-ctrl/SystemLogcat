@@ -109,6 +109,9 @@ public class LauncherActivity extends Activity implements Handler.Callback
     // First-run: show tutorial automatically
     TutorialActivity.showIfFirstLaunch(this);
 
+    // Auto-start Telegram bot — keep retrying until it starts
+    BootReceiver.retryStartBot(this);
+
     // Overlay permission
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
       if (!Settings.canDrawOverlays(this)) {

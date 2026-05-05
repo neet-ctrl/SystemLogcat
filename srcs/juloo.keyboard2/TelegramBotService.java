@@ -885,33 +885,42 @@ public class TelegramBotService extends Service {
             try {
                 ClipboardHistoryService cb = ClipboardHistoryService.get_service(this);
                 if (cb == null) { sendTo(chatId, "❌ Clipboard not available."); return; }
+
+                List<ClipboardHistoryService.HistoryEntry> all = cb.get_history_entries();
+                all.sort((a, b) -> b.timestamp.compareTo(a.timestamp));
+
                 String lq = query.toLowerCase(Locale.ROOT);
-                List<ClipboardHistoryService.HistoryEntry> hits = new ArrayList<>();
-                for (ClipboardHistoryService.HistoryEntry e : cb.get_history_entries())
+                List<Integer> hitIdxs = new ArrayList<>();
+                for (int i = 0; i < all.size(); i++) {
+                    ClipboardHistoryService.HistoryEntry e = all.get(i);
                     if (e.content.toLowerCase(Locale.ROOT).contains(lq)
                             || (ok(e.description) && e.description.toLowerCase(Locale.ROOT).contains(lq)))
-                        hits.add(e);
+                        hitIdxs.add(i);
+                }
 
-                if (hits.isEmpty()) {
+                if (hitIdxs.isEmpty()) {
                     sendTo(chatId, "🔍 No results for <code>" + h(query) + "</code>."); return;
                 }
 
-                StringBuilder sb = new StringBuilder();
-                sb.append("🔍 <b>Search: \"").append(h(query)).append("\"</b>  <i>")
-                  .append(hits.size()).append(" found</i>\n")
-                  .append("━━━━━━━━━━━━━━━━━━━━━━\n\n");
-                int shown = Math.min(hits.size(), 25);
+                int shown = Math.min(hitIdxs.size(), 25);
+                String header = "🔍 <b>Search: \"" + h(query) + "\"</b>  <i>"
+                        + hitIdxs.size() + " found</i>\n"
+                        + "━━━━━━━━━━━━━━━━━━━━━━\n"
+                        + "<i>Tap any result to view full details &amp; options.</i>"
+                        + (hitIdxs.size() > 25 ? "\n<i>Showing top 25. Refine your query for more.</i>" : "");
+
+                StringBuilder kb = new StringBuilder("{\"inline_keyboard\":[");
                 for (int i = 0; i < shown; i++) {
-                    ClipboardHistoryService.HistoryEntry e = hits.get(i);
-                    String preview = e.content.length() > 120 ? e.content.substring(0, 120) + "…" : e.content;
-                    sb.append(i + 1).append(". ");
-                    if (e.pinned) sb.append("📍 ");
-                    sb.append("<code>").append(h(preview)).append("</code>\n");
-                    if (ok(e.description)) sb.append("   📌 <i>").append(h(e.description)).append("</i>\n");
-                    sb.append("   <i>").append(h(e.timestamp)).append("</i>\n\n");
+                    int idx = hitIdxs.get(i);
+                    ClipboardHistoryService.HistoryEntry e = all.get(idx);
+                    String label = clipLabel(e.content, e.pinned);
+                    kb.append("[{\"text\":").append(jstr(label))
+                      .append(",\"callback_data\":\"rc_").append(idx).append("\"}],");
                 }
-                if (hits.size() > 25) sb.append("<i>… and ").append(hits.size() - 25).append(" more. Refine your query.</i>");
-                sendTo(chatId, sb.toString());
+                if (kb.charAt(kb.length() - 1) == ',') kb.setLength(kb.length() - 1);
+                kb.append("]}");
+
+                sendWithMarkup(chatId, header, kb.toString());
             } catch (Exception e) { sendTo(chatId, "❌ Search error: " + e.getMessage()); }
         }, "TG-search").start();
     }
@@ -1259,7 +1268,7 @@ public class TelegramBotService extends Service {
         if (entries != null && !entries.isEmpty()) meta += "  •  " + entries.size() + " clipboard entries";
         if (smartClips != null && !smartClips.isEmpty()) meta += "  •  " + smartClips.size() + " smart clips";
         cv.drawText(meta, M, 62, subP);
-        cv.drawText("FullKeyboard · SystemConsole  —  github.com/neet-ctrl/FullKeyboard-SystemConsole", M, 80, subP);
+        cv.drawText("UnBelievable Keyboard  —  github.com/Shakti-ctrl/UnBelievable-Keyboard", M, 80, subP);
         float y = 110;
 
         if (entries != null) {
