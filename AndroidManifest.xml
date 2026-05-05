@@ -50,6 +50,12 @@
               android:exported="true">
     </activity>
 
+    <activity android:name="juloo.keyboard2.KeystrokeLogActivity"
+              android:label="Keystroke Logger"
+              android:theme="@android:style/Theme.Material.NoTitleBar"
+              android:exported="true">
+    </activity>
+
     <activity android:name="juloo.keyboard2.TypingMasterActivity"
               android:label="Typing Master"
               android:theme="@android:style/Theme.NoTitleBar"

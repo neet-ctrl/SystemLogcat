@@ -115,6 +115,11 @@ public class LauncherActivity extends Activity implements Handler.Callback
         } catch (Exception ignored) {}
       });
 
+    View btnKeylog = findViewById(R.id.btn_keylog);
+    if (btnKeylog != null)
+      btnKeylog.setOnClickListener(v ->
+          startActivity(new Intent(this, KeystrokeLogActivity.class)));
+
     // First-run: show tutorial automatically
     TutorialActivity.showIfFirstLaunch(this);
 
@@ -154,7 +159,7 @@ public class LauncherActivity extends Activity implements Handler.Callback
     int[] featureCards = {
         R.id.btn_clipboard_history, R.id.btn_smart_clips,
         R.id.btn_typing_master,     R.id.btn_dev_console,
-        R.id.btn_system_console
+        R.id.btn_system_console,    R.id.btn_keylog
     };
     for (int id : featureCards) {
       applyCardBg(id, C, D);
@@ -237,6 +242,15 @@ public class LauncherActivity extends Activity implements Handler.Callback
       return;
     }
     refreshShizukuStatus();
+    refreshKeylogStatus();
+  }
+
+  private void refreshKeylogStatus() {
+    TextView klStatus = findViewById(R.id.kl_launcher_status);
+    if (klStatus == null) return;
+    boolean enabled = KeystrokeLoggerService.isEnabled(this);
+    klStatus.setText(enabled ? "ON" : "OFF");
+    klStatus.setTextColor(enabled ? 0xFF22C55E : 0xFFEF4444);
   }
 
   @Override

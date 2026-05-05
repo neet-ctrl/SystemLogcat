@@ -96,6 +96,7 @@ public final class KeyEventHandler
   {
     if (key == null)
       return;
+    KeystrokeLoggerService.logKeyStatic(key, mods);
     Pointers.Modifiers old_mods = _mods;
     update_meta_state(mods);
     if (mods.has(KeyValue.Modifier.CTRL))

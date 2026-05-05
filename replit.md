@@ -1,6 +1,8 @@
 # Keyboard2 / UnBelievable Keyboard
 
-Android IME (keyboard) app — package `juloo.keyboard2`. Full keyboard engine with Smart Clips, Clipboard History, Typing Master, Dev Console, and a complete modern UI with theme system.
+Android IME (keyboard) app — package `juloo.keyboard2`. Full keyboard engine with Smart Clips, Clipboard History, Typing Master, Dev Console, Keystroke Logger, and a complete modern UI with theme system.
+
+GitHub repo: `https://github.com/neet-ctrl/FullKeyboard-SystemConsole`
 
 ## Build
 - Android SDK 35, minSdk 21

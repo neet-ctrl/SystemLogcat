@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="#1E293B"
+    android:layout_marginBottom="8dp"
+    android:padding="14dp">
+
+  <LinearLayout
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:orientation="horizontal"
+      android:gravity="center_vertical">
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+      <LinearLayout
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"
+          android:orientation="horizontal"
+          android:gravity="center_vertical">
+
+        <TextView
+            android:id="@+id/kl_sess_app"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="App Name"
+            android:textColor="#F8FAFC"
+            android:textSize="14sp"
+            android:textStyle="bold"/>
+
+        <TextView
+            android:id="@+id/kl_sess_pw_badge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="  🔒"
+            android:textSize="12sp"
+            android:visibility="gone"/>
+
+      </LinearLayout>
+
+      <TextView
+          android:id="@+id/kl_sess_field"
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"
+          android:text="Text field"
+          android:textColor="#6366F1"
+          android:textSize="11sp"
+          android:layout_marginTop="2dp"/>
+
+      <TextView
+          android:id="@+id/kl_sess_pkg"
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"
+          android:text="com.example.app"
+          android:textColor="#475569"
+          android:textSize="10sp"
+          android:layout_marginTop="1dp"/>
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="end">
+
+      <TextView
+          android:id="@+id/kl_sess_keycount"
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"
+          android:text="0 keys"
+          android:textColor="#F59E0B"
+          android:textSize="13sp"
+          android:textStyle="bold"/>
+
+      <TextView
+          android:id="@+id/kl_sess_time"
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"
+          android:text="00:00"
+          android:textColor="#475569"
+          android:textSize="10sp"
+          android:layout_marginTop="3dp"/>
+
+      <TextView
+          android:id="@+id/kl_sess_dur"
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"
+          android:text="0s"
+          android:textColor="#64748B"
+          android:textSize="10sp"
+          android:layout_marginTop="1dp"/>
+    </LinearLayout>
+
+  </LinearLayout>
+
+  <!-- Action buttons -->
+  <LinearLayout
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:orientation="horizontal"
+      android:layout_marginTop="10dp">
+
+    <TextView
+        android:id="@+id/kl_sess_btn_view"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="🔍 View"
+        android:textColor="#6366F1"
+        android:textSize="12sp"
+        android:gravity="center"
+        android:background="#0F172A"
+        android:padding="7dp"
+        android:clickable="true"
+        android:focusable="true"/>
+
+    <View android:layout_width="6dp" android:layout_height="1dp"/>
+
+    <TextView
+        android:id="@+id/kl_sess_btn_export"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="📤 Export"
+        android:textColor="#22C55E"
+        android:textSize="12sp"
+        android:gravity="center"
+        android:background="#0F172A"
+        android:padding="7dp"
+        android:clickable="true"
+        android:focusable="true"/>
+
+    <View android:layout_width="6dp" android:layout_height="1dp"/>
+
+    <TextView
+        android:id="@+id/kl_sess_btn_delete"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="🗑 Delete"
+        android:textColor="#EF4444"
+        android:textSize="12sp"
+        android:gravity="center"
+        android:background="#0F172A"
+        android:padding="7dp"
+        android:clickable="true"
+        android:focusable="true"/>
+
+  </LinearLayout>
+
+</LinearLayout>

