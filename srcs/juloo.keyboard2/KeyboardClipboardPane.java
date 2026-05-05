@@ -13,20 +13,20 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Modern two-tab clipboard panel shown inside the IME keyboard (replaces the
- * old clipboard_pane.xml content).
+ * Modern two-tab clipboard panel shown inside the IME keyboard.
  *
  * Tab 0 — Clipboard History : ⌨ Paste  📋 Copy  📌/📍 Pin  🗑 Delete
  * Tab 1 — Smart Clips       : ⌨ Paste (unlocked only)  📋/🔒 Copy  📌/📍 Pin
  *
- * Inflated via clipboard_pane.xml; the Keyboard2View bottom row lives in that
- * XML so this view only owns the tab-bar + card list.
+ * Each tab has a search bar with an embedded mini-QWERTY keyboard for filtering
+ * clips without leaving the panel.  The scroll area shrinks when the mini
+ * keyboard is open to keep the total height within the IME window.
  */
 public final class KeyboardClipboardPane extends LinearLayout
         implements ClipboardHistoryService.OnClipboardHistoryChange,
                    SmartClipsService.OnSmartClipsChangeListener {
 
-    // ── Palette (mirrors FloatingWidgetService glass palette) ─────────────────
+    // ── Palette (mirrors FloatingWidgetService) ────────────────────────────────
     private static final int C_BG        = 0xFF0A0E1A;
     private static final int C_SURFACE   = 0xCC1E2040;
     private static final int C_SURFACE_B = 0xCC151832;
@@ -39,14 +39,28 @@ public final class KeyboardClipboardPane extends LinearLayout
     private static final int C_INACTIVE  = 0xAA252947;
     private static final int C_BORDER    = 0x553A3F6E;
 
+    // ── Fields ────────────────────────────────────────────────────────────────
     private final float dp;
-    private LinearLayout _cardsContainer;
-    private Button _tabHistory, _tabSmart;
-    private boolean _showSmart = false;
-    private ClipboardHistoryService _histService;
-    private SmartClipsService _smartService;
 
-    // ── XML constructor (required for inflation) ──────────────────────────────
+    private LinearLayout  _cardsContainer;
+    private Button        _tabHistory, _tabSmart;
+    private ScrollView    _scrollView;
+    private LinearLayout  _miniKbContainer;
+    private TextView      _searchDisplay;
+
+    private boolean _showSmart   = false;
+    private boolean _searchOpen  = false;
+    private final StringBuilder _searchQuery = new StringBuilder();
+
+    private ClipboardHistoryService _histService;
+    private SmartClipsService       _smartService;
+
+    // Scroll area heights (dp) — shrink when mini-keyboard is visible
+    private static final int SCROLL_H_NORMAL = 210;
+    private static final int SCROLL_H_SEARCH = 120;
+
+    // ── Constructors ──────────────────────────────────────────────────────────
+
     public KeyboardClipboardPane(Context ctx, AttributeSet attrs) {
         super(ctx, attrs);
         dp = ctx.getResources().getDisplayMetrics().density;
@@ -65,25 +79,38 @@ public final class KeyboardClipboardPane extends LinearLayout
         setOrientation(VERTICAL);
         setBackgroundColor(C_BG);
 
+        // Tab bar
         addView(buildTabBar(ctx));
 
+        // Thin primary-colour divider
         View divider = new View(ctx);
         divider.setBackgroundColor(C_PRIMARY);
         divider.setAlpha(0.30f);
         addView(divider, new LayoutParams(LayoutParams.MATCH_PARENT, 1));
 
-        ScrollView sv = new ScrollView(ctx);
-        sv.setFillViewport(true);
-        sv.setOverScrollMode(OVER_SCROLL_NEVER);
+        // Search bar (always visible)
+        addView(buildSearchBar(ctx));
+
+        // Mini-QWERTY (initially hidden)
+        _miniKbContainer = buildMiniKeyboard(ctx);
+        _miniKbContainer.setVisibility(GONE);
+        addView(_miniKbContainer);
+
+        // Scrollable card area
+        _scrollView = new ScrollView(ctx);
+        _scrollView.setFillViewport(true);
+        _scrollView.setOverScrollMode(OVER_SCROLL_NEVER);
 
         _cardsContainer = new LinearLayout(ctx);
         _cardsContainer.setOrientation(VERTICAL);
-        _cardsContainer.setPadding(dp(8), dp(8), dp(8), dp(8));
-        sv.addView(_cardsContainer, new LayoutParams(
+        _cardsContainer.setPadding(dp(8), dp(6), dp(8), dp(6));
+        _scrollView.addView(_cardsContainer, new LayoutParams(
                 LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
 
-        addView(sv, new LayoutParams(LayoutParams.MATCH_PARENT, dp(270)));
+        addView(_scrollView, new LayoutParams(
+                LayoutParams.MATCH_PARENT, dp(SCROLL_H_NORMAL)));
 
+        // Services
         _histService  = ClipboardHistoryService.get_service(ctx);
         _smartService = SmartClipsService.getInstance(ctx);
         if (_histService != null) _histService.set_on_clipboard_history_change(this);
@@ -110,7 +137,7 @@ public final class KeyboardClipboardPane extends LinearLayout
         LayoutParams lp1 = new LayoutParams(0, dp(30), 1f);
         lp1.setMargins(0, 0, dp(6), 0);
         bar.addView(_tabHistory, lp1);
-        bar.addView(_tabSmart, new LayoutParams(0, dp(30), 1f));
+        bar.addView(_tabSmart,   new LayoutParams(0, dp(30), 1f));
         return bar;
     }
 
@@ -134,7 +161,7 @@ public final class KeyboardClipboardPane extends LinearLayout
         _showSmart = smart;
         styleTab(_tabHistory, !smart);
         styleTab(_tabSmart,    smart);
-        refresh(ctx);
+        clearSearch(ctx);   // reset search query when switching tabs
     }
 
     private void styleTab(Button b, boolean active) {
@@ -145,12 +172,215 @@ public final class KeyboardClipboardPane extends LinearLayout
         b.setBackground(bg);
     }
 
-    // ── Refresh ───────────────────────────────────────────────────────────────
+    // ── Search bar ────────────────────────────────────────────────────────────
+
+    private LinearLayout buildSearchBar(Context ctx) {
+        LinearLayout row = new LinearLayout(ctx);
+        row.setOrientation(HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(8), dp(4), dp(8), dp(4));
+        row.setBackgroundColor(0xFF0D1120);
+
+        // Pill container for 🔍 + query text
+        LinearLayout pill = new LinearLayout(ctx);
+        pill.setOrientation(HORIZONTAL);
+        pill.setGravity(Gravity.CENTER_VERTICAL);
+        pill.setPadding(dp(10), dp(5), dp(10), dp(5));
+        GradientDrawable pillBg = new GradientDrawable();
+        pillBg.setColor(C_INACTIVE);
+        pillBg.setCornerRadius(dp(20));
+        pillBg.setStroke(1, C_BORDER);
+        pill.setBackground(pillBg);
+
+        TextView icon = new TextView(ctx);
+        icon.setText("🔍");
+        icon.setTextSize(11);
+        LayoutParams iconLp = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
+        iconLp.setMargins(0, 0, dp(5), 0);
+        pill.addView(icon, iconLp);
+
+        _searchDisplay = new TextView(ctx);
+        _searchDisplay.setHint("Search clips…");
+        _searchDisplay.setHintTextColor(C_TXT_HINT);
+        _searchDisplay.setTextColor(C_TXT);
+        _searchDisplay.setTextSize(12);
+        _searchDisplay.setSingleLine(true);
+        _searchDisplay.setEllipsize(TextUtils.TruncateAt.END);
+        pill.addView(_searchDisplay, new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
+
+        LayoutParams pillLp = new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f);
+        row.addView(pill, pillLp);
+
+        // Tap the pill to toggle mini-keyboard
+        pill.setOnClickListener(v -> toggleMiniKeyboard(ctx));
+
+        // × clear button (shown only when query is non-empty)
+        Button clear = new Button(ctx);
+        clear.setText("×");
+        clear.setTextSize(16);
+        clear.setTypeface(Typeface.DEFAULT_BOLD);
+        clear.setTextColor(C_TXT_HINT);
+        clear.setPadding(0, 0, 0, 0);
+        clear.setMinWidth(0);
+        clear.setMinHeight(0);
+        clear.setBackground(null);
+        LayoutParams clLp = new LayoutParams(dp(32), dp(32));
+        clLp.setMargins(dp(6), 0, 0, 0);
+        clear.setLayoutParams(clLp);
+        clear.setVisibility(INVISIBLE);
+        clear.setOnClickListener(v -> clearSearch(ctx));
+        clear.setTag("search_clear");
+        row.addView(clear);
+
+        return row;
+    }
+
+    private void toggleMiniKeyboard(Context ctx) {
+        _searchOpen = !_searchOpen;
+        _miniKbContainer.setVisibility(_searchOpen ? VISIBLE : GONE);
+        LayoutParams svLp = (LayoutParams) _scrollView.getLayoutParams();
+        svLp.height = dp(_searchOpen ? SCROLL_H_SEARCH : SCROLL_H_NORMAL);
+        _scrollView.setLayoutParams(svLp);
+        updateSearchDisplay();
+        refresh(ctx);
+    }
+
+    private void clearSearch(Context ctx) {
+        _searchQuery.setLength(0);
+        _searchOpen = false;
+        _miniKbContainer.setVisibility(GONE);
+        LayoutParams svLp = (LayoutParams) _scrollView.getLayoutParams();
+        svLp.height = dp(SCROLL_H_NORMAL);
+        _scrollView.setLayoutParams(svLp);
+        updateSearchDisplay();
+        refresh(ctx);
+    }
+
+    private void appendSearch(Context ctx, String ch) {
+        _searchQuery.append(ch);
+        updateSearchDisplay();
+        refresh(ctx);
+    }
+
+    private void backspaceSearch(Context ctx) {
+        if (_searchQuery.length() > 0) {
+            _searchQuery.deleteCharAt(_searchQuery.length() - 1);
+            updateSearchDisplay();
+            refresh(ctx);
+        }
+    }
+
+    private void updateSearchDisplay() {
+        String q = _searchQuery.toString();
+        _searchDisplay.setText(q.isEmpty() ? null : q);
+
+        // Show/hide the × clear button (found by tag in parent)
+        if (_searchDisplay.getParent() instanceof LinearLayout) {
+            LinearLayout pill = (LinearLayout) _searchDisplay.getParent();
+            if (pill.getParent() instanceof LinearLayout) {
+                LinearLayout row = (LinearLayout) pill.getParent();
+                View clrBtn = row.findViewWithTag("search_clear");
+                if (clrBtn != null) clrBtn.setVisibility(q.isEmpty() ? INVISIBLE : VISIBLE);
+            }
+        }
+
+        // Highlight pill border when active
+        if (_searchDisplay.getParent() instanceof LinearLayout) {
+            LinearLayout pill = (LinearLayout) _searchDisplay.getParent();
+            GradientDrawable pillBg = new GradientDrawable();
+            pillBg.setColor(C_INACTIVE);
+            pillBg.setCornerRadius(dp(20));
+            pillBg.setStroke(_searchOpen ? dp(1) : 1,
+                    _searchOpen ? C_PRIMARY_L : C_BORDER);
+            pill.setBackground(pillBg);
+        }
+    }
+
+    // ── Mini-QWERTY keyboard ──────────────────────────────────────────────────
+
+    private static final String[] KEYS_ROW1 = {"Q","W","E","R","T","Y","U","I","O","P"};
+    private static final String[] KEYS_ROW2 = {"A","S","D","F","G","H","J","K","L"};
+    private static final String[] KEYS_ROW3 = {"Z","X","C","V","B","N","M"};
+
+    private LinearLayout buildMiniKeyboard(Context ctx) {
+        LinearLayout kb = new LinearLayout(ctx);
+        kb.setOrientation(VERTICAL);
+        kb.setPadding(dp(4), dp(4), dp(4), dp(4));
+        kb.setBackgroundColor(0xFF0D1120);
+
+        // Row 1: Q…P
+        kb.addView(buildKeyRow(ctx, KEYS_ROW1, false));
+        // Row 2: A…L (centred by adding side margin)
+        LinearLayout row2 = buildKeyRow(ctx, KEYS_ROW2, false);
+        LayoutParams r2lp = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
+        r2lp.setMargins(dp(14), dp(3), dp(14), 0);
+        row2.setLayoutParams(r2lp);
+        kb.addView(row2);
+        // Row 3: Z…M + ⌫
+        kb.addView(buildKeyRow(ctx, KEYS_ROW3, true));
+
+        return kb;
+    }
+
+    private LinearLayout buildKeyRow(Context ctx, String[] letters, boolean withBackspace) {
+        LinearLayout row = new LinearLayout(ctx);
+        row.setOrientation(HORIZONTAL);
+        row.setGravity(Gravity.CENTER);
+        LayoutParams rowLp = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
+        rowLp.setMargins(0, dp(3), 0, 0);
+        row.setLayoutParams(rowLp);
+
+        for (String letter : letters) {
+            Button b = makeMiniKey(ctx, letter, 1f);
+            b.setOnClickListener(v -> appendSearch(getContext(), letter.toLowerCase()));
+            row.addView(b);
+        }
+
+        if (withBackspace) {
+            Button back = makeMiniKey(ctx, "⌫", 1.5f);
+            back.setTextColor(0xFFFF8A80);   // soft red
+            back.setOnClickListener(v -> backspaceSearch(getContext()));
+            row.addView(back);
+        }
+        return row;
+    }
+
+    private Button makeMiniKey(Context ctx, String label, float weight) {
+        Button b = new Button(ctx);
+        b.setText(label);
+        b.setTextSize(11);
+        b.setTypeface(Typeface.DEFAULT_BOLD);
+        b.setTextColor(C_TXT);
+        b.setPadding(0, 0, 0, 0);
+        b.setMinWidth(0);
+        b.setMinHeight(0);
+        LayoutParams lp = new LayoutParams(0, dp(26), weight);
+        lp.setMargins(dp(2), 0, dp(2), 0);
+        b.setLayoutParams(lp);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(0xFF1E2040);
+        bg.setCornerRadius(dp(6));
+        bg.setStroke(1, C_BORDER);
+        b.setBackground(bg);
+        return b;
+    }
+
+    // ── Refresh / filtering ───────────────────────────────────────────────────
 
     private void refresh(Context ctx) {
         _cardsContainer.removeAllViews();
         if (_showSmart) buildSmartCards(ctx);
         else            buildHistoryCards(ctx);
+    }
+
+    /** Returns true if [text] matches the current search query (case-insensitive). */
+    private boolean matchesSearch(String... fields) {
+        if (_searchQuery.length() == 0) return true;
+        String q = _searchQuery.toString().toLowerCase();
+        for (String f : fields) {
+            if (f != null && f.toLowerCase().contains(q)) return true;
+        }
+        return false;
     }
 
     // ── History cards ─────────────────────────────────────────────────────────
@@ -165,19 +395,27 @@ public final class KeyboardClipboardPane extends LinearLayout
             showEmpty(ctx, "No clipboard history yet.\nCopy some text to see it here.");
             return;
         }
+
         List<String> pinned = new ArrayList<>(), rest = new ArrayList<>();
         for (String s : raw) {
+            if (!matchesSearch(s)) continue;
             if (ClipboardHistoryService.isPinned(s)) pinned.add(s);
             else rest.add(s);
         }
+
         List<String> ordered = new ArrayList<>();
         ordered.addAll(pinned);
         ordered.addAll(rest);
 
+        if (ordered.isEmpty()) {
+            showEmpty(ctx, "No clips match "" + _searchQuery + "".");
+            return;
+        }
+
         for (int i = 0; i < ordered.size(); i++) {
-            String text  = ordered.get(i);
-            boolean pin  = ClipboardHistoryService.isPinned(text);
-            _cardsContainer.addView(buildHistoryCard(ctx, text, pin, i));
+            String text = ordered.get(i);
+            _cardsContainer.addView(
+                    buildHistoryCard(ctx, text, ClipboardHistoryService.isPinned(text), i));
         }
     }
 
@@ -194,11 +432,12 @@ public final class KeyboardClipboardPane extends LinearLayout
         card.setBackground(bg);
         if (Build.VERSION.SDK_INT >= 21) card.setElevation(dp(2));
 
-        LayoutParams cardLp = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
+        LayoutParams cardLp = new LayoutParams(
+                LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
         cardLp.setMargins(0, 0, 0, dp(5));
         card.setLayoutParams(cardLp);
 
-        // Pinned accent stripe on the left
+        // Pinned accent stripe
         if (pinned) {
             View stripe = new View(ctx);
             stripe.setBackgroundColor(C_PRIMARY_L);
@@ -229,7 +468,7 @@ public final class KeyboardClipboardPane extends LinearLayout
                 ClipboardHistoryService.copyToClipboard(ctx.getApplicationContext(), text));
         card.addView(copy);
 
-        // 📌 / 📍 Pin toggle
+        // 📌 / 📍 Pin
         Button pin = makeIconBtn(ctx, pinned ? "📌" : "📍",
                 pinned ? 0x554F46E5 : 0x22818CF8);
         pin.setOnClickListener(v -> {
@@ -255,18 +494,26 @@ public final class KeyboardClipboardPane extends LinearLayout
 
     private void buildSmartCards(Context ctx) {
         List<SmartClipsService.SmartClip> clips = _smartService.getClipsForWidget();
-        if (clips.isEmpty()) {
-            showEmpty(ctx, "No smart clips yet.\nOpen the SmartClips screen to add some.");
-            return;
-        }
+
         List<SmartClipsService.SmartClip> pinned = new ArrayList<>(), rest = new ArrayList<>();
         for (SmartClipsService.SmartClip c : clips) {
+            if (!matchesSearch(c.content, c.description, c.keyword, "#" + c.serial))
+                continue;
             if (PinStore.isSmartPinned(ctx, c.serial)) pinned.add(c);
             else rest.add(c);
         }
+
         List<SmartClipsService.SmartClip> ordered = new ArrayList<>();
         ordered.addAll(pinned);
         ordered.addAll(rest);
+
+        if (ordered.isEmpty()) {
+            String msg = clips.isEmpty()
+                    ? "No smart clips yet.\nOpen the SmartClips screen to add some."
+                    : "No smart clips match "" + _searchQuery + "".";
+            showEmpty(ctx, msg);
+            return;
+        }
 
         for (int i = 0; i < ordered.size(); i++) {
             _cardsContainer.addView(buildSmartCard(ctx, ordered.get(i), i));
@@ -287,7 +534,8 @@ public final class KeyboardClipboardPane extends LinearLayout
         card.setBackground(bg);
         if (Build.VERSION.SDK_INT >= 21) card.setElevation(dp(2));
 
-        LayoutParams cardLp = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
+        LayoutParams cardLp = new LayoutParams(
+                LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
         cardLp.setMargins(0, 0, 0, dp(5));
         card.setLayoutParams(cardLp);
 
@@ -296,7 +544,7 @@ public final class KeyboardClipboardPane extends LinearLayout
         row.setOrientation(HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
 
-        // #N serial chip
+        // #N chip
         TextView serial = new TextView(ctx);
         serial.setText("#" + clip.serial);
         serial.setTextSize(9);
@@ -308,7 +556,8 @@ public final class KeyboardClipboardPane extends LinearLayout
         sBg.setStroke(1, C_BORDER);
         serial.setBackground(sBg);
         serial.setPadding(dp(5), dp(2), dp(5), dp(2));
-        LayoutParams slp = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
+        LayoutParams slp = new LayoutParams(
+                LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
         slp.setMargins(0, 0, dp(7), 0);
         row.addView(serial, slp);
 
@@ -327,14 +576,14 @@ public final class KeyboardClipboardPane extends LinearLayout
         tvLp.setMargins(0, 0, dp(4), 0);
         row.addView(tv, tvLp);
 
-        // ⌨ Paste — only for unlocked clips
+        // ⌨ Paste — unlocked only
         if (!clip.locked) {
             Button paste = makeIconBtn(ctx, "⌨", 0x55818CF8);
             paste.setOnClickListener(v -> ClipboardHistoryService.paste(clip.content));
             row.addView(paste);
         }
 
-        // 📋 Copy (🔒 when locked)
+        // 📋 / 🔒 Copy
         Button copy = makeIconBtn(ctx, clip.locked ? "🔒" : "📋",
                 clip.locked ? 0x33FF6B6B : C_GREEN);
         copy.setOnClickListener(v -> {
@@ -369,7 +618,8 @@ public final class KeyboardClipboardPane extends LinearLayout
             kwBg.setCornerRadius(dp(8));
             kw.setBackground(kwBg);
             kw.setPadding(dp(6), dp(2), dp(6), dp(2));
-            LayoutParams kwLp = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
+            LayoutParams kwLp = new LayoutParams(
+                    LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
             kwLp.setMargins(0, dp(4), 0, 0);
             card.addView(kw, kwLp);
         }
@@ -385,8 +635,9 @@ public final class KeyboardClipboardPane extends LinearLayout
         tv.setTextColor(C_TXT_HINT);
         tv.setTextSize(12);
         tv.setGravity(Gravity.CENTER);
-        tv.setPadding(dp(16), dp(36), dp(16), dp(36));
-        _cardsContainer.addView(tv, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+        tv.setPadding(dp(16), dp(28), dp(16), dp(28));
+        _cardsContainer.addView(tv, new LayoutParams(
+                LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
     }
 
     private Button makeIconBtn(Context ctx, String icon, int color) {
