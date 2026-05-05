@@ -544,6 +544,16 @@ public class FloatingWidgetService extends Service
             card.addView(tv, new LinearLayout.LayoutParams(0,
                     LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
 
+            // ⌨ Paste button — injects text directly into the active field via IME
+            Button paste = makePasteBtn(ctx, dp);
+            paste.setOnClickListener(v -> {
+                boolean pasted = ClipboardHistoryService.pasteOrCopy(ctx, text);
+                android.widget.Toast.makeText(ctx,
+                        pasted ? "Pasted!" : "Copied! (focus a text field first)",
+                        android.widget.Toast.LENGTH_SHORT).show();
+            });
+            card.addView(paste);
+
             // 📋 Copy button (circular green)
             Button copy = makeCopyBtn(ctx, dp);
             copy.setOnClickListener(v ->
@@ -626,6 +636,18 @@ public class FloatingWidgetService extends Service
             tvLp.setMargins(dp(8), 0, 0, 0);
             row.addView(tv, tvLp);
 
+            // ⌨ Paste button — only shown for unlocked clips; injects via IME
+            if (!clip.locked) {
+                Button paste = makePasteBtn(ctx, dp);
+                paste.setOnClickListener(v -> {
+                    boolean pasted = ClipboardHistoryService.pasteOrCopy(ctx, clip.content);
+                    Toast.makeText(ctx,
+                            pasted ? "Pasted!" : "Copied! (focus a text field first)",
+                            Toast.LENGTH_SHORT).show();
+                });
+                row.addView(paste);
+            }
+
             // 📋 Copy button
             Button copy = makeCopyBtn(ctx, dp);
             copy.setOnClickListener(v -> {
@@ -690,6 +712,25 @@ public class FloatingWidgetService extends Service
         GradientDrawable bg = new GradientDrawable();
         bg.setShape(GradientDrawable.OVAL);
         bg.setColor(COL_GREEN);
+        b.setBackground(bg);
+        if (Build.VERSION.SDK_INT >= 21) b.setElevation(2 * dp);
+        return b;
+    }
+
+    /** Circular paste button — injects text directly via the IME connection. */
+    private static Button makePasteBtn(Context ctx, float dp) {
+        Button b = new Button(ctx);
+        b.setText("⌨");
+        b.setTextSize(13);
+        b.setPadding(0, 0, 0, 0);
+        b.setMinWidth(0); b.setMinHeight(0);
+        int sz = (int)(34 * dp);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(sz, sz);
+        lp.setMargins((int)(5 * dp), 0, 0, 0);
+        b.setLayoutParams(lp);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setShape(GradientDrawable.OVAL);
+        bg.setColor(0x44818CF8);  // soft indigo — distinct from green copy and indigo pin
         b.setBackground(bg);
         if (Build.VERSION.SDK_INT >= 21) b.setElevation(2 * dp);
         return b;
