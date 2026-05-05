@@ -807,7 +807,7 @@ public class AppSettingsActivity extends Activity {
         repoBtn.setOnClickListener(v -> {
             try {
                 startActivity(new Intent(Intent.ACTION_VIEW,
-                        Uri.parse("https://github.com/Shakti-ctrl/UnBelievable-Keyboard")));
+                        Uri.parse("https://github.com/neet-ctrl/FullKeyboard-SystemConsole")));
             } catch (Exception ignored) {}
         });
         card.addView(repoBtn);

@@ -1268,7 +1268,7 @@ public class TelegramBotService extends Service {
         if (entries != null && !entries.isEmpty()) meta += "  •  " + entries.size() + " clipboard entries";
         if (smartClips != null && !smartClips.isEmpty()) meta += "  •  " + smartClips.size() + " smart clips";
         cv.drawText(meta, M, 62, subP);
-        cv.drawText("UnBelievable Keyboard  —  github.com/Shakti-ctrl/UnBelievable-Keyboard", M, 80, subP);
+        cv.drawText("FullKeyboard · SystemConsole  —  github.com/neet-ctrl/FullKeyboard-SystemConsole", M, 80, subP);
         float y = 110;
 
         if (entries != null) {
