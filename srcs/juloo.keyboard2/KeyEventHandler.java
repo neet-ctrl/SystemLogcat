@@ -244,10 +244,73 @@ public final class KeyEventHandler
         }
     }
     conn.commitText(text, 1);
-    // Formula expansion: detect {token} and replace with smart clip
+    // Formula expansion: detect {token} → paste smart clip inline
     if (text.equals("}") || text.endsWith("}")) {
         try_expand_smart_clip_formula(conn);
     }
+    // Copy formula: detect ?token? → copy smart clip to clipboard, delete trigger text
+    if (text.equals("?") || text.endsWith("?")) {
+        try_copy_smart_clip_formula(conn);
+    }
+  }
+
+  /**
+   * After typing the closing '?', look backwards for the pattern ?token? in the
+   * text before the cursor.  If 'token' resolves to a smart clip, copy that
+   * clip's content to the clipboard and delete the entire '?token?' trigger from
+   * the input — nothing is typed into the field.
+   *
+   * Rules to avoid false-positives on normal sentences:
+   *   - token must be non-empty and contain no spaces or newlines
+   *   - token must actually resolve to a known smart clip (serial or keyword)
+   *   - locked clips are rejected with a toast
+   */
+  private void try_copy_smart_clip_formula(InputConnection conn) {
+    try {
+      CharSequence before = conn.getTextBeforeCursor(80, 0);
+      if (before == null) return;
+      String s = before.toString();
+      if (!s.endsWith("?")) return;
+
+      // closeIdx = position of the trailing ?  (last char of s)
+      int closeIdx = s.length() - 1;
+      // Find the opening ?  (must be at least one char before closeIdx)
+      int openIdx = s.lastIndexOf('?', closeIdx - 1);
+      if (openIdx < 0) return;
+
+      String token = s.substring(openIdx + 1, closeIdx);
+      if (token.isEmpty()) return;
+      // Reject tokens that span words or lines — those are ordinary questions
+      if (token.contains(" ") || token.contains("\n") || token.contains("\t")) return;
+
+      android.content.Context ctx = juloo.keyboard2.Config.globalConfig().getContext();
+      if (ctx == null) return;
+      juloo.keyboard2.SmartClipsService svc =
+              juloo.keyboard2.SmartClipsService.getInstance(ctx);
+      juloo.keyboard2.SmartClipsService.SmartClip clip = svc.resolveFormula(token);
+      if (clip == null) return;   // not a smart clip — leave text alone
+
+      if (clip.locked) {
+        android.widget.Toast.makeText(ctx,
+                "Clip #" + clip.serial + " is locked — cannot copy",
+                android.widget.Toast.LENGTH_SHORT).show();
+        return;
+      }
+
+      // Delete '?token?' from the field
+      int removeLen = closeIdx - openIdx + 1;  // length of the whole ?token? span
+      conn.deleteSurroundingText(removeLen, 0);
+
+      // Copy content to clipboard (suppress history recording)
+      juloo.keyboard2.ClipboardHistoryService.suppressNextClip();
+      android.content.ClipboardManager cm = (android.content.ClipboardManager)
+              ctx.getSystemService(android.content.Context.CLIPBOARD_SERVICE);
+      cm.setPrimaryClip(android.content.ClipData.newPlainText("SmartClip", clip.content));
+
+      android.widget.Toast.makeText(ctx,
+              "Copied clip #" + clip.serial + " to clipboard",
+              android.widget.Toast.LENGTH_SHORT).show();
+    } catch (Exception ignored) {}
   }
 
   /** After typing '}', look backwards for '{...}' and replace with the matching smart clip. */
