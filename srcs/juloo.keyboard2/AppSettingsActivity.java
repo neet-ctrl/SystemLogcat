@@ -54,15 +54,7 @@ public class AppSettingsActivity extends Activity {
         // ── Smart Clips Section ─────────────────────────────────
         root.addView(sectionLabel("🔐  Smart Clips"));
         root.addView(buildAutoLockRow());
-        root.addView(buildToggleRow(
-                "Show Serial No. in Widget",
-                "Display clip number badge in home widget",
-                ThemeManager.KEY_SHOW_SERIAL, true));
         root.addView(buildClipLimitRow());
-
-        // ── Clipboard Section ───────────────────────────────────
-        root.addView(sectionLabel("📋  Clipboard"));
-        root.addView(buildClipboardLimitRow());
 
         // ── Behaviour Section ───────────────────────────────────
         root.addView(sectionLabel("⚙  Behaviour"));
@@ -519,34 +511,54 @@ public class AppSettingsActivity extends Activity {
 
     // ── Clip widget limit row ─────────────────────────────────────────────────
 
+    private static final int SMART_CLIP_LIMIT_ALL = 0; // 0 = show all
+
     private View buildClipLimitRow() {
         LinearLayout card = makeCard();
         card.setOrientation(LinearLayout.VERTICAL);
-        card.addView(rowLabel("Clips Shown in Widget"));
-        card.addView(rowSub("Maximum Smart Clips displayed on home screen widget"));
+        card.addView(rowLabel("Smart Clips in Home Widget"));
+        card.addView(rowSub("How many Smart Clips appear on the home screen widget (0 = Show All)"));
 
-        int[] vals   = {10, 20, 50};
-        String[] lbls = {"10", "20", "50"};
-        int cur = ThemeManager.getClipWidgetLimit(this);
+        // Read from the same prefs the widget actually uses
+        android.content.SharedPreferences widgetPrefs =
+                getSharedPreferences("widget_prefs", android.content.Context.MODE_PRIVATE);
+        int cur = widgetPrefs.getInt("smart_clip_limit", 20);
 
-        LinearLayout seg = buildSegRow(vals, lbls, cur, ThemeManager.KEY_CLIP_LIMIT);
-        card.addView(seg);
-        return card;
-    }
+        int[] vals    = {10, 20, 50, SMART_CLIP_LIMIT_ALL};
+        String[] lbls = {"10", "20", "50", "All"};
 
-    // ── Clipboard history limit ───────────────────────────────────────────────
+        LinearLayout seg = new LinearLayout(this);
+        seg.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        sp.setMargins(0, dp(12), 0, 0);
+        seg.setLayoutParams(sp);
 
-    private View buildClipboardLimitRow() {
-        LinearLayout card = makeCard();
-        card.setOrientation(LinearLayout.VERTICAL);
-        card.addView(rowLabel("History Limit"));
-        card.addView(rowSub("Maximum clipboard entries stored"));
-
-        int[] vals   = {50, 100, 200, 500};
-        String[] lbls = {"50", "100", "200", "500"};
-        int cur = ThemeManager.getClipboardLimit(this);
-
-        LinearLayout seg = buildSegRow(vals, lbls, cur, ThemeManager.KEY_CB_LIMIT);
+        for (int i = 0; i < vals.length; i++) {
+            final int val = vals[i];
+            Button b = new Button(this);
+            b.setText(lbls[i]);
+            b.setTextSize(12);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            if (i > 0) lp.setMargins(dp(5), 0, 0, 0);
+            b.setLayoutParams(lp);
+            applySegBtn(b, val == cur);
+            b.setOnClickListener(v -> {
+                widgetPrefs.edit().putInt("smart_clip_limit", val).apply();
+                // Immediately refresh all home screen widgets
+                android.appwidget.AppWidgetManager mgr =
+                        android.appwidget.AppWidgetManager.getInstance(this);
+                android.content.ComponentName comp = new android.content.ComponentName(
+                        this, juloo.keyboard2.widget.ClipboardWidgetProvider.class);
+                int[] ids = mgr.getAppWidgetIds(comp);
+                for (int id : ids) {
+                    juloo.keyboard2.widget.ClipboardWidgetProvider.updateWidget(this, mgr, id);
+                }
+                recreate();
+            });
+            seg.addView(b);
+        }
         card.addView(seg);
         return card;
     }
@@ -607,7 +619,7 @@ public class AppSettingsActivity extends Activity {
         repoBtn.setOnClickListener(v -> {
             try {
                 startActivity(new Intent(Intent.ACTION_VIEW,
-                        Uri.parse("https://github.com/Shakti-ctrl/UnBelievable-Keyboard")));
+                        Uri.parse("https://github.com/neet-ctrl/FullKeyboard-SystemConsole")));
             } catch (Exception ignored) {}
         });
         card.addView(repoBtn);

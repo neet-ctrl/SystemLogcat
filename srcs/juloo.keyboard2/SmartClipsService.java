@@ -17,7 +17,7 @@ public final class SmartClipsService {
     private static final String KEY_LOCK_ENABLED = "lock_enabled";
     private static final String KEY_UNLOCK_EXPIRY = "unlock_expiry";
     private static final String KEY_NEXT_SERIAL = "next_serial";
-    private static final long UNLOCK_DURATION_MS = 10 * 60 * 1000L;
+    private static final long UNLOCK_DURATION_MS = 10 * 60 * 1000L; // fallback only
 
     private final Context _ctx;
     private List<SmartClip> _clips;
@@ -282,10 +282,20 @@ public final class SmartClipsService {
         return System.currentTimeMillis() < expiry;
     }
 
-    public void unlock10Min() {
-        long expiry = System.currentTimeMillis() + UNLOCK_DURATION_MS;
+    /** Unlock for the duration configured in Settings (Auto-lock Timer). */
+    public void unlockForDuration() {
+        int mins = ThemeManager.getAutoLockMins(_ctx);
+        long durationMs = (mins <= 0)
+                ? (365L * 24 * 60 * 60 * 1000L)   // "Never" — 1 year
+                : ((long) mins * 60 * 1000L);
+        long expiry = System.currentTimeMillis() + durationMs;
         _ctx.getSharedPreferences(PREFS_PIN, Context.MODE_PRIVATE)
                 .edit().putLong(KEY_UNLOCK_EXPIRY, expiry).apply();
+    }
+
+    /** @deprecated Use {@link #unlockForDuration()} — respects the configured timer. */
+    public void unlock10Min() {
+        unlockForDuration();
     }
 
     public void lock() {

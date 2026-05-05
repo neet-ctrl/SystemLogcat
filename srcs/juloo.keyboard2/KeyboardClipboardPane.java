@@ -378,7 +378,7 @@ public final class KeyboardClipboardPane extends LinearLayout
         unlockBtn.setTextColor(0xFFFFFFFF);
         unlockBtn.setOnClickListener(v -> {
             if (_smartService.verifyPin(pinInput.toString())) {
-                _smartService.unlock10Min();
+                _smartService.unlockForDuration();
                 _pinPanel.setVisibility(GONE);
                 _listView.setVisibility(VISIBLE);
                 updateList(ctx);

@@ -1078,8 +1078,8 @@ public class SmartClipsActivity extends Activity
                     }
                     if (!p1.equals(p2)) { toast("PINs do not match"); return; }
                     _service.setupPin(p1);
-                    _service.unlock10Min();
-                    toast("PIN set! Unlocked for 10 minutes.");
+                    _service.unlockForDuration();
+                    toast("PIN set! Smart Clips unlocked.");
                     buildUI();
                 })
                 .setNegativeButton("Skip", (d, w) -> buildUI())
@@ -1096,14 +1096,17 @@ public class SmartClipsActivity extends Activity
         pinInput.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_VARIATION_PASSWORD);
         layout.addView(pinInput);
 
-        CheckBox keep10 = new CheckBox(this);
-        keep10.setText("Keep unlocked for 10 minutes");
-        keep10.setChecked(true);
+        CheckBox keepUnlocked = new CheckBox(this);
+        int autoMins = ThemeManager.getAutoLockMins(this);
+        String durationLabel = (autoMins <= 0) ? "Never auto-lock"
+                : "Keep unlocked for " + autoMins + " min";
+        keepUnlocked.setText(durationLabel);
+        keepUnlocked.setChecked(true);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         lp.setMargins(0, dp(12), 0, 0);
-        keep10.setLayoutParams(lp);
-        layout.addView(keep10);
+        keepUnlocked.setLayoutParams(lp);
+        layout.addView(keepUnlocked);
 
         new AlertDialog.Builder(this)
                 .setTitle("🔐  Smart Clips — Enter PIN")
@@ -1111,7 +1114,7 @@ public class SmartClipsActivity extends Activity
                 .setCancelable(!required)
                 .setPositiveButton("Unlock", (d, w) -> {
                     if (_service.verifyPin(pinInput.getText().toString().trim())) {
-                        if (keep10.isChecked()) _service.unlock10Min();
+                        if (keepUnlocked.isChecked()) _service.unlockForDuration();
                         buildUI();
                     } else {
                         toast("Incorrect PIN");

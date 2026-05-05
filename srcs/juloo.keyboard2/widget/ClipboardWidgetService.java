@@ -59,6 +59,11 @@ class ClipboardRemoteViewsFactory implements RemoteViewsService.RemoteViewsFacto
                 if (pa != pb) return pa ? -1 : 1;
                 return Integer.compare(a.serial, b.serial);
             });
+            // Apply smart clip limit (0 = show all)
+            int smartLimit = prefs.getInt("smart_clip_limit", 20);
+            if (smartLimit > 0 && mSmartClips.size() > smartLimit) {
+                mSmartClips = new ArrayList<>(mSmartClips.subList(0, smartLimit));
+            }
         } else {
             // Load history entries and sort pinned-first
             ClipboardHistoryService svc = ClipboardHistoryService.get_service(mContext);
