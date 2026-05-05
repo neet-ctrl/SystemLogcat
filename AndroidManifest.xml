@@ -66,7 +66,9 @@
         <intent-filter>
             <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             <action android:name="juloo.keyboard2.widget.ACTION_COPY" />
+            <action android:name="juloo.keyboard2.widget.ACTION_ITEM_CLICK" />
             <action android:name="juloo.keyboard2.widget.ACTION_TOGGLE_MODE" />
+            <action android:name="juloo.keyboard2.widget.ACTION_CYCLE_LIMIT" />
         </intent-filter>
         <meta-data android:name="android.appwidget.provider"
                    android:resource="@xml/clipboard_widget_info" />

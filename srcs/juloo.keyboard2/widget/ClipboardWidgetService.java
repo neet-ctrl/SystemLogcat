@@ -65,11 +65,20 @@ class ClipboardRemoteViewsFactory implements RemoteViewsService.RemoteViewsFacto
             mEntries.clear();
             if (svc != null) {
                 mEntries = svc.get_history_entries();
+                int totalCount = mEntries.size();
                 mEntries.sort((a, b) -> {
                     if (a.pinned != b.pinned) return a.pinned ? -1 : 1;
                     return b.timestamp.compareTo(a.timestamp);
                 });
-                if (mEntries.size() > 20) mEntries = new ArrayList<>(mEntries.subList(0, 20));
+                // Read configurable limit (default 20)
+                int limit = prefs.getInt("widget_clip_limit", 20);
+                if (mEntries.size() > limit) mEntries = new ArrayList<>(mEntries.subList(0, limit));
+                int shownCount = mEntries.size();
+                // Save counts so the provider can show them in the header
+                prefs.edit()
+                        .putInt("widget_total_count", totalCount)
+                        .putInt("widget_shown_count", shownCount)
+                        .apply();
             }
         }
     }

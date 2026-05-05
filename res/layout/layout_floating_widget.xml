@@ -86,6 +86,20 @@
                     android:minHeight="0dp"
                     android:layout_marginEnd="5dp"/>
 
+                <!-- 🔍 Search -->
+                <Button
+                    android:id="@+id/btn_search"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:text="🔍"
+                    android:textSize="13sp"
+                    android:textColor="#FFCDD5FF"
+                    android:background="@drawable/widget_btn_inactive"
+                    android:padding="0dp"
+                    android:minWidth="0dp"
+                    android:minHeight="0dp"
+                    android:layout_marginEnd="5dp"/>
+
                 <!-- 📌 Pin to top toggle -->
                 <Button
                     android:id="@+id/btn_pin_top"
@@ -142,6 +156,7 @@
             android:paddingTop="10dp"
             android:paddingBottom="4dp">
 
+
             <Button
                 android:id="@+id/btn_mode_history"
                 android:layout_width="0dp"
@@ -169,6 +184,50 @@
                 android:padding="4dp"
                 android:minWidth="0dp"
                 android:minHeight="0dp"/>
+
+        </LinearLayout>
+
+        <!-- ── Search Bar (shown when 🔍 is tapped) ────────────── -->
+        <LinearLayout
+            android:id="@+id/search_bar"
+            android:layout_width="match_parent"
+            android:layout_height="42dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp"
+            android:visibility="gone">
+
+            <EditText
+                android:id="@+id/et_search"
+                android:layout_width="0dp"
+                android:layout_height="34dp"
+                android:layout_weight="1"
+                android:hint="Search all clipboard history…"
+                android:textColorHint="#88AABBCC"
+                android:textColor="#FFE2E8F0"
+                android:textSize="12sp"
+                android:backgroundTint="#445588AA"
+                android:paddingStart="12dp"
+                android:paddingEnd="8dp"
+                android:inputType="text"
+                android:singleLine="true"
+                android:imeOptions="actionSearch"/>
+
+            <Button
+                android:id="@+id/btn_clear_search"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:text="✕"
+                android:textSize="13sp"
+                android:textColor="#FFFF6B6B"
+                android:background="@drawable/widget_btn_inactive"
+                android:padding="0dp"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:layout_marginStart="6dp"/>
 
         </LinearLayout>
 

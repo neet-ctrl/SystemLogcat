@@ -37,10 +37,15 @@ public class FloatingWidgetService extends Service
     private Button   btnModeHistory;
     private Button   btnModeSmart;
     private ListView listView;
+    private View     searchBar;
+    private EditText etSearch;
 
     // ── State ─────────────────────────────────────────────────────────────────
     private boolean showSmartClips = false;
     private boolean _isPinned      = false;
+    private boolean _searchActive  = false;
+    private String  _searchQuery   = "";
+    private int     _clipLimit     = 50;
     private SmartClipsService smartClipsService;
 
     // ── Glass palette ─────────────────────────────────────────────────────────
@@ -95,8 +100,17 @@ public class FloatingWidgetService extends Service
         // Apply programmatic glass styling
         applyGlassStyling();
 
+        // Search bar views
+        searchBar = floatingView.findViewById(R.id.search_bar);
+        etSearch  = floatingView.findViewById(R.id.et_search);
+
+        // Load saved clip limit
+        _clipLimit = getSharedPreferences("widget_prefs", Context.MODE_PRIVATE)
+                .getInt("floating_clip_limit", 50);
+
         setupModeButtons();
         setupListeners();
+        setupSearch();
         updateList();
 
         ClipboardHistoryService clipService = ClipboardHistoryService.get_service(this);
@@ -184,10 +198,7 @@ public class FloatingWidgetService extends Service
 
     private void refreshModeUI() {
         float dp = getResources().getDisplayMetrics().density;
-
-        if (tvTitle != null) {
-            tvTitle.setText(showSmartClips ? "🔐 Smart Clips" : "📋 Clipboard");
-        }
+        // Title is set by updateList() with the clip count — no update here
 
         // Active tab: filled indigo pill
         GradientDrawable activeBg = new GradientDrawable();
@@ -256,6 +267,13 @@ public class FloatingWidgetService extends Service
             pinBtn.setOnClickListener(v -> {
                 _isPinned = !_isPinned;
                 applyPinState(pinBtn);
+            });
+        }
+
+        // Title tapped → show limit picker (clipboard mode only)
+        if (tvTitle != null) {
+            tvTitle.setOnClickListener(v -> {
+                if (!showSmartClips) showLimitPicker();
             });
         }
 
@@ -389,6 +407,111 @@ public class FloatingWidgetService extends Service
     }
 
     // ══════════════════════════════════════════════════════════════════════════
+    // Search
+    // ══════════════════════════════════════════════════════════════════════════
+
+    private void setupSearch() {
+        View btnSearch = floatingView.findViewById(R.id.btn_search);
+        if (btnSearch != null) {
+            btnSearch.setOnClickListener(v -> openSearch());
+        }
+        View btnClear = floatingView.findViewById(R.id.btn_clear_search);
+        if (btnClear != null) {
+            btnClear.setOnClickListener(v -> closeSearch());
+        }
+        if (etSearch != null) {
+            etSearch.addTextChangedListener(new android.text.TextWatcher() {
+                @Override public void beforeTextChanged(CharSequence s, int i, int c, int a) {}
+                @Override public void onTextChanged(CharSequence s, int i, int b, int c) {}
+                @Override public void afterTextChanged(android.text.Editable s) {
+                    _searchQuery = s.toString().trim();
+                    updateList();
+                }
+            });
+        }
+    }
+
+    private void openSearch() {
+        _searchActive = true;
+        if (searchBar != null) searchBar.setVisibility(View.VISIBLE);
+        // Allow keyboard input by making window focusable
+        params.flags = WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
+                | WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH;
+        windowManager.updateViewLayout(floatingView, params);
+        if (etSearch != null) {
+            etSearch.requestFocus();
+        }
+    }
+
+    private void closeSearch() {
+        _searchActive = false;
+        _searchQuery  = "";
+        if (etSearch != null) etSearch.setText("");
+        if (searchBar != null) searchBar.setVisibility(View.GONE);
+        restoreWidgetFlags();
+        updateList();
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // Limit picker
+    // ══════════════════════════════════════════════════════════════════════════
+
+    private void showLimitPicker() {
+        ClipboardHistoryService svc = ClipboardHistoryService.get_service(this);
+        int total = (svc != null) ? svc.get_history_entries().size() : 0;
+
+        params.flags = WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
+                | WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH;
+        windowManager.updateViewLayout(floatingView, params);
+
+        String[] options = {"50 clips", "100 clips", "200 clips", "Custom…"};
+        final int[] values = {50, 100, 200, -1};
+
+        android.app.AlertDialog dlg = new android.app.AlertDialog.Builder(this)
+                .setTitle("Show how many clips?\n(Total saved: " + total + ")")
+                .setItems(options, (d, which) -> {
+                    if (values[which] == -1) {
+                        // Custom input
+                        android.widget.EditText et = new android.widget.EditText(this);
+                        et.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+                        et.setHint("Enter number (e.g. 150)");
+                        android.app.AlertDialog custom = new android.app.AlertDialog.Builder(this)
+                                .setTitle("Custom clip limit")
+                                .setView(et)
+                                .setPositiveButton("OK", (d2, w2) -> {
+                                    try {
+                                        int v = Integer.parseInt(et.getText().toString().trim());
+                                        if (v > 0) { _clipLimit = v; saveLimitAndRefresh(); }
+                                    } catch (NumberFormatException ex) {}
+                                    restoreWidgetFlags();
+                                })
+                                .setNegativeButton("Cancel", (d2, w2) -> restoreWidgetFlags())
+                                .create();
+                        custom.getWindow().setType(Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+                                ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+                                : WindowManager.LayoutParams.TYPE_PHONE);
+                        custom.show();
+                    } else {
+                        _clipLimit = values[which];
+                        saveLimitAndRefresh();
+                        restoreWidgetFlags();
+                    }
+                })
+                .setNegativeButton("Cancel", (d, w) -> restoreWidgetFlags())
+                .create();
+        dlg.getWindow().setType(Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+                ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+                : WindowManager.LayoutParams.TYPE_PHONE);
+        dlg.show();
+    }
+
+    private void saveLimitAndRefresh() {
+        getSharedPreferences("widget_prefs", Context.MODE_PRIVATE)
+                .edit().putInt("floating_clip_limit", _clipLimit).apply();
+        updateList();
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
     // List update
     // ══════════════════════════════════════════════════════════════════════════
 
@@ -398,23 +521,20 @@ public class FloatingWidgetService extends Service
             if (showSmartClips) {
                 List<SmartClipsService.SmartClip> clips =
                         smartClipsService.getClipsForWidget();
-                // Sort pinned smart clips to the top — serial numbers never change
                 java.util.Set<Integer> pins = juloo.keyboard2.PinStore.getSmartPins(this);
                 clips.sort((a, b) -> {
                     boolean pa = pins.contains(a.serial), pb = pins.contains(b.serial);
                     if (pa != pb) return pa ? -1 : 1;
                     return Integer.compare(a.serial, b.serial);
                 });
+                if (tvTitle != null) tvTitle.setText("🔐 Smart Clips  ·  " + clips.size());
                 listView.setAdapter(new GlassSmartClipAdapter(this, clips, this::updateList));
-                // Tap card → paste directly; locked clips show a toast instead
                 listView.setOnItemClickListener((p, v, pos, id) -> {
                     SmartClipsService.SmartClip clip = clips.get(pos);
                     if (clip.locked) {
                         Toast.makeText(this, "Clip locked — open app to view",
                                 Toast.LENGTH_SHORT).show();
                     } else {
-                        // Smart-clip pastes go via IME (send_text), so they
-                        // never touch the system clipboard — no suppress needed.
                         boolean pasted = ClipboardHistoryService.pasteOrCopy(this, clip.content);
                         Toast.makeText(this,
                                 pasted ? "Pasted!" : "Copied! (open a text field to paste directly)",
@@ -422,21 +542,42 @@ public class FloatingWidgetService extends Service
                     }
                 });
             } else {
-                // Sort clipboard clips pinned-first, then load into adapter
                 ClipboardHistoryService svc = ClipboardHistoryService.get_service(this);
-                List<ClipboardHistoryService.HistoryEntry> entries =
+                List<ClipboardHistoryService.HistoryEntry> allEntries =
                         svc != null ? svc.get_history_entries() : new java.util.ArrayList<>();
-                entries.sort((a, b) -> {
-                    if (a.pinned != b.pinned) return a.pinned ? -1 : 1;
-                    return 0;
-                });
+                int total = allEntries.size();
+
+                List<ClipboardHistoryService.HistoryEntry> entries;
+                if (_searchActive && !_searchQuery.isEmpty()) {
+                    // Search mode: filter ALL history, newest first
+                    String q = _searchQuery.toLowerCase();
+                    entries = new java.util.ArrayList<>();
+                    for (ClipboardHistoryService.HistoryEntry e : allEntries) {
+                        if (e.content.toLowerCase().contains(q)
+                                || (e.description != null && e.description.toLowerCase().contains(q))) {
+                            entries.add(e);
+                        }
+                    }
+                    // Already in newest-first order (history is stored newest-first)
+                    if (tvTitle != null)
+                        tvTitle.setText("🔍 Results: " + entries.size() + " / " + total);
+                } else {
+                    // Normal mode: pinned-first then newest, limited to _clipLimit
+                    entries = new java.util.ArrayList<>(allEntries);
+                    entries.sort((a, b) -> {
+                        if (a.pinned != b.pinned) return a.pinned ? -1 : 1;
+                        return 0;
+                    });
+                    if (entries.size() > _clipLimit) entries = entries.subList(0, _clipLimit);
+                    int shown = entries.size();
+                    if (tvTitle != null)
+                        tvTitle.setText("📋 Clipboard  " + shown + " / " + total + "  ▾");
+                }
+
                 List<String> clips = new java.util.ArrayList<>();
                 for (ClipboardHistoryService.HistoryEntry e : entries) clips.add(e.content);
-                if (clips.size() > 50) clips = clips.subList(0, 50);
                 final List<String> finalClips = clips;
                 listView.setAdapter(new GlassClipboardAdapter(this, finalClips));
-                // Tap card → paste directly into the active text field.
-                // Falls back to clipboard copy when no keyboard connection is active.
                 listView.setOnItemClickListener((p, v, pos, id) -> {
                     boolean pasted = ClipboardHistoryService.pasteOrCopy(this, finalClips.get(pos));
                     Toast.makeText(this,

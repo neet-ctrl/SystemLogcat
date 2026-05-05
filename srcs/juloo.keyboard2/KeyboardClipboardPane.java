@@ -102,7 +102,8 @@ public final class KeyboardClipboardPane extends LinearLayout
         _listView.setDividerHeight(dp(6));
         _listView.setPadding(dp(8), dp(6), dp(8), dp(6));
         _listView.setClipToPadding(false);
-        LayoutParams lvLp = new LayoutParams(LayoutParams.MATCH_PARENT, dp(280));
+        LayoutParams lvLp = new LayoutParams(LayoutParams.MATCH_PARENT, 0);
+        lvLp.weight = 1f;
         addView(_listView, lvLp);
 
         // Services

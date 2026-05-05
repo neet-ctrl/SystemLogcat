@@ -410,12 +410,30 @@ public final class ClipboardHistoryService
     }
   }
 
-  /** Toggle the pinned state of a normal clipboard clip. Saves and notifies listeners. */
+  /** Toggle the pinned state of a normal clipboard clip.
+   *  When pinning, the item moves to the END of the pinned section so that
+   *  the first-pinned item always stays at the top. */
   public static synchronized void togglePin(String content)
   {
     if (_service == null) return;
-    for (HistoryEntry e : _service._history) {
-      if (e.content.equals(content)) { e.pinned = !e.pinned; break; }
+    int foundIdx = -1;
+    for (int i = 0; i < _service._history.size(); i++) {
+      if (_service._history.get(i).content.equals(content)) { foundIdx = i; break; }
+    }
+    if (foundIdx < 0) return;
+    HistoryEntry entry = _service._history.get(foundIdx);
+    boolean newPinned = !entry.pinned;
+    entry.pinned = newPinned;
+    if (newPinned) {
+      // Remove from current position, then re-insert right after the last
+      // already-pinned entry so that newly-pinned items stack BELOW earlier ones.
+      // When there are no other pinned items, lastPinnedIdx == -1 → insert at 0.
+      _service._history.remove(foundIdx);
+      int lastPinnedIdx = -1;
+      for (int i = 0; i < _service._history.size(); i++) {
+        if (_service._history.get(i).pinned) lastPinnedIdx = i;
+      }
+      _service._history.add(lastPinnedIdx + 1, entry);
     }
     _service.save_history_to_prefs(_service._context);
     if (_service._listener != null) _service._listener.on_clipboard_history_change();

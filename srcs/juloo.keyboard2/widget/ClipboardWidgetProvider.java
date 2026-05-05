@@ -18,8 +18,9 @@ public class ClipboardWidgetProvider extends AppWidgetProvider {
 
     // ── Action constants ──────────────────────────────────────────────────────
     /** Unified item-click action; EXTRA_ACTION_TYPE distinguishes copy vs pin. */
-    public static final String ACTION_ITEM_CLICK  = "juloo.keyboard2.widget.ACTION_ITEM_CLICK";
-    public static final String ACTION_TOGGLE_MODE = "juloo.keyboard2.widget.ACTION_TOGGLE_MODE";
+    public static final String ACTION_ITEM_CLICK   = "juloo.keyboard2.widget.ACTION_ITEM_CLICK";
+    public static final String ACTION_TOGGLE_MODE  = "juloo.keyboard2.widget.ACTION_TOGGLE_MODE";
+    public static final String ACTION_CYCLE_LIMIT  = "juloo.keyboard2.widget.ACTION_CYCLE_LIMIT";
 
     // ── Extra keys ────────────────────────────────────────────────────────────
     /** "copy" | "pin_clip" | "pin_smart" */
@@ -52,8 +53,25 @@ public class ClipboardWidgetProvider extends AppWidgetProvider {
         views.setRemoteAdapter(R.id.clip_list, intent);
         views.setEmptyView(R.id.clip_list, android.R.id.empty);
 
-        String title = (smartMode && !locked) ? "Smart Clips" : "Clipboard History";
+        // Build title with clip count
+        String baseTitle = (smartMode && !locked) ? "Smart Clips" : "Clipboard";
+        String title;
+        if (!smartMode || locked) {
+            int shown = prefs.getInt("widget_shown_count", 0);
+            int total = prefs.getInt("widget_total_count", 0);
+            title = baseTitle + "  " + shown + " / " + total + "  ▾";
+        } else {
+            title = baseTitle;
+        }
         views.setTextViewText(R.id.tv_widget_title, title);
+
+        // Tap on title cycles the clip limit (20 → 50 → 100 → 20)
+        Intent cycleIntent = new Intent(context, ClipboardWidgetProvider.class);
+        cycleIntent.setAction(ACTION_CYCLE_LIMIT);
+        cycleIntent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId);
+        PendingIntent cyclePendingIntent = PendingIntent.getBroadcast(context, appWidgetId + 2000,
+                cycleIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_MUTABLE);
+        views.setOnClickPendingIntent(R.id.tv_widget_title, cyclePendingIntent);
 
         // Mode toggle button state
         if (smartMode && !locked) {
@@ -133,6 +151,17 @@ public class ClipboardWidgetProvider extends AppWidgetProvider {
                     refreshAllWidgets(context);
                 }
             }
+
+        } else if (ACTION_CYCLE_LIMIT.equals(action)) {
+            SharedPreferences prefs =
+                    context.getSharedPreferences("widget_prefs", Context.MODE_PRIVATE);
+            int cur = prefs.getInt("widget_clip_limit", 20);
+            // Cycle: 20 → 50 → 100 → 20
+            int next = cur < 50 ? 50 : (cur < 100 ? 100 : 20);
+            prefs.edit().putInt("widget_clip_limit", next).apply();
+            android.widget.Toast.makeText(context, "Widget showing up to " + next + " clips",
+                    android.widget.Toast.LENGTH_SHORT).show();
+            refreshAllWidgets(context);
 
         } else if (ACTION_TOGGLE_MODE.equals(action)) {
             SharedPreferences prefs =
