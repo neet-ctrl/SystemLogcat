@@ -408,7 +408,7 @@ public final class KeyboardClipboardPane extends LinearLayout
         ordered.addAll(rest);
 
         if (ordered.isEmpty()) {
-            showEmpty(ctx, "No clips match "" + _searchQuery + "".");
+            showEmpty(ctx, "No clips match \"" + _searchQuery + "\".");
             return;
         }
 
@@ -510,7 +510,7 @@ public final class KeyboardClipboardPane extends LinearLayout
         if (ordered.isEmpty()) {
             String msg = clips.isEmpty()
                     ? "No smart clips yet.\nOpen the SmartClips screen to add some."
-                    : "No smart clips match "" + _searchQuery + "".";
+                    : "No smart clips match \"" + _searchQuery + "\".";
             showEmpty(ctx, msg);
             return;
         }
