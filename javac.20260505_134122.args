@@ -1,0 +1,8 @@
+-source
+8
+-target
+8
+-proc:none
+-classpath
+/dev/null
+srcs/juloo.keyboard2/TutorialActivity.java

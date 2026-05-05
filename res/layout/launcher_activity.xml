@@ -75,6 +75,20 @@
               android:padding="10dp"
               android:layout_marginStart="6dp"/>
 
+          <!-- Tutorial 📖 -->
+          <TextView
+              android:id="@+id/btn_tutorial"
+              android:layout_width="44dp"
+              android:layout_height="44dp"
+              android:text="📖"
+              android:textSize="20sp"
+              android:gravity="center"
+              android:background="@drawable/dev_console_icon_btn"
+              android:contentDescription="Tutorial"
+              android:layout_marginStart="6dp"
+              android:clickable="true"
+              android:focusable="true"/>
+
         </LinearLayout>
 
         <!-- Gesture animations -->

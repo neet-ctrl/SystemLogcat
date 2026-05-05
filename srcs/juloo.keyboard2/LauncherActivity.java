@@ -101,6 +101,14 @@ public class LauncherActivity extends Activity implements Handler.Callback
       btnAppSettings.setOnClickListener(v ->
           startActivity(new Intent(this, AppSettingsActivity.class)));
 
+    View btnTutorial = findViewById(R.id.btn_tutorial);
+    if (btnTutorial != null)
+      btnTutorial.setOnClickListener(v ->
+          startActivity(new Intent(this, TutorialActivity.class)));
+
+    // First-run: show tutorial automatically
+    TutorialActivity.showIfFirstLaunch(this);
+
     // Overlay permission
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
       if (!Settings.canDrawOverlays(this)) {

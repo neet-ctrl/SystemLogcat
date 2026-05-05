@@ -1,0 +1,76 @@
+Design a modern, premium Android keyboard UI with a clean, minimal, and futuristic aesthetic.
+
+Style requirements:
+
+- Use a glassmorphism + material design fusion
+- Soft rounded corners (16–24dp radius)
+- Smooth gradients with subtle depth
+- Semi-transparent background with blur effect
+- Elegant shadows (not harsh, soft elevation)
+
+Color theme:
+
+- Primary: Deep black / dark gray (#0D0D0D, #1A1A1A)
+- Accent: Neon blue / purple glow (#4FC3F7 / #7C4DFF)
+- Text: Pure white with slight opacity variation
+- Secondary elements: muted gray tones
+
+Key design:
+
+- Keys should be floating tiles, not boxed grids
+- Slight spacing between keys (airy layout)
+- Press animation: smooth scale + glow ripple
+- Long-press popup: modern rounded bubble with blur
+
+Typography:
+
+- Use clean modern font (like Google Sans / Inter style)
+- Medium weight, high readability
+- Proper spacing between letters
+
+Top bar:
+
+- Minimal toolbar with icons (clipboard, emoji, settings)
+- Icons should be outline-style, thin and modern
+- Add subtle glow on active selection
+
+Emoji panel:
+
+- Smooth grid with rounded emoji tiles
+- Scroll animation should feel fluid and inertia-based
+- Add category tabs with animated underline
+
+Advanced UI features:
+
+- Gesture typing trail with glowing path
+- Haptic feedback simulation (visual ripple)
+- Dynamic theme (auto adjust with wallpaper colors)
+- Adaptive transparency based on background
+
+Animations:
+
+- All transitions must be smooth (200–300ms ease-in-out)
+- No sudden jumps or harsh movements
+- Keyboard appear/disappear should slide + fade
+
+Layout:
+
+- No unnecessary empty space
+- Compact but breathable design
+- Proper alignment and symmetry
+
+Overall feel:
+
+- Premium, futuristic, clean, distraction-free
+- Inspired by modern apps like iOS keyboard, Gboard, and Nothing UI
+- Should feel like a flagship-level keyboard experience
+
+Avoid:
+
+- Hard edges
+- Overcrowded UI
+- Bright distracting colors
+- Old-style flat boxed keys
+
+Goal:
+Create a keyboard UI that looks high-end, modern, elegant, and visually satisfying, suitable for a next-gen Android experience.

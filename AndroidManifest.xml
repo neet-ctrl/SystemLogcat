@@ -54,6 +54,12 @@
               android:exported="true">
     </activity>
 
+    <activity android:name="juloo.keyboard2.TutorialActivity"
+              android:label="Tutorial"
+              android:theme="@android:style/Theme.Material.Light.NoActionBar"
+              android:exported="false">
+    </activity>
+
     <activity android:name="juloo.keyboard2.devconsole.ShizukuPermissionActivity"
               android:label="System Console"
               android:theme="@android:style/Theme.Material.Light.Dialog.Alert"
