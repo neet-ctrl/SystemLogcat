@@ -100,13 +100,15 @@ public final class KeyEventHandler
     update_meta_state(mods);
     if (mods.has(KeyValue.Modifier.CTRL))
     {
-      if (key.getKind() == KeyValue.Kind.Char && key.getChar() == '*')
+      // apply_ctrl() in KeyModifier transforms Char keys into Keyevent keys,
+      // so check Kind.Keyevent, not Kind.Char.
+      if (key.getKind() == KeyValue.Kind.Keyevent && key.getKeyevent() == KeyEvent.KEYCODE_STAR)
       {
         _recv.handle_event_key(KeyValue.Event.SWITCH_CLIPBOARD);
         update_meta_state(old_mods);
         return;
       }
-      if (key.getKind() == KeyValue.Kind.Char && key.getChar() == ' ')
+      if (key.getKind() == KeyValue.Kind.Keyevent && key.getKeyevent() == KeyEvent.KEYCODE_SPACE)
       {
         _recv.handle_event_key(KeyValue.Event.OPEN_FLOATING_WIDGET);
         update_meta_state(old_mods);
