@@ -23,19 +23,21 @@
         android:elevation="8dp"
         android:padding="12dp">
 
+        <!-- Header Row -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:layout_marginBottom="8dp">
-            
+            android:layout_marginBottom="4dp">
+
             <TextView
+                android:id="@+id/tv_widget_title"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:text="Clipboard History"
-                android:textSize="18sp"
+                android:textSize="16sp"
                 android:textColor="#333333"
                 android:textStyle="bold" />
 
@@ -58,6 +60,38 @@
                 android:textSize="18sp"
                 android:minWidth="40dp"
                 android:layout_marginStart="4dp" />
+        </LinearLayout>
+
+        <!-- Mode Switch Row -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:layout_marginBottom="8dp">
+
+            <Button
+                android:id="@+id/btn_mode_history"
+                android:layout_width="0dp"
+                android:layout_height="36dp"
+                android:layout_weight="1"
+                android:text="Clipboard"
+                android:textSize="12sp"
+                android:textColor="#FFFFFF"
+                android:background="#1565C0"
+                android:padding="4dp"/>
+
+            <Button
+                android:id="@+id/btn_mode_smart"
+                android:layout_width="0dp"
+                android:layout_height="36dp"
+                android:layout_weight="1"
+                android:text="Smart Clips"
+                android:textSize="12sp"
+                android:textColor="#1565C0"
+                android:background="#E3F2FD"
+                android:layout_marginStart="4dp"
+                android:padding="4dp"/>
         </LinearLayout>
 
         <ListView

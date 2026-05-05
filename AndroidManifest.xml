@@ -36,6 +36,12 @@
               android:exported="true">
     </activity>
 
+    <activity android:name="juloo.keyboard2.SmartClipsActivity"
+              android:label="Smart Clips"
+              android:theme="@android:style/Theme.Material.Light.NoActionBar"
+              android:exported="true">
+    </activity>
+
     <activity android:name="juloo.keyboard2.TypingMasterActivity"
               android:label="Typing Master"
               android:theme="@android:style/Theme.NoTitleBar"
@@ -54,6 +60,7 @@
         <intent-filter>
             <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             <action android:name="juloo.keyboard2.widget.ACTION_COPY" />
+            <action android:name="juloo.keyboard2.widget.ACTION_TOGGLE_MODE" />
         </intent-filter>
         <meta-data android:name="android.appwidget.provider"
                    android:resource="@xml/clipboard_widget_info" />

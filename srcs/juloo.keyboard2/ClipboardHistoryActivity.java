@@ -68,6 +68,13 @@ public class ClipboardHistoryActivity extends Activity {
             View btnExport = findViewById(R.id.btn_export_history);
             if (btnExport != null) btnExport.setOnClickListener(v -> exportHistory());
 
+            View btnGotoSmartClips = findViewById(R.id.btn_goto_smart_clips);
+            if (btnGotoSmartClips != null) {
+                btnGotoSmartClips.setOnClickListener(v -> {
+                    startActivity(new Intent(this, SmartClipsActivity.class));
+                });
+            }
+
             View btnClear = findViewById(R.id.btn_clear_all);
             if (btnClear != null) {
                 btnClear.setOnClickListener(v -> {

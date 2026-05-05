@@ -51,7 +51,6 @@ public class LauncherActivity extends Activity implements Handler.Callback
           this.new Tryhere_OnUnhandledKeyEventListener());
     _handler = new Handler(getMainLooper(), this);
 
-    // Shizuku status indicator views
     _shizukuDot        = findViewById(R.id.shizuku_launcher_dot);
     _shizukuStatusText = (TextView) findViewById(R.id.shizuku_status_text);
 
@@ -62,6 +61,15 @@ public class LauncherActivity extends Activity implements Handler.Callback
             startActivity(intent);
         });
     }
+
+    View btnSmartClips = findViewById(R.id.btn_smart_clips);
+    if (btnSmartClips != null) {
+        btnSmartClips.setOnClickListener(v -> {
+            Intent intent = new Intent(this, SmartClipsActivity.class);
+            startActivity(intent);
+        });
+    }
+
     View btnTypingMaster = findViewById(R.id.btn_typing_master);
     if (btnTypingMaster != null) {
         btnTypingMaster.setOnClickListener(v -> {
@@ -74,7 +82,6 @@ public class LauncherActivity extends Activity implements Handler.Callback
         btnDevConsole.setOnClickListener(v -> DevConsoleHelper.show(this));
     }
 
-    // 4th option: System Console (Shizuku-backed device-wide logcat)
     View btnSystemConsole = findViewById(R.id.btn_system_console);
     if (btnSystemConsole != null) {
         btnSystemConsole.setOnClickListener(v -> openSystemConsole());
@@ -148,14 +155,10 @@ public class LauncherActivity extends Activity implements Handler.Callback
     imm.showInputMethodPicker();
   }
 
-  // ── System Console ──────────────────────────────────────────────────────────
-
   private void openSystemConsole() {
     Intent intent = new Intent(this, ShizukuPermissionActivity.class);
     startActivity(intent);
   }
-
-  // ── Shizuku status ──────────────────────────────────────────────────────────
 
   private void refreshShizukuStatus() {
     if (_shizukuDot == null || _shizukuStatusText == null) return;
@@ -171,13 +174,13 @@ public class LauncherActivity extends Activity implements Handler.Callback
     int dotColor;
     String statusMsg;
     if (binderAlive && permGranted) {
-        dotColor  = 0xFF22C55E; // green
+        dotColor  = 0xFF22C55E;
         statusMsg = "Shizuku: Authorized ✓ — System Console ready";
     } else if (binderAlive) {
-        dotColor  = 0xFFF59E0B; // amber
+        dotColor  = 0xFFF59E0B;
         statusMsg = "Shizuku: Running — tap System Console to authorize";
     } else {
-        dotColor  = 0xFFEF4444; // red
+        dotColor  = 0xFFEF4444;
         statusMsg = "Shizuku: Not running — install & start Shizuku for System Console";
     }
 
@@ -188,8 +191,6 @@ public class LauncherActivity extends Activity implements Handler.Callback
             : binderAlive ? 0xFFD97706 : 0xFF6B7280);
     _shizukuStatusText.setText(statusMsg);
   }
-
-  // ── Animations ──────────────────────────────────────────────────────────────
 
   Animatable find_anim(int id)
   {

@@ -244,6 +244,39 @@ public final class KeyEventHandler
         }
     }
     conn.commitText(text, 1);
+    // Formula expansion: detect {token} and replace with smart clip
+    if (text.equals("}") || text.endsWith("}")) {
+        try_expand_smart_clip_formula(conn);
+    }
+  }
+
+  /** After typing '}', look backwards for '{...}' and replace with the matching smart clip. */
+  private void try_expand_smart_clip_formula(InputConnection conn) {
+    try {
+      CharSequence before = conn.getTextBeforeCursor(80, 0);
+      if (before == null) return;
+      String s = before.toString();
+      int closeIdx = s.lastIndexOf('}');
+      if (closeIdx < 0) return;
+      int openIdx = s.lastIndexOf('{', closeIdx - 1);
+      if (openIdx < 0) return;
+      String token = s.substring(openIdx + 1, closeIdx);
+      if (token.isEmpty()) return;
+      android.content.Context ctx = juloo.keyboard2.Config.globalConfig().getContext();
+      if (ctx == null) return;
+      juloo.keyboard2.SmartClipsService svc = juloo.keyboard2.SmartClipsService.getInstance(ctx);
+      juloo.keyboard2.SmartClipsService.SmartClip clip = svc.resolveFormula(token);
+      if (clip == null) return;
+      if (clip.locked) {
+        android.widget.Toast.makeText(ctx, "Clip #" + clip.serial + " is locked", android.widget.Toast.LENGTH_SHORT).show();
+        return;
+      }
+      int removeLen = closeIdx - openIdx + 1;
+      conn.beginBatchEdit();
+      conn.deleteSurroundingText(removeLen, 0);
+      conn.commitText(clip.content, 1);
+      conn.endBatchEdit();
+    } catch (Exception ignored) {}
   }
 
   void replace_text_before_cursor(int remove_length, String new_text)
