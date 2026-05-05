@@ -98,6 +98,21 @@ public final class KeyEventHandler
       return;
     Pointers.Modifiers old_mods = _mods;
     update_meta_state(mods);
+    if (mods.has(KeyValue.Modifier.CTRL))
+    {
+      if (key.getKind() == KeyValue.Kind.Char && key.getChar() == '*')
+      {
+        _recv.handle_event_key(KeyValue.Event.SWITCH_CLIPBOARD);
+        update_meta_state(old_mods);
+        return;
+      }
+      if (key.getKind() == KeyValue.Kind.Char && key.getChar() == ' ')
+      {
+        _recv.handle_event_key(KeyValue.Event.OPEN_FLOATING_WIDGET);
+        update_meta_state(old_mods);
+        return;
+      }
+    }
     switch (key.getKind())
     {
       case Char: send_text(String.valueOf(key.getChar())); break;

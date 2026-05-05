@@ -23,6 +23,7 @@ public final class KeyValue implements Comparable<KeyValue>
     CAPS_LOCK,
     SWITCH_VOICE_TYPING,
     SWITCH_VOICE_TYPING_CHOOSER,
+    OPEN_FLOATING_WIDGET,
   }
 
   // Must be evaluated in the reverse order of their values.

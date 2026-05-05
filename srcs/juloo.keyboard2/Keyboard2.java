@@ -412,7 +412,7 @@ public class Keyboard2 extends InputMethodService
 
         case SWITCH_BACK_EMOJI:
         case SWITCH_BACK_CLIPBOARD:
-          setInputView(_keyboardView);
+          setInputView(_container_view);
           break;
 
         case CHANGE_METHOD_PICKER:
@@ -457,6 +457,12 @@ public class Keyboard2 extends InputMethodService
         case SWITCH_VOICE_TYPING_CHOOSER:
           VoiceImeSwitcher.choose_voice_ime(Keyboard2.this, get_imm(),
               Config.globalPrefs());
+          break;
+
+        case OPEN_FLOATING_WIDGET:
+          Intent floatingWidgetIntent = new Intent(Keyboard2.this,
+              juloo.keyboard2.widget.FloatingWidgetService.class);
+          startService(floatingWidgetIntent);
           break;
       }
     }
