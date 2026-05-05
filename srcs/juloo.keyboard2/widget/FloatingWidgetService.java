@@ -40,6 +40,7 @@ public class FloatingWidgetService extends Service
 
     // ── State ─────────────────────────────────────────────────────────────────
     private boolean showSmartClips = false;
+    private boolean _isPinned      = false;
     private SmartClipsService smartClipsService;
 
     // ── Glass palette ─────────────────────────────────────────────────────────
@@ -110,14 +111,12 @@ public class FloatingWidgetService extends Service
     private void applyGlassStyling() {
         float dp = getResources().getDisplayMetrics().density;
 
-        // Collapsed bubble glass circle
-        if (collapsedView.getBackground() == null) {
-            GradientDrawable bubbleBg = new GradientDrawable();
-            bubbleBg.setShape(GradientDrawable.OVAL);
-            bubbleBg.setColor(0xFF1E1B4B);
-            bubbleBg.setStroke((int)(2 * dp), COL_PRIMARY);
-            collapsedView.setBackground(bubbleBg);
-        }
+        // Collapsed bubble — always apply thin 1dp ring
+        GradientDrawable bubbleBg = new GradientDrawable();
+        bubbleBg.setShape(GradientDrawable.OVAL);
+        bubbleBg.setColor(0xFF1E1B4B);
+        bubbleBg.setStroke((int)(1 * dp), COL_PRIMARY);
+        collapsedView.setBackground(bubbleBg);
         if (Build.VERSION.SDK_INT >= 21) collapsedView.setElevation(14 * dp);
 
         // Expanded glass panel
@@ -233,28 +232,112 @@ public class FloatingWidgetService extends Service
             });
         }
 
-        // Tap collapsed bubble → expand
-        collapsedView.setOnClickListener(v -> {
-            collapsedView.setVisibility(View.GONE);
-            expandedView.setVisibility(View.VISIBLE);
-            params.width  = WindowManager.LayoutParams.MATCH_PARENT;
-            params.height = 520;
-            windowManager.updateViewLayout(floatingView, params);
-        });
+        // Tap collapsed bubble → expand  (uses smart touch that separates tap vs drag)
+        collapsedView.setOnTouchListener(makeBubbleTouchListener());
+
+        // Settings button → open AppSettingsActivity
+        View settingsBtn = floatingView.findViewById(R.id.btn_widget_settings);
+        if (settingsBtn != null) {
+            settingsBtn.setOnClickListener(v -> {
+                android.content.Intent i = new android.content.Intent(
+                        this, juloo.keyboard2.AppSettingsActivity.class);
+                i.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(i);
+            });
+        }
+
+        // Pin-to-top toggle
+        Button pinBtn = floatingView.findViewById(R.id.btn_pin_top);
+        if (pinBtn != null) {
+            pinBtn.setOnClickListener(v -> {
+                _isPinned = !_isPinned;
+                applyPinState(pinBtn);
+            });
+        }
 
         // Drag handle → move the whole window
         View dragHandle = floatingView.findViewById(R.id.drag_handle);
         if (dragHandle != null) {
             dragHandle.setOnTouchListener(makeDragListener());
         }
-        // Also allow dragging from the collapsed bubble
-        collapsedView.setOnTouchListener(makeDragListener());
 
         // Resize grip (bottom-right ⤡) → resize window
         View resizeGrip = floatingView.findViewById(R.id.iv_resize);
         if (resizeGrip != null) {
             resizeGrip.setOnTouchListener(makeResizeListener());
         }
+    }
+
+    /** Pin / unpin the widget so it stays above the soft keyboard. */
+    private void applyPinState(Button pinBtn) {
+        if (_isPinned) {
+            // Pinned: snap to top, FLAG_LAYOUT_IN_SCREEN so keyboard can't push it
+            params.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
+            params.y       = 0;
+            params.flags   = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                    | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
+                    | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS;
+            pinBtn.setTextColor(COL_PRIMARY_L);
+            GradientDrawable pinBg = new GradientDrawable();
+            float dp = getResources().getDisplayMetrics().density;
+            pinBg.setColor(COL_PRIMARY & 0x55FFFFFF);
+            pinBg.setCornerRadius(8 * dp);
+            pinBtn.setBackground(pinBg);
+        } else {
+            // Unpinned: restore free-floating mode
+            params.gravity = Gravity.CENTER;
+            params.flags   = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
+            pinBtn.setTextColor(0x88CDD5FF);
+            pinBtn.setBackgroundResource(R.drawable.widget_btn_inactive);
+        }
+        if (floatingView != null) windowManager.updateViewLayout(floatingView, params);
+    }
+
+    /**
+     * Smart touch listener for the collapsed bubble.
+     * - Small movement (< 8dp) on ACTION_UP → treated as a tap → expands the widget.
+     * - Larger movement → treated as a drag → moves the window.
+     */
+    private View.OnTouchListener makeBubbleTouchListener() {
+        return new View.OnTouchListener() {
+            private int   initialX, initialY;
+            private float touchX, touchY;
+            private boolean dragging;
+            private final float TAP_SLOP = 8 * getResources().getDisplayMetrics().density;
+
+            @Override public boolean onTouch(View v, MotionEvent e) {
+                switch (e.getAction()) {
+                    case MotionEvent.ACTION_DOWN:
+                        initialX = params.x; initialY = params.y;
+                        touchX   = e.getRawX(); touchY = e.getRawY();
+                        dragging = false;
+                        return true;
+                    case MotionEvent.ACTION_MOVE:
+                        float dx = e.getRawX() - touchX;
+                        float dy = e.getRawY() - touchY;
+                        if (!dragging && (Math.abs(dx) > TAP_SLOP || Math.abs(dy) > TAP_SLOP)) {
+                            dragging = true;
+                        }
+                        if (dragging) {
+                            params.x = initialX + (int) dx;
+                            params.y = initialY + (int) dy;
+                            windowManager.updateViewLayout(floatingView, params);
+                        }
+                        return true;
+                    case MotionEvent.ACTION_UP:
+                        if (!dragging) {
+                            // It was a tap — expand the widget
+                            collapsedView.setVisibility(View.GONE);
+                            expandedView.setVisibility(View.VISIBLE);
+                            params.width  = WindowManager.LayoutParams.MATCH_PARENT;
+                            params.height = 520;
+                            windowManager.updateViewLayout(floatingView, params);
+                        }
+                        return true;
+                }
+                return false;
+            }
+        };
     }
 
     private View.OnTouchListener makeDragListener() {
