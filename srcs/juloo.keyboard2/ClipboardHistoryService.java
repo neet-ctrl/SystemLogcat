@@ -342,9 +342,10 @@ public final class ClipboardHistoryService
       String content = prefs.getString("item_" + i, null);
       String time = prefs.getString("time_" + i, "");
       String desc = prefs.getString("desc_" + i, "");
-      String ver = prefs.getString("ver_" + i, "");
+      String ver  = prefs.getString("ver_"  + i, "");
+      boolean pin = prefs.getBoolean("pin_" + i, false);
       if (content != null) {
-        _history.add(new HistoryEntry(content, time, desc, ver));
+        _history.add(new HistoryEntry(content, time, desc, ver, pin));
       }
     }
   }
@@ -356,10 +357,11 @@ public final class ClipboardHistoryService
     editor.putInt("size", _history.size());
     for (int i = 0; i < _history.size(); i++) {
       HistoryEntry ent = _history.get(i);
-      editor.putString("item_" + i, ent.content);
-      editor.putString("time_" + i, ent.timestamp);
-      editor.putString("desc_" + i, ent.description);
-      editor.putString("ver_" + i, ent.version);
+      editor.putString ("item_" + i, ent.content);
+      editor.putString ("time_" + i, ent.timestamp);
+      editor.putString ("desc_" + i, ent.description);
+      editor.putString ("ver_"  + i, ent.version);
+      editor.putBoolean("pin_"  + i, ent.pinned);
     }
     editor.apply();
   }
@@ -371,15 +373,43 @@ public final class ClipboardHistoryService
     public final String description;
     public final String version;
     public final long expiry_timestamp;
+    public boolean pinned;
 
     public HistoryEntry(String c, String time, String desc, String ver)
+    {
+      this(c, time, desc, ver, false);
+    }
+
+    public HistoryEntry(String c, String time, String desc, String ver, boolean pinned)
     {
       content = c;
       timestamp = time;
       description = desc;
       version = ver;
       expiry_timestamp = Long.MAX_VALUE;
+      this.pinned = pinned;
     }
+  }
+
+  /** Toggle the pinned state of a normal clipboard clip. Saves and notifies listeners. */
+  public static synchronized void togglePin(String content)
+  {
+    if (_service == null) return;
+    for (HistoryEntry e : _service._history) {
+      if (e.content.equals(content)) { e.pinned = !e.pinned; break; }
+    }
+    _service.save_history_to_prefs(juloo.keyboard2.Config.globalConfig().getContext());
+    if (_service._listener != null) _service._listener.on_clipboard_history_change();
+  }
+
+  /** Returns whether the clipboard clip with [content] is currently pinned. */
+  public static boolean isPinned(String content)
+  {
+    if (_service == null) return false;
+    for (HistoryEntry e : _service._history) {
+      if (e.content.equals(content)) return e.pinned;
+    }
+    return false;
   }
 
   public interface ClipboardPasteCallback

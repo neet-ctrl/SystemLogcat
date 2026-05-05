@@ -244,7 +244,11 @@ public class ClipboardHistoryActivity extends Activity {
     private void updateList() {
         if (_service == null || _listView == null) return;
         List<ClipboardHistoryService.HistoryEntry> history = _service.get_history_entries();
-        java.util.Collections.sort(history, (a, b) -> b.timestamp.compareTo(a.timestamp));
+        // Pinned entries always float to the top; within each group sort newest-first
+        java.util.Collections.sort(history, (a, b) -> {
+            if (a.pinned != b.pinned) return a.pinned ? -1 : 1;
+            return b.timestamp.compareTo(a.timestamp);
+        });
         _adapter = new ClipAdapter(history);
         _listView.setAdapter(_adapter);
         // Refresh subtitle count in header (quick rebuild avoided — update via tag)
@@ -336,6 +340,21 @@ public class ClipboardHistoryActivity extends Activity {
                 toast("Copied!");
             });
             topRow.addView(copyBtn);
+
+            // ── Pin button (📌 pinned / 📍 unpinned)
+            boolean isPinned = ent.pinned;
+            Button pinBtn = makeCardActionBtn(isPinned ? "📌" : "📍",
+                    isPinned ? C.primary : C.textHint);
+            pinBtn.setOnClickListener(v -> {
+                ClipboardHistoryService.togglePin(ent.content);
+                updateList();
+            });
+            LinearLayout.LayoutParams pinLp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT);
+            pinLp.setMargins(dp(4), 0, 0, 0);
+            pinBtn.setLayoutParams(pinLp);
+            topRow.addView(pinBtn);
 
             // ── Delete button (red circle)
             Button delBtn = makeCardActionBtn("🗑", 0xFFEF4444);

@@ -394,7 +394,14 @@ public class FloatingWidgetService extends Service
             if (showSmartClips) {
                 List<SmartClipsService.SmartClip> clips =
                         smartClipsService.getClipsForWidget();
-                listView.setAdapter(new GlassSmartClipAdapter(this, clips));
+                // Sort pinned smart clips to the top — serial numbers never change
+                java.util.Set<Integer> pins = juloo.keyboard2.PinStore.getSmartPins(this);
+                clips.sort((a, b) -> {
+                    boolean pa = pins.contains(a.serial), pb = pins.contains(b.serial);
+                    if (pa != pb) return pa ? -1 : 1;
+                    return Integer.compare(a.serial, b.serial);
+                });
+                listView.setAdapter(new GlassSmartClipAdapter(this, clips, this::updateList));
                 // Tap card → paste directly; locked clips show a toast instead
                 listView.setOnItemClickListener((p, v, pos, id) -> {
                     SmartClipsService.SmartClip clip = clips.get(pos);
@@ -411,12 +418,23 @@ public class FloatingWidgetService extends Service
                     }
                 });
             } else {
-                List<String> clips = ClipboardHistoryService.getRecentClips(this, 50);
-                listView.setAdapter(new GlassClipboardAdapter(this, clips));
+                // Sort clipboard clips pinned-first, then load into adapter
+                ClipboardHistoryService svc = ClipboardHistoryService.get_service(this);
+                List<ClipboardHistoryService.HistoryEntry> entries =
+                        svc != null ? svc.get_history_entries() : new java.util.ArrayList<>();
+                entries.sort((a, b) -> {
+                    if (a.pinned != b.pinned) return a.pinned ? -1 : 1;
+                    return 0;
+                });
+                List<String> clips = new java.util.ArrayList<>();
+                for (ClipboardHistoryService.HistoryEntry e : entries) clips.add(e.content);
+                if (clips.size() > 50) clips = clips.subList(0, 50);
+                final List<String> finalClips = clips;
+                listView.setAdapter(new GlassClipboardAdapter(this, finalClips));
                 // Tap card → paste directly into the active text field.
                 // Falls back to clipboard copy when no keyboard connection is active.
                 listView.setOnItemClickListener((p, v, pos, id) -> {
-                    boolean pasted = ClipboardHistoryService.pasteOrCopy(this, clips.get(pos));
+                    boolean pasted = ClipboardHistoryService.pasteOrCopy(this, finalClips.get(pos));
                     Toast.makeText(this,
                             pasted ? "Pasted!" : "Copied! (open a text field to paste directly)",
                             Toast.LENGTH_SHORT).show();
@@ -532,6 +550,12 @@ public class FloatingWidgetService extends Service
                     ClipboardHistoryService.copyToClipboard(ctx, text));
             card.addView(copy);
 
+            // 📌/📍 Pin button — toggles pinned-to-top for this clip
+            boolean pinned = ClipboardHistoryService.isPinned(text);
+            Button pinBtn = makePinBtn(ctx, dp, pinned);
+            pinBtn.setOnClickListener(v -> ClipboardHistoryService.togglePin(text));
+            card.addView(pinBtn);
+
             return card;
         }
 
@@ -543,13 +567,16 @@ public class FloatingWidgetService extends Service
     // ══════════════════════════════════════════════════════════════════════════
 
     static class GlassSmartClipAdapter extends ArrayAdapter<SmartClipsService.SmartClip> {
-        private final Context ctx;
-        private final float   dp;
+        private final Context  ctx;
+        private final float    dp;
+        private final Runnable refresh;
 
-        GlassSmartClipAdapter(Context ctx, List<SmartClipsService.SmartClip> clips) {
+        GlassSmartClipAdapter(Context ctx, List<SmartClipsService.SmartClip> clips,
+                              Runnable refresh) {
             super(ctx, 0, clips);
-            this.ctx = ctx;
-            this.dp  = ctx.getResources().getDisplayMetrics().density;
+            this.ctx     = ctx;
+            this.dp      = ctx.getResources().getDisplayMetrics().density;
+            this.refresh = refresh;
         }
 
         @Override
@@ -606,13 +633,26 @@ public class FloatingWidgetService extends Service
                     Toast.makeText(ctx, "Clip locked — open app to view",
                             Toast.LENGTH_SHORT).show();
                 } else {
-                    // Smart Clips copies must not appear in clipboard history
                     ClipboardHistoryService.suppressNextClip();
                     ClipboardHistoryService.copyToClipboard(ctx, clip.content);
                     Toast.makeText(ctx, "Copied!", Toast.LENGTH_SHORT).show();
                 }
             });
             row.addView(copy);
+
+            // 📌/📍 Pin button — display-only; serial/content unchanged
+            boolean pinned = juloo.keyboard2.PinStore.isSmartPinned(ctx, clip.serial);
+            Button pinBtn = makePinBtn(ctx, dp, pinned);
+            pinBtn.setOnClickListener(v -> {
+                if (clip.locked) {
+                    Toast.makeText(ctx, "Clip locked — open app to view",
+                            Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                juloo.keyboard2.PinStore.toggleSmartPin(ctx, clip.serial);
+                if (refresh != null) refresh.run();
+            });
+            row.addView(pinBtn);
             card.addView(row);
 
             // Keyword pill (optional row)
@@ -650,6 +690,25 @@ public class FloatingWidgetService extends Service
         GradientDrawable bg = new GradientDrawable();
         bg.setShape(GradientDrawable.OVAL);
         bg.setColor(COL_GREEN);
+        b.setBackground(bg);
+        if (Build.VERSION.SDK_INT >= 21) b.setElevation(2 * dp);
+        return b;
+    }
+
+    /** Circular pin toggle button — filled 📌 when pinned, outline 📍 when not. */
+    private static Button makePinBtn(Context ctx, float dp, boolean pinned) {
+        Button b = new Button(ctx);
+        b.setText(pinned ? "📌" : "📍");
+        b.setTextSize(13);
+        b.setPadding(0, 0, 0, 0);
+        b.setMinWidth(0); b.setMinHeight(0);
+        int sz = (int)(34 * dp);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(sz, sz);
+        lp.setMargins((int)(5 * dp), 0, 0, 0);
+        b.setLayoutParams(lp);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setShape(GradientDrawable.OVAL);
+        bg.setColor(pinned ? 0x554F46E5 : 0x22818CF8);  // indigo tint — bright when pinned
         b.setBackground(bg);
         if (Build.VERSION.SDK_INT >= 21) b.setElevation(2 * dp);
         return b;

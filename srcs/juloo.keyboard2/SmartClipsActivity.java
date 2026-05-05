@@ -407,6 +407,13 @@ public class SmartClipsActivity extends Activity
                 _filteredClips.add(c);
             }
         }
+        // Pinned smart clips float to top — serial numbers and content unchanged
+        java.util.Set<Integer> pins = PinStore.getSmartPins(this);
+        _filteredClips.sort((a, b) -> {
+            boolean pa = pins.contains(a.serial), pb = pins.contains(b.serial);
+            if (pa != pb) return pa ? -1 : 1;
+            return Integer.compare(a.serial, b.serial);
+        });
         refreshAdapters();
     }
 
@@ -585,6 +592,16 @@ public class SmartClipsActivity extends Activity
         });
         row.addView(withMargin(lock, dp(8)));
 
+        // 📌/📍 Pin — display-only; serial/content never touched
+        boolean pinned = PinStore.isSmartPinned(this, clip.serial);
+        Button pinBtn = makeActionIcon(pinned ? "📌" : "📍", pinned ? C.primary : C.textHint);
+        pinBtn.setContentDescription(pinned ? "Unpin" : "Pin to top");
+        pinBtn.setOnClickListener(v -> {
+            PinStore.toggleSmartPin(this, clip.serial);
+            filterClips(_searchBar != null ? _searchBar.getText().toString() : "");
+        });
+        row.addView(withMargin(pinBtn, dp(8)));
+
         // Spacer
         row.addView(spacer());
 
@@ -718,6 +735,14 @@ public class SmartClipsActivity extends Activity
                 else showLockConfirmDialog(clip);
             });
             btnRow.addView(withMargin(lock, dp(6)));
+
+            boolean gPinned = PinStore.isSmartPinned(SmartClipsActivity.this, clip.serial);
+            Button gPin = makeActionIcon(gPinned ? "📌" : "📍", gPinned ? C.primary : C.textHint);
+            gPin.setOnClickListener(vv -> {
+                PinStore.toggleSmartPin(SmartClipsActivity.this, clip.serial);
+                filterClips(_searchBar != null ? _searchBar.getText().toString() : "");
+            });
+            btnRow.addView(withMargin(gPin, dp(6)));
 
             card.addView(btnRow);
             return card;

@@ -6,7 +6,7 @@
     android:orientation="horizontal"
     android:gravity="center_vertical"
     android:paddingStart="12dp"
-    android:paddingEnd="8dp"
+    android:paddingEnd="6dp"
     android:paddingTop="9dp"
     android:paddingBottom="9dp"
     android:background="@drawable/widget_item_a">
@@ -23,17 +23,30 @@
         android:textSize="12sp"
         android:lineSpacingMultiplier="1.2"/>
 
-    <!-- 📋 Copy icon button -->
+    <!-- 📌/📍 Pin icon button -->
     <Button
-        android:id="@+id/btn_copy"
-        android:layout_width="30dp"
-        android:layout_height="30dp"
-        android:text="📋"
-        android:textSize="13sp"
+        android:id="@+id/btn_pin"
+        android:layout_width="28dp"
+        android:layout_height="28dp"
+        android:text="📍"
+        android:textSize="12sp"
         android:background="@drawable/widget_copy_chip"
         android:padding="0dp"
         android:minWidth="0dp"
         android:minHeight="0dp"
-        android:layout_marginStart="10dp"/>
+        android:layout_marginStart="6dp"/>
+
+    <!-- 📋 Copy icon button -->
+    <Button
+        android:id="@+id/btn_copy"
+        android:layout_width="28dp"
+        android:layout_height="28dp"
+        android:text="📋"
+        android:textSize="12sp"
+        android:background="@drawable/widget_copy_chip"
+        android:padding="0dp"
+        android:minWidth="0dp"
+        android:minHeight="0dp"
+        android:layout_marginStart="6dp"/>
 
 </LinearLayout>
