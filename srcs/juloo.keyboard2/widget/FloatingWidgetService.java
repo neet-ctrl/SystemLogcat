@@ -395,11 +395,32 @@ public class FloatingWidgetService extends Service
                 List<SmartClipsService.SmartClip> clips =
                         smartClipsService.getClipsForWidget();
                 listView.setAdapter(new GlassSmartClipAdapter(this, clips));
+                // Tap card → paste directly; locked clips show a toast instead
+                listView.setOnItemClickListener((p, v, pos, id) -> {
+                    SmartClipsService.SmartClip clip = clips.get(pos);
+                    if (clip.locked) {
+                        Toast.makeText(this, "Clip locked — open app to view",
+                                Toast.LENGTH_SHORT).show();
+                    } else {
+                        // Smart-clip pastes go via IME (send_text), so they
+                        // never touch the system clipboard — no suppress needed.
+                        boolean pasted = ClipboardHistoryService.pasteOrCopy(this, clip.content);
+                        Toast.makeText(this,
+                                pasted ? "Pasted!" : "Copied! (open a text field to paste directly)",
+                                Toast.LENGTH_SHORT).show();
+                    }
+                });
             } else {
                 List<String> clips = ClipboardHistoryService.getRecentClips(this, 50);
                 listView.setAdapter(new GlassClipboardAdapter(this, clips));
-                listView.setOnItemClickListener((p, v, pos, id) ->
-                        ClipboardHistoryService.copyToClipboard(this, clips.get(pos)));
+                // Tap card → paste directly into the active text field.
+                // Falls back to clipboard copy when no keyboard connection is active.
+                listView.setOnItemClickListener((p, v, pos, id) -> {
+                    boolean pasted = ClipboardHistoryService.pasteOrCopy(this, clips.get(pos));
+                    Toast.makeText(this,
+                            pasted ? "Pasted!" : "Copied! (open a text field to paste directly)",
+                            Toast.LENGTH_SHORT).show();
+                });
             }
         });
     }

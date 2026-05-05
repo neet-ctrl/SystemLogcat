@@ -47,6 +47,23 @@ public final class ClipboardHistoryService
       _paste_callback.paste_from_clipboard_pane(clip);
   }
 
+  /**
+   * Attempt to paste [text] directly via the active IME connection.
+   * Falls back to copying to clipboard if the keyboard is not currently
+   * connected (i.e. no active text field / keyboard not open).
+   * Returns {@code true} when IME paste succeeded, {@code false} when the
+   * clipboard-copy fallback was used instead.
+   */
+  public static boolean pasteOrCopy(Context ctx, String text)
+  {
+    if (_paste_callback != null) {
+      _paste_callback.paste_from_clipboard_pane(text);
+      return true;
+    }
+    copyToClipboard(ctx, text);
+    return false;
+  }
+
   /** The maximum size limits the amount of user data stored in memory but also
       gives a sense to the user that the history is not persisted and can be
       forgotten as soon as the app stops. */
