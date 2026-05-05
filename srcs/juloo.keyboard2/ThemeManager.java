@@ -10,7 +10,7 @@ import android.view.ViewGroup;
 public final class ThemeManager {
 
     public static final String PREFS            = "app_ui_prefs";
-    public static final String KEY_THEME        = "theme";          // system | light | dark
+    public static final String KEY_THEME        = "theme";          // system | light | dark | neo_glow
     public static final String KEY_MATRIX       = "matrix_mode";
     public static final String KEY_MATRIX_SPEED = "matrix_speed";   // slow | normal | fast
     public static final String KEY_MATRIX_DENSITY = "matrix_density"; // low | medium | high
@@ -62,16 +62,21 @@ public final class ThemeManager {
         return prefs(ctx).getInt(KEY_CB_LIMIT, 100);
     }
 
+    public static boolean isNeoGlowMode(Context ctx) {
+        return "neo_glow".equals(getTheme(ctx));
+    }
+
     public static boolean isDarkMode(Context ctx) {
         String t = getTheme(ctx);
-        if ("dark".equals(t)) return true;
+        if ("dark".equals(t) || "neo_glow".equals(t)) return true;
         if ("light".equals(t)) return false;
         int mask = ctx.getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK;
         return mask == Configuration.UI_MODE_NIGHT_YES;
     }
 
     public static ThemeColors colors(Context ctx) {
-        if (isMatrixMode(ctx)) return MATRIX;
+        if (isMatrixMode(ctx))  return MATRIX;
+        if (isNeoGlowMode(ctx)) return NEO_GLOW;
         return isDarkMode(ctx) ? DARK : LIGHT;
     }
 
@@ -154,6 +159,25 @@ public final class ThemeManager {
         0xFF00FFCC,  // cyan
         0xFF88FF00,  // lime
         0xFF00FFFF   // cyan-lock
+    );
+
+    // ── Neo Glow: glassmorphism + neon blue/purple, deep black canvas ─────────
+    public static final ThemeColors NEO_GLOW = new ThemeColors(
+        0xFF0A0A12,  // background   — pitch-black deep space
+        0xFF12122A,  // surface       — elevated dark glass panel
+        0xFF1A1A3A,  // surfaceVariant— slightly lifted glass
+        0xFF4FC3F7,  // primary       — neon cyan-blue (accent / interactive)
+        0xFFA78BFA,  // secondary     — neon purple (secondary accent)
+        0xFFECF0FF,  // textPrimary   — near-white with cool blue tint
+        0xFF7A90CC,  // textSecondary — muted indigo-gray
+        0xFF3A4A7A,  // textHint      — very muted deep indigo
+        0xFFECF0FF,  // headerText    — bright white
+        0xFF0D0D22,  // headerBg      — deep indigo-black
+        0xFF1E2A5A,  // divider       — dark indigo separator
+        0xFF00E5B0,  // green         — neon teal
+        0xFF4FC3F7,  // blue          — neon cyan
+        0xFFFF9D5C,  // orange        — warm neon
+        0xFFA78BFA   // purple        — neon violet
     );
 
     public static final class ThemeColors {

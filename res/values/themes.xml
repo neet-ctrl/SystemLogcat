@@ -295,4 +295,40 @@
     <item name="clipboard_divider_color">?colorLabel</item>
     <item name="clipboard_divider_height">2dp</item>
  </style>
+ <!-- ══════════════════════════════════════════════════════════════
+      Neo Glow — glassmorphism + neon blue/purple, deep black base
+      Premium futuristic aesthetic inspired by Nothing UI / iOS blur
+      ══════════════════════════════════════════════════════════════ -->
+ <style name="NeoGlow" parent="BaseTheme">
+    <item name="android:isLightTheme">false</item>
+    <!-- Deep pitch-black background — the canvas everything floats on -->
+    <item name="colorKeyboard">#0A0A12</item>
+    <!-- Floating tile keys: elevated dark glass, clearly separated from bg -->
+    <item name="colorKey">#181830</item>
+    <!-- Press state: neon blue glow wash -->
+    <item name="colorKeyActivated">#1B3060</item>
+    <!-- Main labels: near-white with a cool blue tint -->
+    <item name="colorLabel">#ECF0FF</item>
+    <!-- Activated label: vivid neon cyan-blue -->
+    <item name="colorLabelActivated">#4FC3F7</item>
+    <!-- Locked / special: neon purple accent -->
+    <item name="colorLabelLocked">#A78BFA</item>
+    <!-- Sub/corner labels: muted indigo-gray -->
+    <item name="colorSubLabel">#7A90CC</item>
+    <!-- Large rounded corners — the "floating tile" look -->
+    <item name="keyBorderRadius">8dp</item>
+    <!-- Whisper-thin top/left highlight border simulating glass refraction -->
+    <item name="keyBorderWidth">0.8dp</item>
+    <item name="keyBorderWidthActivated">1.2dp</item>
+    <item name="keyBorderColorLeft">#2A3A7A</item>
+    <item name="keyBorderColorTop">#3A4A9A</item>
+    <item name="keyBorderColorRight">#1E2A5A</item>
+    <item name="keyBorderColorBottom">#141E40</item>
+    <!-- Emoji pane: same deep dark glass surface -->
+    <item name="emoji_button_bg">#0E0E20</item>
+    <item name="emoji_color">#ECF0FF</item>
+    <!-- Clipboard divider: subtle neon line -->
+    <item name="clipboard_divider_color">#2A3A7A</item>
+    <item name="clipboard_divider_height">1px</item>
+ </style>
 </resources>

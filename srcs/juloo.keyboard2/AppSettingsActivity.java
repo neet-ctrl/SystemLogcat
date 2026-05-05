@@ -125,41 +125,252 @@ public class AppSettingsActivity extends Activity {
         LinearLayout card = makeCard();
         card.setOrientation(LinearLayout.VERTICAL);
 
-        TextView label = rowLabel("Theme");
-        card.addView(label);
+        card.addView(rowLabel("App UI Theme"));
+        card.addView(rowSub("Controls the color scheme of Smart Clips, Settings & all app screens"));
 
-        TextView sub = rowSub("Controls the overall color scheme of Smart Clips & App Settings");
-        card.addView(sub);
-
-        String[] opts  = {"system", "light", "dark"};
-        String[] labels = {"System", "Light", "Dark"};
         String current = ThemeManager.getTheme(this);
 
-        LinearLayout seg = new LinearLayout(this);
-        seg.setOrientation(LinearLayout.HORIZONTAL);
-        LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        sp.setMargins(0, dp(12), 0, 0);
-        seg.setLayoutParams(sp);
+        // Row 1: System | Light
+        LinearLayout row1 = makeThemeRow();
+        row1.addView(makeThemeBtn("system", "⚙ System",  "Follows device", current));
+        row1.addView(themeRowSpacer());
+        row1.addView(makeThemeBtn("light",  "☀ Light",   "Indigo & white", current));
+        card.addView(row1);
 
-        for (int i = 0; i < opts.length; i++) {
-            final String val = opts[i];
-            Button b = new Button(this);
-            b.setText(labels[i]);
-            b.setTextSize(13);
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0,
-                    LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
-            if (i > 0) lp.setMargins(dp(6), 0, 0, 0);
-            b.setLayoutParams(lp);
-            applySegBtn(b, val.equals(current));
-            b.setOnClickListener(v -> {
-                ThemeManager.prefs(this).edit().putString(ThemeManager.KEY_THEME, val).apply();
-                recreate();
-            });
-            seg.addView(b);
+        LinearLayout.LayoutParams row2Lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        row2Lp.setMargins(0, dp(8), 0, 0);
+
+        // Row 2: Dark | Neo Glow
+        LinearLayout row2 = makeThemeRow();
+        row2.setLayoutParams(row2Lp);
+        row2.addView(makeThemeBtn("dark",     "🌙 Dark",    "Navy & soft indigo", current));
+        row2.addView(themeRowSpacer());
+        row2.addView(makeNeoGlowBtn(current));
+        card.addView(row2);
+
+        // Neo Glow preview strip (shown when selected)
+        if ("neo_glow".equals(current)) {
+            card.addView(buildNeoGlowPreview());
         }
-        card.addView(seg);
+
         return card;
+    }
+
+    private LinearLayout makeThemeRow() {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        lp.setMargins(0, dp(12), 0, 0);
+        row.setLayoutParams(lp);
+        return row;
+    }
+
+    private View themeRowSpacer() {
+        View v = new View(this);
+        v.setLayoutParams(new LinearLayout.LayoutParams(dp(8), 1));
+        return v;
+    }
+
+    private View makeThemeBtn(String val, String label, String sub, String current) {
+        LinearLayout cell = new LinearLayout(this);
+        cell.setOrientation(LinearLayout.VERTICAL);
+        cell.setPadding(dp(12), dp(10), dp(12), dp(10));
+        cell.setGravity(android.view.Gravity.CENTER_HORIZONTAL);
+        cell.setLayoutParams(new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        cell.setClickable(true);
+        cell.setFocusable(true);
+
+        boolean selected = val.equals(current);
+        android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+        bg.setColor(selected ? C.primary : C.surfaceVariant);
+        bg.setCornerRadius(dp(10));
+        if (!selected) bg.setStroke(dp(1), C.divider);
+        cell.setBackground(bg);
+
+        TextView name = new TextView(this);
+        name.setText(label);
+        name.setTextSize(13);
+        name.setTypeface(Typeface.DEFAULT_BOLD);
+        name.setTextColor(selected ? 0xFFFFFFFF : C.textPrimary);
+        name.setGravity(android.view.Gravity.CENTER);
+        cell.addView(name);
+
+        TextView desc = new TextView(this);
+        desc.setText(sub);
+        desc.setTextSize(10);
+        desc.setTextColor(selected ? 0xCCFFFFFF : C.textHint);
+        desc.setGravity(android.view.Gravity.CENTER);
+        LinearLayout.LayoutParams dlp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        dlp.setMargins(0, dp(3), 0, 0);
+        desc.setLayoutParams(dlp);
+        cell.addView(desc);
+
+        cell.setOnClickListener(v -> {
+            ThemeManager.prefs(this).edit().putString(ThemeManager.KEY_THEME, val).apply();
+            recreate();
+        });
+        return cell;
+    }
+
+    private View makeNeoGlowBtn(String current) {
+        boolean selected = "neo_glow".equals(current);
+        LinearLayout cell = new LinearLayout(this);
+        cell.setOrientation(LinearLayout.VERTICAL);
+        cell.setPadding(dp(12), dp(10), dp(12), dp(10));
+        cell.setGravity(android.view.Gravity.CENTER_HORIZONTAL);
+        cell.setLayoutParams(new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        cell.setClickable(true);
+        cell.setFocusable(true);
+
+        // Gradient background: deep black → indigo for the button itself
+        android.graphics.drawable.GradientDrawable bg;
+        if (selected) {
+            bg = new android.graphics.drawable.GradientDrawable(
+                    android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+                    new int[]{0xFF0D0D22, 0xFF1A1060, 0xFF0A1A40});
+        } else {
+            bg = new android.graphics.drawable.GradientDrawable();
+            bg.setColor(C.surfaceVariant);
+            bg.setStroke(dp(1), selected ? 0xFF4FC3F7 : C.divider);
+        }
+        bg.setCornerRadius(dp(10));
+        cell.setBackground(bg);
+
+        // "✦ Neo Glow" label with neon colour when selected
+        TextView name = new TextView(this);
+        name.setText("✦ Neo Glow");
+        name.setTextSize(13);
+        name.setTypeface(Typeface.DEFAULT_BOLD);
+        name.setTextColor(selected ? 0xFF4FC3F7 : C.textPrimary);
+        name.setGravity(android.view.Gravity.CENTER);
+        cell.addView(name);
+
+        // Mini colour dot row showing the palette
+        LinearLayout dots = new LinearLayout(this);
+        dots.setOrientation(LinearLayout.HORIZONTAL);
+        dots.setGravity(android.view.Gravity.CENTER);
+        LinearLayout.LayoutParams dotsLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        dotsLp.setMargins(0, dp(5), 0, 0);
+        dots.setLayoutParams(dotsLp);
+        int[] palette = {0xFF0A0A12, 0xFF181830, 0xFF4FC3F7, 0xFFA78BFA, 0xFF00E5B0};
+        for (int col : palette) {
+            View dot = new View(this);
+            android.graphics.drawable.GradientDrawable dotBg = new android.graphics.drawable.GradientDrawable();
+            dotBg.setColor(col);
+            dotBg.setCornerRadius(dp(6));
+            dotBg.setStroke(1, 0x554FC3F7);
+            dot.setBackground(dotBg);
+            LinearLayout.LayoutParams dlp = new LinearLayout.LayoutParams(dp(10), dp(10));
+            dlp.setMargins(dp(2), 0, dp(2), 0);
+            dot.setLayoutParams(dlp);
+            dots.addView(dot);
+        }
+        cell.addView(dots);
+
+        cell.setOnClickListener(v -> {
+            ThemeManager.prefs(this).edit().putString(ThemeManager.KEY_THEME, "neo_glow").apply();
+            recreate();
+        });
+        return cell;
+    }
+
+    /** Shown below the selector when Neo Glow is active — visual palette preview. */
+    private View buildNeoGlowPreview() {
+        LinearLayout preview = new LinearLayout(this);
+        preview.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        lp.setMargins(0, dp(14), 0, 0);
+        preview.setLayoutParams(lp);
+
+        // Gradient banner row
+        LinearLayout banner = new LinearLayout(this);
+        banner.setOrientation(LinearLayout.HORIZONTAL);
+        android.graphics.drawable.GradientDrawable bannerBg =
+                new android.graphics.drawable.GradientDrawable(
+                        android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
+                        new int[]{0xFF0A0A12, 0xFF181830, 0xFF1B3060, 0xFF181830, 0xFF0A0A12});
+        bannerBg.setCornerRadius(dp(10));
+        banner.setBackground(bannerBg);
+        banner.setPadding(dp(14), dp(12), dp(14), dp(12));
+        banner.setGravity(android.view.Gravity.CENTER_VERTICAL);
+
+        // Floating key mockup
+        String[] keyLabels = {"Q", "W", "E", "R"};
+        for (String kl : keyLabels) {
+            TextView key = new TextView(this);
+            key.setText(kl);
+            key.setTextSize(13);
+            key.setTextColor(0xFFECF0FF);
+            key.setTypeface(Typeface.DEFAULT_BOLD);
+            key.setGravity(android.view.Gravity.CENTER);
+            int ksz = dp(36);
+            android.graphics.drawable.GradientDrawable keyBg = new android.graphics.drawable.GradientDrawable();
+            keyBg.setColor(0xFF181830);
+            keyBg.setCornerRadius(dp(8));
+            keyBg.setStroke(1, 0xFF2A3A7A);
+            key.setBackground(keyBg);
+            LinearLayout.LayoutParams klp = new LinearLayout.LayoutParams(ksz, ksz);
+            klp.setMargins(dp(3), 0, dp(3), 0);
+            key.setLayoutParams(klp);
+            if (Build.VERSION.SDK_INT >= 21) key.setElevation(dp(3));
+            banner.addView(key);
+        }
+
+        // Glow accent key
+        TextView glowKey = new TextView(this);
+        glowKey.setText("✦");
+        glowKey.setTextSize(14);
+        glowKey.setTextColor(0xFF4FC3F7);
+        glowKey.setTypeface(Typeface.DEFAULT_BOLD);
+        glowKey.setGravity(android.view.Gravity.CENTER);
+        int ksz = dp(36);
+        android.graphics.drawable.GradientDrawable glowBg = new android.graphics.drawable.GradientDrawable();
+        glowBg.setColor(0xFF1B3060);
+        glowBg.setCornerRadius(dp(8));
+        glowBg.setStroke(1, 0xFF4FC3F7);
+        glowKey.setBackground(glowBg);
+        LinearLayout.LayoutParams glp = new LinearLayout.LayoutParams(ksz, ksz);
+        glp.setMargins(dp(3), 0, dp(3), 0);
+        glowKey.setLayoutParams(glp);
+        if (Build.VERSION.SDK_INT >= 21) glowKey.setElevation(dp(5));
+        banner.addView(glowKey);
+
+        // Spacer then label
+        View sp = new View(this);
+        sp.setLayoutParams(new LinearLayout.LayoutParams(0, 1, 1f));
+        banner.addView(sp);
+
+        LinearLayout labelCol = new LinearLayout(this);
+        labelCol.setOrientation(LinearLayout.VERTICAL);
+        labelCol.setGravity(android.view.Gravity.CENTER_VERTICAL);
+
+        TextView t1 = new TextView(this);
+        t1.setText("Neo Glow");
+        t1.setTextSize(12);
+        t1.setTypeface(Typeface.DEFAULT_BOLD);
+        t1.setTextColor(0xFF4FC3F7);
+        labelCol.addView(t1);
+
+        TextView t2 = new TextView(this);
+        t2.setText("Glassmorphism · Neon accents");
+        t2.setTextSize(9);
+        t2.setTextColor(0xFF7A90CC);
+        LinearLayout.LayoutParams t2lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        t2lp.setMargins(0, dp(2), 0, 0);
+        t2.setLayoutParams(t2lp);
+        labelCol.addView(t2);
+
+        banner.addView(labelCol);
+        preview.addView(banner);
+        return preview;
     }
 
     // ── Matrix section ────────────────────────────────────────────────────────
