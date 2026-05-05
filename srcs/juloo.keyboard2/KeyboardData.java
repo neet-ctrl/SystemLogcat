@@ -705,7 +705,7 @@ public final class KeyboardData
 
   /**
    * Returns a new KeyboardData with smart clip keys injected into empty corner
-   * slots (NW=1, NE=2, SW=3, SE=4) as defined by SmartClipKeyBinder.
+   * slots (1=NW, 2=NE, 3=SW, 4=SE, 5=W, 6=E, 7=N, 8=S) as defined by SmartClipKeyBinder.
    *
    * Each injected key is a Kind.String value with magic content:
    *   "#<serial>\uE001<clip content>"
@@ -734,7 +734,7 @@ public final class KeyboardData
           for (Map.Entry<Integer, Integer> e : slots.entrySet())
           {
             int slot = e.getKey();
-            if (slot < 1 || slot > 4) continue;
+            if (slot < 1 || slot > 8) continue;
             if (result.getKeyValue(slot) != null) continue; // never overwrite real keys
             int serial = e.getValue();
             SmartClipsService.SmartClip clip = svc.getBySerial(serial);

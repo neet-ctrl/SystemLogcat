@@ -14,10 +14,11 @@ import java.util.Map;
  *
  * Format (SharedPreferences, JSON):
  *   { "a": { "1": 3, "4": 7 }, "q": { "2": 1 } }
- *   outer key = key label (key0.getString()), inner key = slot (1-4), value = smart clip serial
+ *   outer key = key label (key0.getString()), inner key = slot (1-8), value = smart clip serial
  *
- * Slots:  1=NW (top-left)  2=NE (top-right)
- *         3=SW (bot-left)  4=SE (bot-right)
+ * Slots:  1=NW  7=N   2=NE
+ *         5=W   (key)  6=E
+ *         3=SW  8=S   4=SE
  *
  * When the user swipes to an assigned corner the keyboard injects a magic
  * Kind.String value:  "#<serial>\uE001<content>"
@@ -62,7 +63,7 @@ public final class SmartClipKeyBinder {
         return s != null ? s : -1;
     }
 
-    /** Assign clip [serial] to [keyName] corner [slot] (1-4). */
+    /** Assign clip [serial] to [keyName] swipe slot (1-8). */
     public static void assign(Context ctx, String keyName, int slot, int serial) {
         Map<String, Map<Integer, Integer>> map = asMap(ctx);
         if (!map.containsKey(keyName)) map.put(keyName, new LinkedHashMap<Integer, Integer>());
