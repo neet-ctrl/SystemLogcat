@@ -6,6 +6,7 @@
     android:background="?attr/colorKeyboard">
 
   <juloo.keyboard2.KeyboardClipboardPane
+      android:id="@+id/keyboard_clipboard_pane"
       android:layout_width="match_parent"
       android:layout_height="wrap_content"/>
 

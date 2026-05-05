@@ -146,8 +146,15 @@ public class Keyboard2 extends InputMethodService
 
   void openClipboardPane()
   {
-    if (_clipboard_pane == null)
+    if (_clipboard_pane == null) {
       _clipboard_pane = (ViewGroup)inflate_view(R.layout.clipboard_pane);
+      // Wire the "⬅ Back" button inside KeyboardClipboardPane to return to the keyboard
+      juloo.keyboard2.KeyboardClipboardPane kcp =
+          _clipboard_pane.findViewById(R.id.keyboard_clipboard_pane);
+      if (kcp != null) {
+        kcp.setOnDismissListener(() -> setInputView(_container_view));
+      }
+    }
     setInputView(_clipboard_pane);
   }
 
