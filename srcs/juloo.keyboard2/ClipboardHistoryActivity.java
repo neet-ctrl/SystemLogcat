@@ -8,7 +8,9 @@ import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.view.GestureDetector;
 import android.view.Gravity;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.*;
@@ -89,6 +91,7 @@ public class ClipboardHistoryActivity extends Activity {
 
         setContentView(root);
         updateList();
+        setupSwipeGestures();
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -869,6 +872,84 @@ public class ClipboardHistoryActivity extends Activity {
 
     private static int colorWithAlpha(int color, int alpha) {
         return (color & 0x00FFFFFF) | (alpha << 24);
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // Swipe gestures — left = delete, right = copy
+    // ══════════════════════════════════════════════════════════════════════════
+
+    private void setupSwipeGestures() {
+        final int SWIPE_MIN_DISTANCE  = dp(60);   // minimum horizontal travel
+        final int SWIPE_MIN_VELOCITY  = dp(80);   // minimum pixels/second
+        final int SWIPE_MAX_OFF_PATH  = dp(80);   // max vertical deviation allowed
+
+        GestureDetector detector = new GestureDetector(this,
+                new GestureDetector.SimpleOnGestureListener() {
+
+            @Override
+            public boolean onFling(MotionEvent e1, MotionEvent e2,
+                                   float velocityX, float velocityY) {
+                if (e1 == null || e2 == null) return false;
+
+                float dx = e2.getX() - e1.getX();
+                float dy = e2.getY() - e1.getY();
+
+                // Must be more horizontal than vertical and exceed thresholds
+                if (Math.abs(dy) > SWIPE_MAX_OFF_PATH) return false;
+                if (Math.abs(dx) < SWIPE_MIN_DISTANCE) return false;
+                if (Math.abs(velocityX) < SWIPE_MIN_VELOCITY) return false;
+
+                int pos = _listView.pointToPosition((int) e1.getX(), (int) e1.getY());
+                if (pos == ListView.INVALID_POSITION || _adapter == null) return false;
+                if (pos >= _adapter.filtered.size()) return false;
+
+                ClipboardHistoryService.HistoryEntry ent = _adapter.filtered.get(pos);
+
+                if (dx < 0) {
+                    // ← Swipe LEFT  →  delete (no confirmation)
+                    animateAndDelete(pos, ent.content);
+                } else {
+                    // → Swipe RIGHT  →  copy
+                    copyText(ent.content);
+                    toast("Copied!");
+                }
+                return true;
+            }
+        });
+
+        _listView.setOnTouchListener((v, event) -> {
+            detector.onTouchEvent(event);
+            return false; // let ListView still handle scroll and taps normally
+        });
+    }
+
+    /** Slide the card off-screen to the left, then remove and refresh. */
+    private void animateAndDelete(int pos, String content) {
+        View itemView = null;
+        int firstVisible = _listView.getFirstVisiblePosition();
+        int localIndex = pos - firstVisible;
+        if (localIndex >= 0 && localIndex < _listView.getChildCount()) {
+            itemView = _listView.getChildAt(localIndex);
+        }
+
+        if (itemView != null && android.os.Build.VERSION.SDK_INT >= 12) {
+            final View target = itemView;
+            target.animate()
+                    .translationX(-target.getWidth())
+                    .alpha(0f)
+                    .setDuration(180)
+                    .withEndAction(() -> {
+                        _service.remove_history_entry(content);
+                        updateList();
+                        toast("Deleted");
+                    })
+                    .start();
+        } else {
+            // Fallback: instant delete (older API / off-screen item)
+            _service.remove_history_entry(content);
+            updateList();
+            toast("Deleted");
+        }
     }
 
     private void copyText(String text) {
