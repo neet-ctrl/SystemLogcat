@@ -95,16 +95,15 @@ public final class KeyboardClipboardPane extends LinearLayout
         _pinPanel.setVisibility(GONE);
         addView(_pinPanel, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
 
-        // ListView — same as floating widget
+        // ListView — fixed height so the pane stays keyboard-sized (not full-screen)
         _listView = new ListView(ctx);
         _listView.setBackgroundColor(0x00000000);
         _listView.setDivider(null);
         _listView.setDividerHeight(dp(6));
         _listView.setPadding(dp(8), dp(6), dp(8), dp(6));
         _listView.setClipToPadding(false);
-        LayoutParams lvLp = new LayoutParams(LayoutParams.MATCH_PARENT, 0);
-        lvLp.weight = 1f;
-        addView(_listView, lvLp);
+        int listH = (int) ctx.getResources().getDimension(R.dimen.clipboard_view_height);
+        addView(_listView, new LayoutParams(LayoutParams.MATCH_PARENT, listH));
 
         // Services
         _histService  = ClipboardHistoryService.get_service(ctx);
