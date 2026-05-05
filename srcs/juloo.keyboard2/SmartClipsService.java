@@ -90,6 +90,38 @@ public final class SmartClipsService {
         }
     }
 
+    /**
+     * Bulk-import clips from a backup restore.
+     * Skips any clip whose serial already exists in the current list.
+     * Preserves the locked flag on each restored clip as-is; the OLD pin
+     * hash is intentionally never restored — locked clips will be controlled
+     * by whatever pin is currently set up on this device.
+     * Updates the next-serial counter to be at least max(existing, hint).
+     */
+    public void importClipsFromBackup(List<SmartClip> toImport, int nextSerialHint) {
+        java.util.Set<Integer> existing = new java.util.HashSet<>();
+        int maxSerial = 0;
+        for (SmartClip c : _clips) {
+            existing.add(c.serial);
+            if (c.serial > maxSerial) maxSerial = c.serial;
+        }
+        for (SmartClip c : toImport) {
+            if (!existing.contains(c.serial)) {
+                _clips.add(c);
+                existing.add(c.serial);
+                if (c.serial > maxSerial) maxSerial = c.serial;
+            }
+        }
+        // Ensure next-serial won't collide with any restored serial
+        SharedPreferences prefs = _ctx.getSharedPreferences(PREFS_CLIPS, Context.MODE_PRIVATE);
+        int currentNext = prefs.getInt(KEY_NEXT_SERIAL, 1);
+        int newNext = Math.max(Math.max(currentNext, nextSerialHint), maxSerial + 1);
+        prefs.edit().putInt(KEY_NEXT_SERIAL, newNext).apply();
+        saveToPrefs();
+        notifyListeners();
+        notifyWidget();
+    }
+
     public void addClip(String content, String description, String keyword) {
         SharedPreferences prefs = _ctx.getSharedPreferences(PREFS_CLIPS, Context.MODE_PRIVATE);
         int nextSerial = prefs.getInt(KEY_NEXT_SERIAL, 1);

@@ -63,14 +63,17 @@ public class SettingsActivity extends PreferenceActivity
             return true;
         }
 
-        int clipCount = 0;
+        int clipCount  = 0;
+        int smartCount = 0;
         try {
             org.json.JSONObject parsed = new org.json.JSONObject(backupJson);
-            if (parsed.has("clipboard")) clipCount = parsed.getJSONArray("clipboard").length();
+            if (parsed.has("clipboard"))   clipCount  = parsed.getJSONArray("clipboard").length();
+            if (parsed.has("smart_clips")) smartCount = parsed.getJSONArray("smart_clips").length();
         } catch (Exception ignored) {}
 
-        final String json  = backupJson;
-        final int    clips = clipCount;
+        final String json       = backupJson;
+        final int    clips      = clipCount;
+        final int    smartClips = smartCount;
 
         // Step 1 — choose format
         new android.app.AlertDialog.Builder(this)
@@ -273,9 +276,10 @@ public class SettingsActivity extends PreferenceActivity
       try {
         org.json.JSONObject backup = new org.json.JSONObject(json);
 
-        int clipCount     = backup.has("clipboard")    ? backup.getJSONArray("clipboard").length()  : 0;
-        int settingsCount = backup.has("settings")     ? backup.getJSONObject("settings").length()  : 0;
+        int clipCount     = backup.has("clipboard")    ? backup.getJSONArray("clipboard").length()   : 0;
+        int settingsCount = backup.has("settings")     ? backup.getJSONObject("settings").length()   : 0;
         int wordsCount    = backup.has("learned_words")? backup.getJSONArray("learned_words").length(): 0;
+        int smartCount    = backup.has("smart_clips")  ? backup.getJSONArray("smart_clips").length() : 0;
 
         android.graphics.pdf.PdfDocument doc = new android.graphics.pdf.PdfDocument();
 
@@ -341,14 +345,16 @@ public class SettingsActivity extends PreferenceActivity
 
         // ── SUMMARY BOX ─────────────────────────────────────────────────────
         bg.setColor(0xFFE8EAF6);
-        cvRef[0].drawRect(M, yRef[0], PW - M, yRef[0] + 44, bg);
+        cvRef[0].drawRect(M, yRef[0], PW - M, yRef[0] + 56, bg);
         txtB.setColor(0xFF1A237E);
         txtB.setTextSize(11);
         cvRef[0].drawText(
-            "Clipboard: " + clipCount + " entries    |    Settings: " + settingsCount +
-            " keys    |    Learned Words: " + wordsCount,
-            M + 10, yRef[0] + 27, txtB);
-        yRef[0] += 56;
+            "Clipboard: " + clipCount + " entries    |    Smart Clips: " + smartCount,
+            M + 10, yRef[0] + 18, txtB);
+        cvRef[0].drawText(
+            "Settings: " + settingsCount + " keys    |    Learned Words: " + wordsCount,
+            M + 10, yRef[0] + 38, txtB);
+        yRef[0] += 68;
 
         // helper: ensure enough room, else new page
         // (Java lambda can't reassign outer local, so use array refs throughout)
@@ -403,6 +409,67 @@ public class SettingsActivity extends PreferenceActivity
             }
 
             // bottom divider
+            divPt.setColor(0xFFDDDDDD);
+            cv.drawLine(M, yRef[0] + blockH, PW - M, yRef[0] + blockH, divPt);
+            yRef[0] += blockH + 4;
+          }
+        }
+
+        // ── SMART CLIPS SECTION ──────────────────────────────────────────────
+        if (backup.has("smart_clips")) {
+          org.json.JSONArray sc_arr = backup.getJSONArray("smart_clips");
+          checkNewPage(doc, pageRef, cvRef, yRef, pgNumRef, M, PH, PW, 30);
+          cv = cvRef[0];
+
+          yRef[0] += 8;
+          bg.setColor(0xFF4527A0);
+          cv.drawRect(M, yRef[0], PW - M, yRef[0] + 22, bg);
+          txtB.setColor(0xFFFFFFFF);
+          txtB.setTextSize(12);
+          cv.drawText("Smart Clips  (" + smartCount + ")", M + 8, yRef[0] + 15, txtB);
+          yRef[0] += 28;
+
+          for (int i = 0; i < sc_arr.length(); i++) {
+            org.json.JSONObject sc  = sc_arr.getJSONObject(i);
+            int    serial  = sc.optInt("serial", i + 1);
+            String content = sc.optString("content", "");
+            String desc    = sc.optString("description", "");
+            String kw      = sc.optString("keyword", "");
+            boolean locked = sc.optBoolean("locked", false);
+            boolean hidden = sc.optBoolean("hidden", false);
+            String  ts     = sc.optString("timestamp", "");
+
+            int linesNeeded = (int) Math.ceil(content.length() / 70.0) + 3;
+            float blockH = Math.min(linesNeeded * 13 + 24, 110);
+            checkNewPage(doc, pageRef, cvRef, yRef, pgNumRef, M, PH, PW, blockH + 6);
+            cv = cvRef[0];
+
+            // card background (alternating)
+            bg.setColor(i % 2 == 0 ? 0xFFF3E5F5 : 0xFFFFFFFF);
+            cv.drawRect(M, yRef[0], PW - M, yRef[0] + blockH, bg);
+
+            // meta line: #serial  keyword  flags  timestamp
+            txtB.setColor(0xFF4527A0);
+            txtB.setTextSize(10);
+            String flags = (locked ? " 🔒LOCKED" : "") + (hidden ? "  HIDDEN" : "");
+            String meta  = "#" + serial
+                    + (kw.isEmpty()   ? "" : "  🔑 " + kw)
+                    + (desc.isEmpty() ? "" : "  — " + desc)
+                    + flags
+                    + (ts.isEmpty()   ? "" : "  " + ts);
+            cv.drawText(truncate(meta, 88), M + 6, yRef[0] + 14, txtB);
+
+            // content (masked if locked)
+            txtN.setColor(locked ? 0xFFAAAAAA : 0xFF212121);
+            txtN.setTextSize(9.5f);
+            String displayContent = locked ? "(content hidden — clip is locked)" : content;
+            float ty = yRef[0] + 26;
+            for (String line : wrapText(displayContent, 88)) {
+              if (ty > yRef[0] + blockH - 6) break;
+              cv.drawText(line, M + 6, ty, txtN);
+              ty += 12;
+            }
+
             divPt.setColor(0xFFDDDDDD);
             cv.drawLine(M, yRef[0] + blockH, PW - M, yRef[0] + blockH, divPt);
             yRef[0] += blockH + 4;

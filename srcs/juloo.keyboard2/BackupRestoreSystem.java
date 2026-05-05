@@ -61,6 +61,34 @@ public class BackupRestoreSystem {
                 backup.put("learned_words", learnedJson);
             }
 
+            // 4. Smart Clips — all clips with every field.
+            //    Pin hash / lock-enabled flag are intentionally EXCLUDED so that
+            //    locked clips on restore are controlled by the device's current pin.
+            SmartClipsService smartSvc = SmartClipsService.getInstance(context);
+            org.json.JSONArray smartJson = new org.json.JSONArray();
+            for (SmartClipsService.SmartClip c : smartSvc.getClips()) {
+                org.json.JSONObject obj = new org.json.JSONObject();
+                obj.put("serial",      c.serial);
+                obj.put("content",     c.content);
+                obj.put("description", c.description);
+                obj.put("keyword",     c.keyword);
+                obj.put("hidden",      c.hidden);
+                obj.put("locked",      c.locked);
+                obj.put("timestamp",   c.timestamp);
+                smartJson.put(obj);
+            }
+            backup.put("smart_clips", smartJson);
+
+            // Next-serial counter so restored clips don't clash with new ones
+            SharedPreferences clipsPrefs =
+                    context.getSharedPreferences("smart_clips_data", Context.MODE_PRIVATE);
+            backup.put("smart_clips_next_serial", clipsPrefs.getInt("next_serial", smartJson.length() + 1));
+
+            // 5. Smart clip display-pin state (which serials are pinned to top)
+            backup.put("smart_clip_pins",
+                    context.getSharedPreferences("clip_pin_prefs", Context.MODE_PRIVATE)
+                           .getString("smart_pins", ""));
+
             return backup.toString();
         } catch (Exception e) {
             return null;
@@ -168,6 +196,32 @@ public class BackupRestoreSystem {
                     }
                     clipboardService.import_history_batch(toImport);
                 }
+            }
+
+            // 3a. Restore Smart Clips (locked flag preserved; pin hash NOT restored)
+            if (backup.has("smart_clips")) {
+                org.json.JSONArray smartJson = backup.getJSONArray("smart_clips");
+                List<SmartClipsService.SmartClip> toImport = new ArrayList<>(smartJson.length());
+                for (int i = 0; i < smartJson.length(); i++) {
+                    org.json.JSONObject obj = smartJson.getJSONObject(i);
+                    toImport.add(new SmartClipsService.SmartClip(
+                            obj.getInt("serial"),
+                            obj.getString("content"),
+                            obj.optString("description", ""),
+                            obj.optString("keyword", ""),
+                            obj.optBoolean("hidden", false),
+                            obj.optBoolean("locked", false),
+                            obj.optString("timestamp", "")
+                    ));
+                }
+                int nextSerial = backup.optInt("smart_clips_next_serial", 1);
+                SmartClipsService.getInstance(context).importClipsFromBackup(toImport, nextSerial);
+            }
+
+            // 3b. Restore display-pin state for smart clips
+            if (backup.has("smart_clip_pins")) {
+                context.getSharedPreferences("clip_pin_prefs", Context.MODE_PRIVATE)
+                       .edit().putString("smart_pins", backup.getString("smart_clip_pins")).apply();
             }
 
             // 3. Restore Learned Words (append, skip duplicates)
