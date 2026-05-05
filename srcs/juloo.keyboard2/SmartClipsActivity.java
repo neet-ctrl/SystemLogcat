@@ -460,6 +460,9 @@ public class SmartClipsActivity extends Activity
         sBg.setCornerRadius(dp(20));
         serial.setBackground(sBg);
         serial.setPadding(dp(8), dp(3), dp(8), dp(3));
+        // Tap serial chip → edit serial number
+        serial.setClickable(true);
+        serial.setOnClickListener(v -> showEditSerialDialog(clip));
         topRow.addView(serial);
 
         // Keyword pill
@@ -851,6 +854,8 @@ public class SmartClipsActivity extends Activity
             sBg.setColor(C.primary); sBg.setAlpha(30); sBg.setCornerRadius(dp(20));
             serial.setBackground(sBg);
             serial.setPadding(dp(7), dp(2), dp(7), dp(2));
+            serial.setClickable(true);
+            serial.setOnClickListener(v -> showEditSerialDialog(clip));
             topRow.addView(serial);
             topRow.addView(spacer());
             if (clip.hidden) {
@@ -1118,6 +1123,54 @@ public class SmartClipsActivity extends Activity
                 .setMessage("Lock this clip? PIN required to view or copy it.")
                 .setPositiveButton("Lock", (d, w) -> _service.updateClip(clip.withLocked(true)))
                 .setNegativeButton("Cancel", null).show();
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // Dialogs — Serial rename
+    // ══════════════════════════════════════════════════════════════════════════
+
+    private void showEditSerialDialog(SmartClipsService.SmartClip clip) {
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(dp(24), dp(20), dp(24), dp(12));
+
+        TextView info = new TextView(this);
+        info.setText("Assign a new serial number to this clip.\nThe number must be unique — no two clips can share it.");
+        info.setTextSize(12);
+        info.setTextColor(C.textSecondary);
+        LinearLayout.LayoutParams ilp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        ilp.setMargins(0, 0, 0, dp(12));
+        info.setLayoutParams(ilp);
+        layout.addView(info);
+
+        EditText et = new EditText(this);
+        et.setHint("New serial number");
+        et.setText(String.valueOf(clip.serial));
+        et.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+        et.setSelectAllOnFocus(true);
+        et.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        layout.addView(et);
+
+        new AlertDialog.Builder(this)
+                .setTitle("✏  Rename Serial  #" + clip.serial)
+                .setView(layout)
+                .setPositiveButton("Rename", (d, w) -> {
+                    String input = et.getText().toString().trim();
+                    if (input.isEmpty()) { toast("Serial number cannot be empty"); return; }
+                    int newSerial;
+                    try { newSerial = Integer.parseInt(input); }
+                    catch (NumberFormatException ex) { toast("Invalid number"); return; }
+                    if (newSerial <= 0) { toast("Serial must be greater than 0"); return; }
+                    if (!_service.renameSerial(clip.serial, newSerial)) {
+                        toast("Serial #" + newSerial + " is already taken by another clip");
+                    } else {
+                        toast("Clip renamed to #" + newSerial);
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 
     // ══════════════════════════════════════════════════════════════════════════

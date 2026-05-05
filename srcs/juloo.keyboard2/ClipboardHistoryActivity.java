@@ -14,9 +14,14 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.*;
+import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 
 public class ClipboardHistoryActivity extends Activity {
 
@@ -27,6 +32,11 @@ public class ClipboardHistoryActivity extends Activity {
     private ThemeManager.ThemeColors C;
     private float D;
     private String _createdSig;
+    // Date filter
+    private String _dateFilter = null;   // "yyyy-MM-dd" or null = all
+    private View   _dateBannerView;      // outer banner row (VISIBLE/GONE)
+    private TextView _dateBannerText;    // text inside banner
+    private Button _dateCalBtn;          // calendar pill in header
 
     // ══════════════════════════════════════════════════════════════════════════
     // Lifecycle
@@ -71,6 +81,9 @@ public class ClipboardHistoryActivity extends Activity {
 
         // ── Header ────────────────────────────────────────────────
         root.addView(buildHeader());
+
+        // ── Date filter banner (hidden until a date is selected) ──
+        root.addView(buildDateFilterBanner());
 
         // ── Search bar ────────────────────────────────────────────
         root.addView(buildSearchBar());
@@ -142,7 +155,345 @@ public class ClipboardHistoryActivity extends Activity {
         smartBtn.setOnClickListener(v -> startActivity(new Intent(this, SmartClipsActivity.class)));
         h.addView(smartBtn);
 
+        // 📅 Calendar date-filter pill
+        _dateCalBtn = makeHeaderPill("📅", C.blue);
+        _dateCalBtn.setOnClickListener(v -> {
+            if (_dateFilter != null) clearDateFilter();
+            else showDateCalendar();
+        });
+        h.addView(_dateCalBtn);
+
         return h;
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // Date filter banner
+    // ══════════════════════════════════════════════════════════════════════════
+
+    private View buildDateFilterBanner() {
+        LinearLayout banner = new LinearLayout(this);
+        banner.setOrientation(LinearLayout.HORIZONTAL);
+        banner.setGravity(Gravity.CENTER_VERTICAL);
+        banner.setPadding(dp(14), dp(8), dp(10), dp(8));
+        GradientDrawable bannerBg = new GradientDrawable();
+        bannerBg.setColor(colorWithAlpha(C.blue, 0x28));
+        banner.setBackground(bannerBg);
+        banner.setVisibility(View.GONE);
+        _dateBannerView = banner;
+
+        _dateBannerText = new TextView(this);
+        _dateBannerText.setTextSize(11);
+        _dateBannerText.setTextColor(C.textPrimary);
+        _dateBannerText.setLayoutParams(new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        banner.addView(_dateBannerText);
+
+        Button clearBtn = new Button(this);
+        clearBtn.setText("✕");
+        clearBtn.setTextSize(12);
+        clearBtn.setTextColor(0xFFFFFFFF);
+        clearBtn.setPadding(dp(8), dp(4), dp(8), dp(4));
+        clearBtn.setMinWidth(0); clearBtn.setMinHeight(0);
+        GradientDrawable clBg = new GradientDrawable();
+        clBg.setColor(colorWithAlpha(C.blue, 0x60));
+        clBg.setCornerRadius(dp(16));
+        clearBtn.setBackground(clBg);
+        clearBtn.setOnClickListener(v -> clearDateFilter());
+        LinearLayout.LayoutParams clLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        clLp.setMargins(dp(8), 0, 0, 0);
+        clearBtn.setLayoutParams(clLp);
+        banner.addView(clearBtn);
+
+        return banner;
+    }
+
+    private void clearDateFilter() {
+        _dateFilter = null;
+        // Restore calendar button to normal blue
+        if (_dateCalBtn != null) {
+            GradientDrawable bg = new GradientDrawable();
+            bg.setColor(C.blue);
+            bg.setCornerRadius(dp(20));
+            _dateCalBtn.setBackground(bg);
+            _dateCalBtn.setTextColor(0xFFFFFFFF);
+        }
+        updateList();
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // Date calendar filter dialog
+    // ══════════════════════════════════════════════════════════════════════════
+
+    private void showDateCalendar() {
+        // Collect date → count map from ALL history
+        List<ClipboardHistoryService.HistoryEntry> all = _service.get_history_entries();
+        Map<String, Integer> dateCounts = new LinkedHashMap<>();
+        for (ClipboardHistoryService.HistoryEntry e : all) {
+            if (e.timestamp == null || e.timestamp.length() < 10) continue;
+            String d = e.timestamp.substring(0, 10);
+            dateCounts.put(d, dateCounts.containsKey(d) ? dateCounts.get(d) + 1 : 1);
+        }
+        if (dateCounts.isEmpty()) {
+            toast("No clips with timestamps found.");
+            return;
+        }
+
+        // Navigate to the most recent month that has clips
+        String latestDate = Collections.max(dateCounts.keySet());
+        final Calendar displayCal = Calendar.getInstance();
+        try {
+            int y = Integer.parseInt(latestDate.substring(0, 4));
+            int m = Integer.parseInt(latestDate.substring(5, 7)) - 1;
+            displayCal.set(y, m, 1);
+        } catch (Exception ignored) {
+            displayCal.set(Calendar.DAY_OF_MONTH, 1);
+        }
+
+        // ── Dialog root ────────────────────────────────────────────────────────
+        ScrollView sv = new ScrollView(this);
+        sv.setOverScrollMode(View.OVER_SCROLL_NEVER);
+
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(dp(4), dp(8), dp(4), dp(4));
+        sv.addView(root);
+
+        // ── Month navigation row ───────────────────────────────────────────────
+        LinearLayout navRow = new LinearLayout(this);
+        navRow.setOrientation(LinearLayout.HORIZONTAL);
+        navRow.setGravity(Gravity.CENTER_VERTICAL);
+        navRow.setPadding(dp(8), dp(4), dp(8), dp(4));
+
+        Button prevBtn = makePlainCalBtn("◀");
+        TextView monthLabel = new TextView(this);
+        monthLabel.setTextSize(14);
+        monthLabel.setTextColor(C.textPrimary);
+        monthLabel.setTypeface(Typeface.DEFAULT_BOLD);
+        monthLabel.setGravity(Gravity.CENTER);
+        monthLabel.setLayoutParams(new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        Button nextBtn = makePlainCalBtn("▶");
+
+        navRow.addView(prevBtn);
+        navRow.addView(monthLabel);
+        navRow.addView(nextBtn);
+        root.addView(navRow);
+
+        // ── Day-of-week header row ─────────────────────────────────────────────
+        LinearLayout dowRow = new LinearLayout(this);
+        dowRow.setOrientation(LinearLayout.HORIZONTAL);
+        dowRow.setPadding(dp(4), dp(4), dp(4), dp(2));
+        for (String label : new String[]{"Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"}) {
+            TextView tv = new TextView(this);
+            tv.setText(label);
+            tv.setTextSize(10);
+            tv.setTextColor(C.textHint);
+            tv.setGravity(Gravity.CENTER);
+            tv.setTypeface(Typeface.DEFAULT_BOLD);
+            tv.setLayoutParams(new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+            dowRow.addView(tv);
+        }
+        root.addView(dowRow);
+
+        // Thin divider under DOW row
+        View divider = new View(this);
+        divider.setBackgroundColor(C.divider);
+        LinearLayout.LayoutParams divLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 1);
+        divLp.setMargins(dp(8), 0, dp(8), dp(6));
+        divider.setLayoutParams(divLp);
+        root.addView(divider);
+
+        // ── Calendar grid container (rebuilt on month change) ──────────────────
+        LinearLayout gridContainer = new LinearLayout(this);
+        gridContainer.setOrientation(LinearLayout.VERTICAL);
+        root.addView(gridContainer);
+
+        // ── Month summary ──────────────────────────────────────────────────────
+        TextView monthSummary = new TextView(this);
+        monthSummary.setTextSize(10);
+        monthSummary.setTextColor(C.textSecondary);
+        monthSummary.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams sumLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        sumLp.setMargins(0, dp(8), 0, dp(4));
+        monthSummary.setLayoutParams(sumLp);
+        root.addView(monthSummary);
+
+        final AlertDialog[] dlgRef = new AlertDialog[1];
+
+        // ── Rebuild grid lambda ────────────────────────────────────────────────
+        final Runnable[] buildGrid = new Runnable[1];
+        buildGrid[0] = () -> buildCalendarGrid(
+                displayCal, dateCounts, gridContainer, monthLabel, monthSummary, dlgRef);
+
+        prevBtn.setOnClickListener(v -> {
+            displayCal.add(Calendar.MONTH, -1);
+            buildGrid[0].run();
+        });
+        nextBtn.setOnClickListener(v -> {
+            displayCal.add(Calendar.MONTH, 1);
+            buildGrid[0].run();
+        });
+
+        // Initial build
+        buildGrid[0].run();
+
+        // ── Show dialog ────────────────────────────────────────────────────────
+        AlertDialog dlg = new AlertDialog.Builder(this)
+                .setTitle("📅  Filter by Date")
+                .setView(sv)
+                .setNeutralButton("Show All Dates", (d, w) -> clearDateFilter())
+                .setNegativeButton("Cancel", null)
+                .create();
+        dlgRef[0] = dlg;
+        dlg.show();
+    }
+
+    private void buildCalendarGrid(
+            Calendar displayCal,
+            Map<String, Integer> dateCounts,
+            LinearLayout gridContainer,
+            TextView monthLabel,
+            TextView monthSummary,
+            AlertDialog[] dlgRef) {
+
+        gridContainer.removeAllViews();
+
+        int year  = displayCal.get(Calendar.YEAR);
+        int month = displayCal.get(Calendar.MONTH); // 0-indexed
+        String monthPrefix = String.format(Locale.getDefault(), "%04d-%02d", year, month + 1);
+
+        // Update month label
+        java.text.SimpleDateFormat sdf =
+                new java.text.SimpleDateFormat("MMMM yyyy", Locale.getDefault());
+        monthLabel.setText(sdf.format(displayCal.getTime()));
+
+        // Count total clips in this month
+        int monthTotal = 0;
+        for (Map.Entry<String, Integer> e : dateCounts.entrySet()) {
+            if (e.getKey().startsWith(monthPrefix + "-")) monthTotal += e.getValue();
+        }
+        monthSummary.setText(monthTotal > 0
+                ? monthTotal + " clip" + (monthTotal != 1 ? "s" : "") + " in this month"
+                : "No clips this month");
+
+        // Calendar grid
+        Calendar cal = Calendar.getInstance();
+        cal.set(year, month, 1);
+        int daysInMonth = cal.getActualMaximum(Calendar.DAY_OF_MONTH);
+        int firstDow    = cal.get(Calendar.DAY_OF_WEEK) - 1; // 0=Sun
+
+        // Today's date string for highlighting
+        Calendar today = Calendar.getInstance();
+        String todayStr = String.format(Locale.getDefault(), "%04d-%02d-%02d",
+                today.get(Calendar.YEAR), today.get(Calendar.MONTH) + 1,
+                today.get(Calendar.DAY_OF_MONTH));
+
+        int totalCells = firstDow + daysInMonth;
+        int rows = (int) Math.ceil(totalCells / 7.0);
+
+        for (int row = 0; row < rows; row++) {
+            LinearLayout weekRow = new LinearLayout(gridContainer.getContext());
+            weekRow.setOrientation(LinearLayout.HORIZONTAL);
+            LinearLayout.LayoutParams wLp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT);
+            wLp.setMargins(dp(4), dp(3), dp(4), dp(3));
+            weekRow.setLayoutParams(wLp);
+
+            for (int col = 0; col < 7; col++) {
+                int cellIdx = row * 7 + col;
+                int dayNum  = cellIdx - firstDow + 1;
+                boolean valid = (dayNum >= 1 && dayNum <= daysInMonth);
+
+                LinearLayout cell = new LinearLayout(this);
+                cell.setOrientation(LinearLayout.VERTICAL);
+                cell.setGravity(Gravity.CENTER);
+                int cellSz = dp(40);
+                LinearLayout.LayoutParams cLp = new LinearLayout.LayoutParams(
+                        0, cellSz, 1f);
+                cLp.setMargins(dp(2), 0, dp(2), 0);
+                cell.setLayoutParams(cLp);
+
+                if (valid) {
+                    String dateStr = String.format(Locale.getDefault(),
+                            "%04d-%02d-%02d", year, month + 1, dayNum);
+                    Integer count = dateCounts.get(dateStr);
+                    boolean hasClips = (count != null && count > 0);
+                    boolean isToday  = dateStr.equals(todayStr);
+                    boolean isSelected = dateStr.equals(_dateFilter);
+
+                    // Cell background
+                    GradientDrawable cellBg = new GradientDrawable();
+                    cellBg.setCornerRadius(dp(8));
+                    if (isSelected) {
+                        cellBg.setColor(C.green);
+                        cellBg.setAlpha(220);
+                    } else if (hasClips) {
+                        cellBg.setColor(C.blue);
+                        cellBg.setAlpha(isToday ? 220 : 160);
+                    } else if (isToday) {
+                        cellBg.setColor(0);
+                        cellBg.setStroke(dp(1), C.textHint);
+                    } else {
+                        cellBg.setColor(0);
+                    }
+                    cell.setBackground(cellBg);
+
+                    // Day number
+                    TextView dayTv = new TextView(this);
+                    dayTv.setText(String.valueOf(dayNum));
+                    dayTv.setTextSize(hasClips || isToday ? 12 : 11);
+                    dayTv.setGravity(Gravity.CENTER);
+                    dayTv.setTypeface(hasClips ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
+                    dayTv.setTextColor(hasClips || isSelected ? 0xFFFFFFFF : C.textHint);
+                    cell.addView(dayTv);
+
+                    // Count badge (for days with clips)
+                    if (hasClips) {
+                        TextView cntTv = new TextView(this);
+                        cntTv.setText(String.valueOf(count));
+                        cntTv.setTextSize(8);
+                        cntTv.setGravity(Gravity.CENTER);
+                        cntTv.setTextColor(isSelected ? 0xCCFFFFFF : 0xAAFFFFFF);
+                        cell.addView(cntTv);
+
+                        // Tap to filter
+                        final String ds = dateStr;
+                        cell.setClickable(true);
+                        cell.setOnClickListener(v -> {
+                            _dateFilter = ds;
+                            // Highlight the calendar button green
+                            if (_dateCalBtn != null) {
+                                GradientDrawable bg = new GradientDrawable();
+                                bg.setColor(C.green);
+                                bg.setCornerRadius(dp(20));
+                                _dateCalBtn.setBackground(bg);
+                            }
+                            updateList();
+                            if (dlgRef[0] != null) dlgRef[0].dismiss();
+                        });
+                    }
+                }
+
+                weekRow.addView(cell);
+            }
+            gridContainer.addView(weekRow);
+        }
+    }
+
+    private Button makePlainCalBtn(String text) {
+        Button b = new Button(this);
+        b.setText(text);
+        b.setTextSize(14);
+        b.setTextColor(C.textPrimary);
+        b.setBackground(null);
+        b.setPadding(dp(14), dp(6), dp(14), dp(6));
+        b.setMinWidth(0); b.setMinHeight(0);
+        return b;
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -246,15 +597,35 @@ public class ClipboardHistoryActivity extends Activity {
 
     private void updateList() {
         if (_service == null || _listView == null) return;
-        List<ClipboardHistoryService.HistoryEntry> history = _service.get_history_entries();
+        List<ClipboardHistoryService.HistoryEntry> history =
+                new ArrayList<>(_service.get_history_entries());
+
+        // Apply date filter if active
+        if (_dateFilter != null) {
+            List<ClipboardHistoryService.HistoryEntry> filtered = new ArrayList<>();
+            for (ClipboardHistoryService.HistoryEntry e : history) {
+                if (e.timestamp != null && e.timestamp.startsWith(_dateFilter))
+                    filtered.add(e);
+            }
+            history = filtered;
+            // Update banner text
+            if (_dateBannerText != null) {
+                _dateBannerText.setText("📅  " + _dateFilter + "  ·  " + history.size()
+                        + " clip" + (history.size() != 1 ? "s" : "")
+                        + "  ·  tap 📅 to clear");
+            }
+            if (_dateBannerView != null) _dateBannerView.setVisibility(View.VISIBLE);
+        } else {
+            if (_dateBannerView != null) _dateBannerView.setVisibility(View.GONE);
+        }
+
         // Pinned entries always float to the top; within each group sort newest-first
-        java.util.Collections.sort(history, (a, b) -> {
+        Collections.sort(history, (a, b) -> {
             if (a.pinned != b.pinned) return a.pinned ? -1 : 1;
             return b.timestamp.compareTo(a.timestamp);
         });
         _adapter = new ClipAdapter(history);
         _listView.setAdapter(_adapter);
-        // Refresh subtitle count in header (quick rebuild avoided — update via tag)
     }
 
     // ══════════════════════════════════════════════════════════════════════════

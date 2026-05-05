@@ -148,6 +148,35 @@ public final class SmartClipsService {
         notifyWidget();
     }
 
+    /**
+     * Rename a clip's serial number.  Returns false if newSerial is already
+     * taken by another clip (duplicate rejected), or if oldSerial is not found.
+     */
+    public boolean renameSerial(int oldSerial, int newSerial) {
+        if (oldSerial == newSerial) return true;
+        for (SmartClip c : _clips) {
+            if (c.serial == newSerial) return false; // duplicate
+        }
+        for (int i = 0; i < _clips.size(); i++) {
+            if (_clips.get(i).serial == oldSerial) {
+                SmartClip old = _clips.get(i);
+                _clips.set(i, new SmartClip(newSerial, old.content, old.description,
+                        old.keyword, old.hidden, old.locked, old.timestamp));
+                // Advance next-serial counter if needed
+                SharedPreferences prefs = _ctx.getSharedPreferences(PREFS_CLIPS, Context.MODE_PRIVATE);
+                int next = prefs.getInt(KEY_NEXT_SERIAL, 1);
+                if (newSerial >= next) {
+                    prefs.edit().putInt(KEY_NEXT_SERIAL, newSerial + 1).apply();
+                }
+                saveToPrefs();
+                notifyListeners();
+                notifyWidget();
+                return true;
+            }
+        }
+        return false;
+    }
+
     public void deleteClip(int serial) {
         for (int i = 0; i < _clips.size(); i++) {
             if (_clips.get(i).serial == serial) {
