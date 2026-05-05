@@ -9,6 +9,7 @@ import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.PowerManager;
 import android.provider.Settings;
 import android.view.Gravity;
 import android.view.View;
@@ -920,7 +921,44 @@ public class AppSettingsActivity extends Activity {
                                 REQ_PHONE_STATE));
         card.addView(makeDivider());
 
-        // ── 8. Read System Logs (Shizuku) ────────────────────────────────────
+        // ── 8. Disable Battery Optimization ──────────────────────────────────
+        boolean batteryIgnored = false;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
+            batteryIgnored = pm != null && pm.isIgnoringBatteryOptimizations(getPackageName());
+        } else {
+            batteryIgnored = true;
+        }
+        addPermRow(card,
+                "🔋", "Disable Battery Optimization",
+                "Prevents Android from killing the Telegram bot when the screen is off or app is in the background. REQUIRED for 100% uptime.",
+                batteryIgnored,
+                batteryIgnored ? null : "Disable Now",
+                batteryIgnored ? null : v -> {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        try {
+                            startActivity(new Intent(
+                                    Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                                    Uri.parse("package:" + getPackageName())));
+                        } catch (Exception ex) {
+                            try {
+                                startActivity(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));
+                            } catch (Exception ignored) {}
+                        }
+                    }
+                });
+        card.addView(makeDivider());
+
+        // ── 9. Manufacturer Auto-start ────────────────────────────────────────
+        addPermRow(card,
+                "🚀", "Manufacturer Auto-start",
+                "On MIUI/OxygenOS/Samsung/Huawei devices, you must also allow auto-start in the vendor security app so the bot survives a reboot.",
+                false,
+                "Open Settings",
+                v -> openManufacturerAutoStart());
+        card.addView(makeDivider());
+
+        // ── 10. Read System Logs (Shizuku) ────────────────────────────────────
         addPermRow(card,
                 "📋", "Read System Logs",
                 "Captures device-wide Logcat for the System Console feature.\nRequires Shizuku — install it, start its service, then authorize this app inside Shizuku.",
@@ -934,6 +972,53 @@ public class AppSettingsActivity extends Activity {
                         Toast.LENGTH_LONG).show());
 
         return card;
+    }
+
+    private void openManufacturerAutoStart() {
+        String[][] intents = {
+            // MIUI (Xiaomi / Redmi / POCO)
+            {"com.miui.securitycenter",
+             "com.miui.permcenter.autostart.AutoStartManagementActivity"},
+            // OxygenOS / ColorOS (OnePlus / Oppo / Realme)
+            {"com.oneplus.security",
+             "com.oneplus.security.chainlaunch.view.ChainLaunchAppListActivity"},
+            {"com.coloros.safecenter",
+             "com.coloros.privacypermissionsentry.PermissionTopActivity"},
+            {"com.oppo.safe",
+             "com.oppo.safe.permission.startup.StartupAppListActivity"},
+            // Samsung
+            {"com.samsung.android.lool",
+             "com.samsung.android.sm.battery.ui.BatteryActivity"},
+            // Huawei / Honor
+            {"com.huawei.systemmanager",
+             "com.huawei.systemmanager.startupmgr.ui.StartupNormalAppListActivity"},
+            // Vivo
+            {"com.vivo.permissionmanager",
+             "com.vivo.permissionmanager.activity.BgStartUpManagerActivity"},
+            // Asus
+            {"com.asus.mobilemanager",
+             "com.asus.mobilemanager.powersaver.PowerSaverSettings"},
+            // Letv
+            {"com.letv.android.letvsafe",
+             "com.letv.android.letvsafe.AutobootManageActivity"},
+        };
+        for (String[] pair : intents) {
+            try {
+                Intent i = new Intent();
+                i.setClassName(pair[0], pair[1]);
+                startActivity(i);
+                return;
+            } catch (Exception ignored) {}
+        }
+        // Fallback: open generic app settings
+        try {
+            startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    Uri.parse("package:" + getPackageName())));
+        } catch (Exception ignored) {
+            Toast.makeText(this,
+                    "Go to Settings → Apps → This app → Battery → No restrictions",
+                    Toast.LENGTH_LONG).show();
+        }
     }
 
     private void addPermRow(LinearLayout parent,

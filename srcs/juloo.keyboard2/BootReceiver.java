@@ -8,7 +8,7 @@ import android.os.Looper;
 
 public class BootReceiver extends BroadcastReceiver {
 
-    private static final int MAX_RETRIES = 10;
+    private static final int  MAX_RETRIES    = 10;
     private static final long RETRY_DELAY_MS = 5000;
 
     @Override
@@ -19,7 +19,10 @@ public class BootReceiver extends BroadcastReceiver {
                 || action.equals(Intent.ACTION_MY_PACKAGE_REPLACED)
                 || action.equals("android.intent.action.PACKAGE_REPLACED")
                 || action.equals("android.intent.action.PACKAGE_ADDED")) {
-            tryStartBot(context.getApplicationContext(), 0);
+            Context ctx = context.getApplicationContext();
+            tryStartBot(ctx, 0);
+            BotWatchdogReceiver.schedule(ctx);
+            TelegramBotService.enrollWorkManager(ctx);
         }
     }
 

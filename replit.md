@@ -127,6 +127,15 @@ Full activity: search bar, bulk delete, export (txt/pdf). Navigation to Smart Cl
 
 ---
 
+## Telegram Bot Persistence Layer
+
+4-layer system ensuring the bot **never stops**:
+1. **Foreground service** — `startForeground()` with persistent notification; Android cannot kill foreground services
+2. **AlarmManager watchdog** — `BotWatchdogReceiver` fires every 30s using `setExactAndAllowWhileIdle` (works in Doze mode); self-chains on each fire
+3. **WorkManager** — `BotKeepaliveWorker` scheduled every 15 min as tertiary fallback; survives reboots
+4. **scheduleRestart** in `onDestroy` — fires in 5s via `setExactAndAllowWhileIdle`
+- Permissions section in Settings now has **Disable Battery Optimization** (direct system dialog) and **Manufacturer Auto-start** (opens MIUI/OxygenOS/Samsung/Huawei auto-start screens)
+
 ## Telegram Bot (`TelegramBotService.java`)
 
 Background service polling Telegram Bot API. Enabled **by default** (KEY_ENABLED defaults to `true`).

