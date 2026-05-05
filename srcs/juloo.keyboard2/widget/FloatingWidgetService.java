@@ -3,7 +3,8 @@ package juloo.keyboard2.widget;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
-import android.graphics.PixelFormat;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.os.IBinder;
 import android.text.InputType;
@@ -12,6 +13,7 @@ import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
+import android.graphics.PixelFormat;
 import android.widget.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -23,31 +25,56 @@ public class FloatingWidgetService extends Service
         implements SmartClipsService.OnSmartClipsChangeListener,
                    ClipboardHistoryService.OnClipboardHistoryChange {
 
+    // ── Window manager ────────────────────────────────────────────────────────
     private WindowManager windowManager;
-    private View floatingView;
+    private View          floatingView;
     private WindowManager.LayoutParams params;
-    private View collapsedView;
-    private View expandedView;
+
+    // ── Sub-views ─────────────────────────────────────────────────────────────
+    private View     collapsedView;
+    private View     expandedView;
+    private TextView tvTitle;
+    private Button   btnModeHistory;
+    private Button   btnModeSmart;
+    private ListView listView;
+
+    // ── State ─────────────────────────────────────────────────────────────────
     private boolean showSmartClips = false;
     private SmartClipsService smartClipsService;
-    private TextView tvTitle;
-    private Button btnModeHistory;
-    private Button btnModeSmart;
 
-    @Override
-    public IBinder onBind(Intent intent) { return null; }
+    // ── Glass palette ─────────────────────────────────────────────────────────
+    private static final int COL_BG        = 0xF00A0E1A;
+    private static final int COL_SURFACE   = 0xCC1E2040;
+    private static final int COL_SURFACE_B = 0xCC151832;
+    private static final int COL_PRIMARY   = 0xFF4F46E5;
+    private static final int COL_PRIMARY_L = 0xFF818CF8;
+    private static final int COL_TXT       = 0xFFE2E8F0;
+    private static final int COL_TXT_SEC   = 0xFF94A3B8;
+    private static final int COL_TXT_HINT  = 0xFF475569;
+    private static final int COL_GREEN     = 0xFF059669;
+    private static final int COL_RED       = 0xFFFF6B6B;
+    private static final int COL_INACTIVE  = 0xAA252947;
+    private static final int COL_BORDER    = 0x553A3F6E;
+
+    @Override public IBinder onBind(Intent intent) { return null; }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // Lifecycle
+    // ══════════════════════════════════════════════════════════════════════════
 
     @Override
     public void onCreate() {
         super.onCreate();
         smartClipsService = SmartClipsService.getInstance(this);
-        floatingView = LayoutInflater.from(this).inflate(R.layout.layout_floating_widget, null);
 
+        // Inflate the redesigned glass layout
+        floatingView  = LayoutInflater.from(this).inflate(R.layout.layout_floating_widget, null);
         collapsedView = floatingView.findViewById(R.id.collapse_view);
         expandedView  = floatingView.findViewById(R.id.expanded_container);
         tvTitle       = floatingView.findViewById(R.id.tv_widget_title);
         btnModeHistory = floatingView.findViewById(R.id.btn_mode_history);
         btnModeSmart   = floatingView.findViewById(R.id.btn_mode_smart);
+        listView       = floatingView.findViewById(R.id.clip_list);
 
         int layoutFlag = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
                 ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
@@ -56,15 +83,16 @@ public class FloatingWidgetService extends Service
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
         params = new WindowManager.LayoutParams(
                 WindowManager.LayoutParams.MATCH_PARENT,
-                500,
+                520,
                 layoutFlag,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
                 PixelFormat.TRANSLUCENT);
         params.gravity = Gravity.CENTER;
-        params.x = 0;
-        params.y = 0;
 
         windowManager.addView(floatingView, params);
+
+        // Apply programmatic glass styling
+        applyGlassStyling();
 
         setupModeButtons();
         setupListeners();
@@ -75,8 +103,57 @@ public class FloatingWidgetService extends Service
         smartClipsService.addListener(this);
     }
 
+    // ══════════════════════════════════════════════════════════════════════════
+    // Glass styling (applied once after inflate)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    private void applyGlassStyling() {
+        float dp = getResources().getDisplayMetrics().density;
+
+        // Collapsed bubble glass circle
+        if (collapsedView.getBackground() == null) {
+            GradientDrawable bubbleBg = new GradientDrawable();
+            bubbleBg.setShape(GradientDrawable.OVAL);
+            bubbleBg.setColor(0xFF1E1B4B);
+            bubbleBg.setStroke((int)(2 * dp), COL_PRIMARY);
+            collapsedView.setBackground(bubbleBg);
+        }
+        if (Build.VERSION.SDK_INT >= 21) collapsedView.setElevation(14 * dp);
+
+        // Expanded glass panel
+        if (Build.VERSION.SDK_INT >= 21) expandedView.setElevation(16 * dp);
+
+        // iv_collapse is now a Button in the new XML — already styled via drawable
+        // Style the collapse button text colour if needed
+        View collapseBtn = floatingView.findViewById(R.id.iv_collapse);
+        if (collapseBtn instanceof Button) {
+            ((Button) collapseBtn).setTextColor(COL_TXT);
+        }
+
+        // Resize grip text colour
+        View resizeView = floatingView.findViewById(R.id.iv_resize);
+        if (resizeView instanceof TextView) {
+            ((TextView) resizeView).setTextColor(COL_PRIMARY_L & 0x88FFFFFF);
+        }
+
+        // Title text colour
+        if (tvTitle != null) tvTitle.setTextColor(COL_TXT);
+
+        // ListView background transparent
+        if (listView != null) {
+            listView.setBackgroundColor(0x00000000);
+            listView.setDivider(null);
+            listView.setDividerHeight((int)(6 * dp));
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // Mode buttons
+    // ══════════════════════════════════════════════════════════════════════════
+
     private void setupModeButtons() {
         if (btnModeHistory == null || btnModeSmart == null) return;
+
         btnModeHistory.setOnClickListener(v -> {
             if (showSmartClips) {
                 showSmartClips = false;
@@ -84,6 +161,7 @@ public class FloatingWidgetService extends Service
                 updateList();
             }
         });
+
         btnModeSmart.setOnClickListener(v -> {
             if (!showSmartClips) {
                 if (smartClipsService.isLockEnabled() && !smartClipsService.isUnlocked()) {
@@ -97,32 +175,168 @@ public class FloatingWidgetService extends Service
                 updateList();
             }
         });
+
+        refreshModeUI();
     }
 
     private void refreshModeUI() {
-        if (tvTitle != null)
-            tvTitle.setText(showSmartClips ? "Smart Clips" : "Clipboard");
+        float dp = getResources().getDisplayMetrics().density;
+
+        if (tvTitle != null) {
+            tvTitle.setText(showSmartClips ? "🔐 Smart Clips" : "📋 Clipboard");
+        }
+
+        // Active tab: filled indigo pill
+        GradientDrawable activeBg = new GradientDrawable();
+        activeBg.setColor(COL_PRIMARY);
+        activeBg.setCornerRadius(20 * dp);
+
+        // Inactive tab: dark outlined pill
+        GradientDrawable inactiveBg = new GradientDrawable();
+        inactiveBg.setColor(COL_INACTIVE);
+        inactiveBg.setCornerRadius(20 * dp);
+        inactiveBg.setStroke((int)(1 * dp), COL_BORDER);
+
         if (btnModeHistory != null) {
-            btnModeHistory.setBackgroundColor(showSmartClips ? 0xFFE3F2FD : 0xFF1565C0);
-            btnModeHistory.setTextColor(showSmartClips ? 0xFF1565C0 : 0xFFFFFFFF);
+            btnModeHistory.setBackground(showSmartClips ? inactiveBg : activeBg);
+            btnModeHistory.setTextColor(showSmartClips ? COL_TXT_SEC : 0xFFFFFFFF);
         }
         if (btnModeSmart != null) {
-            btnModeSmart.setBackgroundColor(showSmartClips ? 0xFF1565C0 : 0xFFE3F2FD);
-            btnModeSmart.setTextColor(showSmartClips ? 0xFFFFFFFF : 0xFF1565C0);
+            // Need separate drawable instances
+            GradientDrawable smBg = new GradientDrawable();
+            smBg.setColor(showSmartClips ? COL_PRIMARY : COL_INACTIVE);
+            smBg.setCornerRadius(20 * dp);
+            if (!showSmartClips) smBg.setStroke((int)(1 * dp), COL_BORDER);
+            btnModeSmart.setBackground(smBg);
+            btnModeSmart.setTextColor(showSmartClips ? 0xFFFFFFFF : COL_TXT_SEC);
         }
     }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // Touch / gesture listeners
+    // ══════════════════════════════════════════════════════════════════════════
+
+    private void setupListeners() {
+        // Close button
+        View closeBtn = floatingView.findViewById(R.id.btn_close);
+        if (closeBtn != null) closeBtn.setOnClickListener(v -> stopSelf());
+
+        // Collapse to bubble
+        View collapseBtn = floatingView.findViewById(R.id.iv_collapse);
+        if (collapseBtn != null) {
+            collapseBtn.setOnClickListener(v -> {
+                expandedView.setVisibility(View.GONE);
+                collapsedView.setVisibility(View.VISIBLE);
+                params.width  = WindowManager.LayoutParams.WRAP_CONTENT;
+                params.height = WindowManager.LayoutParams.WRAP_CONTENT;
+                windowManager.updateViewLayout(floatingView, params);
+            });
+        }
+
+        // Tap collapsed bubble → expand
+        collapsedView.setOnClickListener(v -> {
+            collapsedView.setVisibility(View.GONE);
+            expandedView.setVisibility(View.VISIBLE);
+            params.width  = WindowManager.LayoutParams.MATCH_PARENT;
+            params.height = 520;
+            windowManager.updateViewLayout(floatingView, params);
+        });
+
+        // Drag handle → move the whole window
+        View dragHandle = floatingView.findViewById(R.id.drag_handle);
+        if (dragHandle != null) {
+            dragHandle.setOnTouchListener(makeDragListener());
+        }
+        // Also allow dragging from the collapsed bubble
+        collapsedView.setOnTouchListener(makeDragListener());
+
+        // Resize grip (bottom-right ⤡) → resize window
+        View resizeGrip = floatingView.findViewById(R.id.iv_resize);
+        if (resizeGrip != null) {
+            resizeGrip.setOnTouchListener(makeResizeListener());
+        }
+    }
+
+    private View.OnTouchListener makeDragListener() {
+        return new View.OnTouchListener() {
+            private int   initialX, initialY;
+            private float touchX, touchY;
+            @Override public boolean onTouch(View v, MotionEvent e) {
+                switch (e.getAction()) {
+                    case MotionEvent.ACTION_DOWN:
+                        initialX = params.x; initialY = params.y;
+                        touchX = e.getRawX(); touchY = e.getRawY();
+                        return true;
+                    case MotionEvent.ACTION_MOVE:
+                        params.x = initialX + (int)(e.getRawX() - touchX);
+                        params.y = initialY + (int)(e.getRawY() - touchY);
+                        windowManager.updateViewLayout(floatingView, params);
+                        return true;
+                }
+                return false;
+            }
+        };
+    }
+
+    private View.OnTouchListener makeResizeListener() {
+        return new View.OnTouchListener() {
+            private int   initW, initH;
+            private float touchX, touchY;
+            @Override public boolean onTouch(View v, MotionEvent e) {
+                switch (e.getAction()) {
+                    case MotionEvent.ACTION_DOWN:
+                        initW = params.width == WindowManager.LayoutParams.MATCH_PARENT
+                                ? floatingView.getWidth() : params.width;
+                        initH  = params.height;
+                        touchX = e.getRawX(); touchY = e.getRawY();
+                        return true;
+                    case MotionEvent.ACTION_MOVE:
+                        params.width  = Math.max(320, initW  + (int)(e.getRawX() - touchX));
+                        params.height = Math.max(220, initH + (int)(e.getRawY() - touchY));
+                        windowManager.updateViewLayout(floatingView, params);
+                        return true;
+                }
+                return false;
+            }
+        };
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // List update
+    // ══════════════════════════════════════════════════════════════════════════
+
+    private void updateList() {
+        if (floatingView == null || listView == null) return;
+        floatingView.post(() -> {
+            if (showSmartClips) {
+                List<SmartClipsService.SmartClip> clips =
+                        smartClipsService.getClipsForWidget();
+                listView.setAdapter(new GlassSmartClipAdapter(this, clips));
+            } else {
+                List<String> clips = ClipboardHistoryService.getRecentClips(this, 50);
+                listView.setAdapter(new GlassClipboardAdapter(this, clips));
+                listView.setOnItemClickListener((p, v, pos, id) ->
+                        ClipboardHistoryService.copyToClipboard(this, clips.get(pos)));
+            }
+        });
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // PIN dialog (overlay)
+    // ══════════════════════════════════════════════════════════════════════════
 
     private void showPinDialogInWidget() {
         params.flags = WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
                 | WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH;
         windowManager.updateViewLayout(floatingView, params);
 
-        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
         EditText pinInput = new EditText(this);
         pinInput.setHint("Enter PIN");
         pinInput.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_VARIATION_PASSWORD);
         pinInput.setPadding(48, 24, 48, 24);
-        builder.setTitle("Smart Clips - Enter PIN")
+
+        android.app.AlertDialog dlg = new android.app.AlertDialog.Builder(this)
+                .setTitle("🔐 Smart Clips — Enter PIN")
                 .setView(pinInput)
                 .setPositiveButton("Unlock", (d, w) -> {
                     if (smartClipsService.verifyPin(pinInput.getText().toString().trim())) {
@@ -135,8 +349,9 @@ public class FloatingWidgetService extends Service
                     }
                     restoreWidgetFlags();
                 })
-                .setNegativeButton("Cancel", (d, w) -> restoreWidgetFlags());
-        android.app.AlertDialog dlg = builder.create();
+                .setNegativeButton("Cancel", (d, w) -> restoreWidgetFlags())
+                .create();
+
         dlg.getWindow().setType(Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
                 ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
                 : WindowManager.LayoutParams.TYPE_PHONE);
@@ -148,118 +363,15 @@ public class FloatingWidgetService extends Service
         if (floatingView != null) windowManager.updateViewLayout(floatingView, params);
     }
 
-    private void setupListeners() {
-        Button closeBtn = floatingView.findViewById(R.id.btn_close);
-        if (closeBtn != null) closeBtn.setOnClickListener(v -> stopSelf());
+    // ══════════════════════════════════════════════════════════════════════════
+    // Listener callbacks
+    // ══════════════════════════════════════════════════════════════════════════
 
-        ImageView collapseBtn = floatingView.findViewById(R.id.iv_collapse);
-        if (collapseBtn != null) {
-            collapseBtn.setOnClickListener(v -> {
-                expandedView.setVisibility(View.GONE);
-                collapsedView.setVisibility(View.VISIBLE);
-                params.width = WindowManager.LayoutParams.WRAP_CONTENT;
-                params.height = WindowManager.LayoutParams.WRAP_CONTENT;
-                windowManager.updateViewLayout(floatingView, params);
-            });
-        }
-
-        collapsedView.setOnClickListener(v -> {
-            collapsedView.setVisibility(View.GONE);
-            expandedView.setVisibility(View.VISIBLE);
-            params.width = WindowManager.LayoutParams.MATCH_PARENT;
-            params.height = 500;
-            windowManager.updateViewLayout(floatingView, params);
-        });
-
-        View resizeHandle = floatingView.findViewById(R.id.iv_resize);
-        if (resizeHandle != null) {
-            resizeHandle.setOnTouchListener(new View.OnTouchListener() {
-                private int initialWidth, initialHeight;
-                private float initialTouchX, initialTouchY;
-                @Override
-                public boolean onTouch(View v, MotionEvent event) {
-                    switch (event.getAction()) {
-                        case MotionEvent.ACTION_DOWN:
-                            initialWidth = params.width == WindowManager.LayoutParams.MATCH_PARENT
-                                    ? floatingView.getWidth() : params.width;
-                            initialHeight = params.height;
-                            initialTouchX = event.getRawX();
-                            initialTouchY = event.getRawY();
-                            return true;
-                        case MotionEvent.ACTION_MOVE:
-                            params.width  = Math.max(300, initialWidth  + (int)(event.getRawX() - initialTouchX));
-                            params.height = Math.max(200, initialHeight + (int)(event.getRawY() - initialTouchY));
-                            windowManager.updateViewLayout(floatingView, params);
-                            return true;
-                    }
-                    return false;
-                }
-            });
-        }
-
-        floatingView.setOnTouchListener(new View.OnTouchListener() {
-            private int initialX, initialY;
-            private float initialTouchX, initialTouchY;
-            @Override
-            public boolean onTouch(View v, MotionEvent event) {
-                switch (event.getAction()) {
-                    case MotionEvent.ACTION_DOWN:
-                        initialX = params.x; initialY = params.y;
-                        initialTouchX = event.getRawX(); initialTouchY = event.getRawY();
-                        return true;
-                    case MotionEvent.ACTION_MOVE:
-                        params.x = initialX + (int)(event.getRawX() - initialTouchX);
-                        params.y = initialY + (int)(event.getRawY() - initialTouchY);
-                        windowManager.updateViewLayout(floatingView, params);
-                        return true;
-                }
-                return false;
-            }
-        });
-    }
-
-    private void updateList() {
-        if (floatingView == null) return;
-        floatingView.post(() -> {
-            ListView listView = floatingView.findViewById(R.id.clip_list);
-            if (listView == null) return;
-
-            if (showSmartClips) {
-                List<SmartClipsService.SmartClip> clips = smartClipsService.getClipsForWidget();
-                SmartClipAdapter adapter = new SmartClipAdapter(this, clips);
-                listView.setAdapter(adapter);
-            } else {
-                List<String> clips = ClipboardHistoryService.getRecentClips(this, 50);
-                int[] colors = {0xFFE3F2FD, 0xFFF1F8E9, 0xFFFFF3E0, 0xFFF3E5F5, 0xFFE0F2F1};
-                ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, R.layout.clipboard_widget_item, R.id.clip_text, clips) {
-                    @Override
-                    public View getView(int position, View convertView, android.view.ViewGroup parent) {
-                        View view = super.getView(position, convertView, parent);
-                        view.setBackgroundColor(colors[position % colors.length]);
-                        TextView text = view.findViewById(R.id.clip_text);
-                        String item = getItem(position);
-                        text.setText(item);
-                        text.setMaxLines(2);
-                        text.setEllipsize(android.text.TextUtils.TruncateAt.END);
-                        view.findViewById(R.id.btn_copy).setOnClickListener(v ->
-                                ClipboardHistoryService.copyToClipboard(getContext(), item));
-                        return view;
-                    }
-                };
-                listView.setAdapter(adapter);
-                listView.setOnItemClickListener((parent, view, position, id) ->
-                        ClipboardHistoryService.copyToClipboard(this, clips.get(position)));
-            }
-        });
-    }
-
-    @Override
-    public void on_clipboard_history_change() {
+    @Override public void on_clipboard_history_change() {
         if (!showSmartClips && floatingView != null) updateList();
     }
 
-    @Override
-    public void onSmartClipsChanged() {
+    @Override public void onSmartClipsChanged() {
         if (showSmartClips && floatingView != null) updateList();
     }
 
@@ -270,55 +382,170 @@ public class FloatingWidgetService extends Service
         if (floatingView != null) windowManager.removeView(floatingView);
     }
 
-    static class SmartClipAdapter extends ArrayAdapter<SmartClipsService.SmartClip> {
+    // ══════════════════════════════════════════════════════════════════════════
+    // Glass Clipboard adapter (programmatic)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    static class GlassClipboardAdapter extends ArrayAdapter<String> {
         private final Context ctx;
-        SmartClipAdapter(Context ctx, List<SmartClipsService.SmartClip> clips) {
-            super(ctx, 0, clips);
+        private final float   dp;
+
+        GlassClipboardAdapter(Context ctx, List<String> items) {
+            super(ctx, 0, items);
             this.ctx = ctx;
+            this.dp  = ctx.getResources().getDisplayMetrics().density;
         }
 
         @Override
-        public View getView(int position, View convertView, android.view.ViewGroup parent) {
-            SmartClipsService.SmartClip clip = getItem(position);
-            LinearLayout layout = new LinearLayout(ctx);
-            layout.setOrientation(LinearLayout.HORIZONTAL);
-            layout.setPadding(16, 12, 16, 12);
-            int[] colors = {0xFFE3F2FD, 0xFFF1F8E9, 0xFFFFF3E0, 0xFFF3E5F5, 0xFFE0F2F1};
-            layout.setBackgroundColor(colors[position % colors.length]);
+        public View getView(int pos, View convertView, android.view.ViewGroup parent) {
+            String text = getItem(pos);
 
+            // Card
+            LinearLayout card = new LinearLayout(ctx);
+            card.setOrientation(LinearLayout.HORIZONTAL);
+            card.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            card.setPadding(dp(14), dp(10), dp(8), dp(10));
+            GradientDrawable bg = new GradientDrawable();
+            bg.setColor(pos % 2 == 0 ? COL_SURFACE : COL_SURFACE_B);
+            bg.setCornerRadius(dp(12));
+            card.setBackground(bg);
+            if (Build.VERSION.SDK_INT >= 21) card.setElevation(dp(2));
+
+            // Content
+            TextView tv = new TextView(ctx);
+            tv.setText(text);
+            tv.setTextColor(COL_TXT);
+            tv.setTextSize(12);
+            tv.setMaxLines(2);
+            tv.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            tv.setLineSpacing(0, 1.2f);
+            card.addView(tv, new LinearLayout.LayoutParams(0,
+                    LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
+            // 📋 Copy button (circular green)
+            Button copy = makeCopyBtn(ctx, dp);
+            copy.setOnClickListener(v ->
+                    ClipboardHistoryService.copyToClipboard(ctx, text));
+            card.addView(copy);
+
+            return card;
+        }
+
+        private int dp(int v) { return (int)(v * dp); }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // Glass Smart Clip adapter (programmatic)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    static class GlassSmartClipAdapter extends ArrayAdapter<SmartClipsService.SmartClip> {
+        private final Context ctx;
+        private final float   dp;
+
+        GlassSmartClipAdapter(Context ctx, List<SmartClipsService.SmartClip> clips) {
+            super(ctx, 0, clips);
+            this.ctx = ctx;
+            this.dp  = ctx.getResources().getDisplayMetrics().density;
+        }
+
+        @Override
+        public View getView(int pos, View convertView, android.view.ViewGroup parent) {
+            SmartClipsService.SmartClip clip = getItem(pos);
+
+            // Card
+            LinearLayout card = new LinearLayout(ctx);
+            card.setOrientation(LinearLayout.VERTICAL);
+            card.setPadding(dp(12), dp(10), dp(10), dp(10));
+            GradientDrawable bg = new GradientDrawable();
+            bg.setColor(pos % 2 == 0 ? COL_SURFACE : COL_SURFACE_B);
+            bg.setCornerRadius(dp(12));
+            card.setBackground(bg);
+            if (Build.VERSION.SDK_INT >= 21) card.setElevation(dp(2));
+
+            // Top row: serial chip + content + copy button
+            LinearLayout row = new LinearLayout(ctx);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+
+            // #N serial chip
             TextView serial = new TextView(ctx);
-            serial.setText("#" + clip.serial + " ");
-            serial.setTextSize(12);
-            serial.setTextColor(0xFF1565C0);
-            serial.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
-            layout.addView(serial);
+            serial.setText("#" + clip.serial);
+            serial.setTextSize(9);
+            serial.setTextColor(COL_PRIMARY_L);
+            serial.setTypeface(Typeface.DEFAULT_BOLD);
+            GradientDrawable sBg = new GradientDrawable();
+            sBg.setColor(COL_INACTIVE);
+            sBg.setCornerRadius(dp(12));
+            sBg.setStroke((int)(0.8f * dp), COL_BORDER);
+            serial.setBackground(sBg);
+            serial.setPadding(dp(6), dp(2), dp(6), dp(2));
+            row.addView(serial);
 
-            TextView text = new TextView(ctx);
-            String display = clip.locked ? "●●●● Locked" : clip.content;
-            text.setText(display);
-            text.setTextColor(clip.locked ? 0xFFAAAAAA : 0xFF212121);
-            text.setTextSize(13);
-            text.setMaxLines(2);
-            text.setEllipsize(android.text.TextUtils.TruncateAt.END);
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0,
+            // Content text
+            String display = clip.locked ? "⬛  ⬛  ⬛   locked"
+                    : (clip.description.isEmpty() ? clip.content : clip.description);
+            TextView tv = new TextView(ctx);
+            tv.setText(display);
+            tv.setTextColor(clip.locked ? COL_TXT_HINT : COL_TXT);
+            tv.setTextSize(12);
+            tv.setMaxLines(2);
+            tv.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            LinearLayout.LayoutParams tvLp = new LinearLayout.LayoutParams(0,
                     LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
-            layout.addView(text, lp);
+            tvLp.setMargins(dp(8), 0, 0, 0);
+            row.addView(tv, tvLp);
 
-            Button copyBtn = new Button(ctx);
-            copyBtn.setText("Copy");
-            copyBtn.setTextSize(11);
-            copyBtn.setBackgroundColor(android.graphics.Color.TRANSPARENT);
-            copyBtn.setTextColor(0xFF1565C0);
-            copyBtn.setPadding(12, 4, 12, 4);
-            copyBtn.setOnClickListener(v -> {
+            // 📋 Copy button
+            Button copy = makeCopyBtn(ctx, dp);
+            copy.setOnClickListener(v -> {
                 if (clip.locked) {
-                    Toast.makeText(ctx, "Clip is locked. Open app to view.", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(ctx, "Clip locked — open app to view",
+                            Toast.LENGTH_SHORT).show();
                 } else {
                     ClipboardHistoryService.copyToClipboard(ctx, clip.content);
+                    Toast.makeText(ctx, "Copied!", Toast.LENGTH_SHORT).show();
                 }
             });
-            layout.addView(copyBtn);
-            return layout;
+            row.addView(copy);
+            card.addView(row);
+
+            // Keyword pill (optional row)
+            if (!clip.keyword.isEmpty()) {
+                TextView kw = new TextView(ctx);
+                kw.setText("{" + clip.keyword + "}");
+                kw.setTextSize(9);
+                kw.setTextColor(0xFF818CF8);
+                LinearLayout.LayoutParams kwLp = new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT);
+                kwLp.setMargins(0, dp(4), 0, 0);
+                kw.setLayoutParams(kwLp);
+                card.addView(kw);
+            }
+
+            return card;
         }
+
+        private int dp(int v) { return (int)(v * dp); }
+    }
+
+    // ── Shared factory ────────────────────────────────────────────────────────
+
+    private static Button makeCopyBtn(Context ctx, float dp) {
+        Button b = new Button(ctx);
+        b.setText("📋");
+        b.setTextSize(14);
+        b.setPadding(0, 0, 0, 0);
+        b.setMinWidth(0); b.setMinHeight(0);
+        int sz = (int)(34 * dp);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(sz, sz);
+        lp.setMargins((int)(8 * dp), 0, 0, 0);
+        b.setLayoutParams(lp);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setShape(GradientDrawable.OVAL);
+        bg.setColor(COL_GREEN);
+        b.setBackground(bg);
+        if (Build.VERSION.SDK_INT >= 21) b.setElevation(2 * dp);
+        return b;
     }
 }

@@ -3,7 +3,6 @@ package juloo.keyboard2.widget;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.graphics.Color;
 import android.os.Bundle;
 import android.widget.RemoteViews;
 import android.widget.RemoteViewsService;
@@ -22,14 +21,20 @@ public class ClipboardWidgetService extends RemoteViewsService {
 }
 
 class ClipboardRemoteViewsFactory implements RemoteViewsService.RemoteViewsFactory {
+
     private Context mContext;
     private List<String> mClips = new ArrayList<>();
     private List<SmartClipsService.SmartClip> mSmartClips = new ArrayList<>();
     private boolean mSmartMode = false;
-    private final String[] mColors = {"#E3F2FD", "#F1F8E9", "#FFF3E0", "#F3E5F5", "#E0F2F1"};
+
+    // Dark glass palette — alternating per row
+    private static final int[] ITEM_DRAWABLES = {
+        R.drawable.widget_item_a,
+        R.drawable.widget_item_b
+    };
 
     public ClipboardRemoteViewsFactory(Context context, boolean smartMode) {
-        mContext = context;
+        mContext  = context;
         mSmartMode = smartMode;
     }
 
@@ -37,13 +42,13 @@ class ClipboardRemoteViewsFactory implements RemoteViewsService.RemoteViewsFacto
 
     @Override
     public void onDataSetChanged() {
-        SharedPreferences prefs = mContext.getSharedPreferences("widget_prefs", Context.MODE_PRIVATE);
+        SharedPreferences prefs =
+                mContext.getSharedPreferences("widget_prefs", Context.MODE_PRIVATE);
         mSmartMode = prefs.getBoolean("smart_mode", false);
         if (mSmartMode) {
-            SmartClipsService service = SmartClipsService.getInstance(mContext);
-            mSmartClips = service.getClipsForWidget();
+            mSmartClips = SmartClipsService.getInstance(mContext).getClipsForWidget();
         } else {
-            mClips = ClipboardHistoryService.getRecentClips(mContext, 15);
+            mClips = ClipboardHistoryService.getRecentClips(mContext, 20);
         }
     }
 
@@ -56,23 +61,24 @@ class ClipboardRemoteViewsFactory implements RemoteViewsService.RemoteViewsFacto
 
     @Override
     public RemoteViews getViewAt(int position) {
-        if (mSmartMode) {
-            return getSmartClipView(position);
-        } else {
-            return getClipboardView(position);
-        }
+        return mSmartMode ? getSmartClipView(position) : getClipboardView(position);
     }
 
+    // ── Smart Clip row ────────────────────────────────────────────────────────
+
     private RemoteViews getSmartClipView(int position) {
-        RemoteViews rv = new RemoteViews(mContext.getPackageName(), R.layout.smart_clip_widget_item);
+        RemoteViews rv = new RemoteViews(
+                mContext.getPackageName(), R.layout.smart_clip_widget_item);
         if (position >= mSmartClips.size()) return rv;
         SmartClipsService.SmartClip clip = mSmartClips.get(position);
 
+        // Serial chip
         rv.setTextViewText(R.id.tv_serial, "#" + clip.serial);
 
+        // Content — masked if locked
         String display;
         if (clip.locked) {
-            display = "●●●● Locked";
+            display = "⬛  ⬛  ⬛   locked";
         } else if (clip.description != null && !clip.description.isEmpty()) {
             display = clip.description;
         } else {
@@ -81,19 +87,30 @@ class ClipboardRemoteViewsFactory implements RemoteViewsService.RemoteViewsFacto
         }
         rv.setTextViewText(R.id.clip_text, display);
 
-        int colorIndex = position % mColors.length;
-        rv.setInt(R.id.smart_clip_container, "setBackgroundColor", Color.parseColor(mColors[colorIndex]));
+        // Text colour — dim when locked
+        rv.setTextColor(R.id.clip_text, clip.locked ? 0xFF475569 : 0xFFE2E8F0);
 
+        // Alternating glass card background
+        rv.setInt(R.id.smart_clip_container, "setBackgroundResource",
+                ITEM_DRAWABLES[position % ITEM_DRAWABLES.length]);
+
+        // Copy tap → fill-in intent
         Bundle extras = new Bundle();
-        extras.putString(ClipboardWidgetProvider.EXTRA_ITEM_TEXT, clip.locked ? "" : clip.content);
-        Intent fillInIntent = new Intent();
-        fillInIntent.putExtras(extras);
-        rv.setOnClickFillInIntent(R.id.btn_copy, fillInIntent);
+        extras.putString(ClipboardWidgetProvider.EXTRA_ITEM_TEXT,
+                clip.locked ? "" : clip.content);
+        Intent fillIn = new Intent();
+        fillIn.putExtras(extras);
+        rv.setOnClickFillInIntent(R.id.btn_copy, fillIn);
+
         return rv;
     }
 
+    // ── Clipboard History row ─────────────────────────────────────────────────
+
     private RemoteViews getClipboardView(int position) {
-        RemoteViews rv = new RemoteViews(mContext.getPackageName(), R.layout.clipboard_widget_item);
+        RemoteViews rv = new RemoteViews(
+                mContext.getPackageName(), R.layout.clipboard_widget_item);
+
         ClipboardHistoryService.HistoryEntry entry = null;
         ClipboardHistoryService service = ClipboardHistoryService.get_service(mContext);
         if (service != null) {
@@ -102,7 +119,7 @@ class ClipboardRemoteViewsFactory implements RemoteViewsService.RemoteViewsFacto
         }
 
         String displayContent = "";
-        String fullContent = "";
+        String fullContent    = "";
         if (entry != null) {
             fullContent = entry.content;
             if (entry.description != null && !entry.description.isEmpty()) {
@@ -114,19 +131,24 @@ class ClipboardRemoteViewsFactory implements RemoteViewsService.RemoteViewsFacto
         }
 
         rv.setTextViewText(R.id.clip_text, displayContent);
-        int colorIndex = position % mColors.length;
-        rv.setInt(R.id.clip_container, "setBackgroundColor", Color.parseColor(mColors[colorIndex]));
+        rv.setTextColor(R.id.clip_text, 0xFFE2E8F0);
 
+        // Alternating glass card background
+        rv.setInt(R.id.clip_container, "setBackgroundResource",
+                ITEM_DRAWABLES[position % ITEM_DRAWABLES.length]);
+
+        // Copy tap → fill-in intent
         Bundle extras = new Bundle();
         extras.putString(ClipboardWidgetProvider.EXTRA_ITEM_TEXT, fullContent);
-        Intent fillInIntent = new Intent();
-        fillInIntent.putExtras(extras);
-        rv.setOnClickFillInIntent(R.id.btn_copy, fillInIntent);
+        Intent fillIn = new Intent();
+        fillIn.putExtras(extras);
+        rv.setOnClickFillInIntent(R.id.btn_copy, fillIn);
+
         return rv;
     }
 
-    @Override public RemoteViews getLoadingView() { return null; }
-    @Override public int getViewTypeCount() { return 2; }
-    @Override public long getItemId(int position) { return position; }
-    @Override public boolean hasStableIds() { return true; }
+    @Override public RemoteViews getLoadingView()  { return null; }
+    @Override public int         getViewTypeCount() { return 2; }
+    @Override public long        getItemId(int p)   { return p; }
+    @Override public boolean     hasStableIds()     { return true; }
 }

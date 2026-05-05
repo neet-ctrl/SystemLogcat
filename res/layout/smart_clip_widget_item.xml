@@ -4,20 +4,30 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="horizontal"
-    android:padding="8dp"
-    android:background="#FFFFFF">
+    android:gravity="center_vertical"
+    android:paddingStart="10dp"
+    android:paddingEnd="8dp"
+    android:paddingTop="9dp"
+    android:paddingBottom="9dp"
+    android:background="@drawable/widget_item_a">
 
+    <!-- #N serial chip -->
     <TextView
         android:id="@+id/tv_serial"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="#1"
-        android:textSize="12sp"
-        android:textColor="#1565C0"
+        android:textSize="9sp"
+        android:textColor="#FF818CF8"
         android:textStyle="bold"
-        android:paddingEnd="8dp"
-        android:gravity="center_vertical"/>
+        android:background="@drawable/widget_btn_inactive"
+        android:paddingStart="6dp"
+        android:paddingEnd="6dp"
+        android:paddingTop="2dp"
+        android:paddingBottom="2dp"
+        android:layout_marginEnd="8dp"/>
 
+    <!-- Content / description -->
     <TextView
         android:id="@+id/clip_text"
         android:layout_width="0dp"
@@ -25,14 +35,21 @@
         android:layout_weight="1"
         android:maxLines="2"
         android:ellipsize="end"
-        android:textColor="#000000"
-        android:textSize="13sp"/>
+        android:textColor="#FFE2E8F0"
+        android:textSize="12sp"
+        android:lineSpacingMultiplier="1.2"/>
 
+    <!-- 📋 Copy icon button -->
     <Button
         android:id="@+id/btn_copy"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Copy"
-        android:textSize="11sp"
-        style="?android:attr/borderlessButtonStyle"/>
+        android:layout_width="30dp"
+        android:layout_height="30dp"
+        android:text="📋"
+        android:textSize="13sp"
+        android:background="@drawable/widget_copy_chip"
+        android:padding="0dp"
+        android:minWidth="0dp"
+        android:minHeight="0dp"
+        android:layout_marginStart="8dp"/>
+
 </LinearLayout>
