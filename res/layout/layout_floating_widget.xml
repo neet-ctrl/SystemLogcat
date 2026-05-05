@@ -33,94 +33,104 @@
         android:elevation="16dp"
         android:padding="0dp">
 
-        <!-- ── Drag Handle ──────────────────────────────────────── -->
-        <View
-            android:id="@+id/drag_handle"
-            android:layout_width="40dp"
-            android:layout_height="4dp"
-            android:layout_gravity="center_horizontal"
-            android:layout_marginTop="10dp"
-            android:layout_marginBottom="6dp"
-            android:background="@drawable/float_drag_handle"/>
-
-        <!-- ── Header Row ───────────────────────────────────────── -->
+        <!-- ── Header bar — this whole block is the drag area ────── -->
         <LinearLayout
+            android:id="@+id/header_bar"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:background="@drawable/widget_header_bg"
-            android:paddingStart="16dp"
-            android:paddingEnd="8dp"
-            android:paddingTop="12dp"
-            android:paddingBottom="12dp">
+            android:orientation="vertical"
+            android:background="@drawable/widget_header_bg">
 
-            <TextView
-                android:id="@+id/tv_widget_title"
-                android:layout_width="0dp"
+            <!-- Drag pill indicator -->
+            <View
+                android:id="@+id/drag_handle"
+                android:layout_width="36dp"
+                android:layout_height="4dp"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginTop="8dp"
+                android:layout_marginBottom="4dp"
+                android:background="@drawable/float_drag_handle"/>
+
+            <!-- Button row inside header -->
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="Clipboard"
-                android:textSize="15sp"
-                android:textColor="#FFFFFFFF"
-                android:textStyle="bold"/>
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="16dp"
+                android:paddingEnd="8dp"
+                android:paddingTop="4dp"
+                android:paddingBottom="10dp">
 
-            <!-- ⚙ Settings -->
-            <Button
-                android:id="@+id/btn_widget_settings"
-                android:layout_width="32dp"
-                android:layout_height="32dp"
-                android:text="⚙"
-                android:textSize="14sp"
-                android:textColor="#FFCDD5FF"
-                android:background="@drawable/widget_btn_inactive"
-                android:padding="0dp"
-                android:minWidth="0dp"
-                android:minHeight="0dp"
-                android:layout_marginEnd="5dp"/>
+                <TextView
+                    android:id="@+id/tv_widget_title"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Clipboard"
+                    android:textSize="15sp"
+                    android:textColor="#FFFFFFFF"
+                    android:textStyle="bold"/>
 
-            <!-- 📌 Pin to top toggle -->
-            <Button
-                android:id="@+id/btn_pin_top"
-                android:layout_width="32dp"
-                android:layout_height="32dp"
-                android:text="📌"
-                android:textSize="13sp"
-                android:textColor="#88CDD5FF"
-                android:background="@drawable/widget_btn_inactive"
-                android:padding="0dp"
-                android:minWidth="0dp"
-                android:minHeight="0dp"
-                android:layout_marginEnd="5dp"/>
+                <!-- ⚙ Settings -->
+                <Button
+                    android:id="@+id/btn_widget_settings"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:text="⚙"
+                    android:textSize="14sp"
+                    android:textColor="#FFCDD5FF"
+                    android:background="@drawable/widget_btn_inactive"
+                    android:padding="0dp"
+                    android:minWidth="0dp"
+                    android:minHeight="0dp"
+                    android:layout_marginEnd="5dp"/>
 
-            <!-- ⌗ Collapse to bubble -->
-            <Button
-                android:id="@+id/iv_collapse"
-                android:layout_width="32dp"
-                android:layout_height="32dp"
-                android:text="⌗"
-                android:textSize="15sp"
-                android:textColor="#FFCDD5FF"
-                android:background="@drawable/widget_btn_inactive"
-                android:padding="0dp"
-                android:minWidth="0dp"
-                android:minHeight="0dp"
-                android:layout_marginEnd="5dp"/>
+                <!-- 📌 Pin to top toggle -->
+                <Button
+                    android:id="@+id/btn_pin_top"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:text="📌"
+                    android:textSize="13sp"
+                    android:textColor="#88CDD5FF"
+                    android:background="@drawable/widget_btn_inactive"
+                    android:padding="0dp"
+                    android:minWidth="0dp"
+                    android:minHeight="0dp"
+                    android:layout_marginEnd="5dp"/>
 
-            <!-- ✕ Close -->
-            <Button
-                android:id="@+id/btn_close"
-                android:layout_width="32dp"
-                android:layout_height="32dp"
-                android:text="✕"
-                android:textSize="13sp"
-                android:textColor="#FFFF6B6B"
-                android:background="@drawable/widget_btn_inactive"
-                android:padding="0dp"
-                android:minWidth="0dp"
-                android:minHeight="0dp"/>
+                <!-- ⌗ Collapse to bubble -->
+                <Button
+                    android:id="@+id/iv_collapse"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:text="⌗"
+                    android:textSize="15sp"
+                    android:textColor="#FFCDD5FF"
+                    android:background="@drawable/widget_btn_inactive"
+                    android:padding="0dp"
+                    android:minWidth="0dp"
+                    android:minHeight="0dp"
+                    android:layout_marginEnd="5dp"/>
+
+                <!-- ✕ Close -->
+                <Button
+                    android:id="@+id/btn_close"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:text="✕"
+                    android:textSize="13sp"
+                    android:textColor="#FFFF6B6B"
+                    android:background="@drawable/widget_btn_inactive"
+                    android:padding="0dp"
+                    android:minWidth="0dp"
+                    android:minHeight="0dp"/>
+
+            </LinearLayout>
 
         </LinearLayout>
+        <!-- end header_bar -->
 
         <!-- ── Mode Tabs ────────────────────────────────────────── -->
         <LinearLayout
@@ -176,23 +186,25 @@
             android:paddingBottom="4dp"
             android:clipToPadding="false"/>
 
-        <!-- ── Resize Grip ──────────────────────────────────────── -->
+        <!-- ── Resize Grip (bottom-right corner) ────────────────── -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="28dp"
+            android:layout_height="32dp"
             android:orientation="horizontal"
-            android:gravity="end|center_vertical"
-            android:paddingEnd="12dp"
-            android:paddingBottom="6dp">
+            android:gravity="end|bottom"
+            android:paddingEnd="0dp"
+            android:paddingBottom="0dp">
 
             <TextView
                 android:id="@+id/iv_resize"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
                 android:text="⤡"
-                android:textSize="18sp"
-                android:textColor="#664F46E5"
-                android:padding="4dp"/>
+                android:textSize="20sp"
+                android:textColor="#DD818CF8"
+                android:gravity="center"
+                android:background="#331E2040"
+                android:padding="8dp"/>
 
         </LinearLayout>
 

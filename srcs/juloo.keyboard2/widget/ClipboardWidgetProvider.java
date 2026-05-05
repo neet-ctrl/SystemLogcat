@@ -46,6 +46,17 @@ public class ClipboardWidgetProvider extends AppWidgetProvider {
         String title = (smartMode && !locked) ? "Smart Clips" : "Clipboard History";
         views.setTextViewText(R.id.tv_widget_title, title);
 
+        // Update the mode toggle button to reflect current state clearly
+        if (smartMode && !locked) {
+            views.setTextViewText(R.id.btn_mode_smart, "✓ Smart");
+            views.setTextColor(R.id.btn_mode_smart, 0xFFFFFFFF);
+            views.setInt(R.id.btn_mode_smart, "setBackgroundResource", R.drawable.widget_btn_active);
+        } else {
+            views.setTextViewText(R.id.btn_mode_smart, "🔐 Smart");
+            views.setTextColor(R.id.btn_mode_smart, 0xFFCDD5FF);
+            views.setInt(R.id.btn_mode_smart, "setBackgroundResource", R.drawable.widget_btn_inactive);
+        }
+
         Intent copyIntent = new Intent(context, ClipboardWidgetProvider.class);
         copyIntent.setAction(ACTION_COPY);
         PendingIntent copyPendingIntent = PendingIntent.getBroadcast(context, 0, copyIntent,
@@ -81,6 +92,11 @@ public class ClipboardWidgetProvider extends AppWidgetProvider {
         if (ACTION_COPY.equals(action)) {
             String text = intent.getStringExtra(EXTRA_ITEM_TEXT);
             if (text != null && !text.isEmpty()) {
+                // If smart mode is active, this copy came from a Smart Clip — suppress history
+                SharedPreferences prefs = context.getSharedPreferences("widget_prefs", Context.MODE_PRIVATE);
+                if (prefs.getBoolean("smart_mode", false)) {
+                    ClipboardHistoryService.suppressNextClip();
+                }
                 ClipboardHistoryService.copyToClipboard(context, text);
             }
         } else if (ACTION_TOGGLE_MODE.equals(action)) {

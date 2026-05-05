@@ -255,10 +255,10 @@ public class FloatingWidgetService extends Service
             });
         }
 
-        // Drag handle → move the whole window
-        View dragHandle = floatingView.findViewById(R.id.drag_handle);
-        if (dragHandle != null) {
-            dragHandle.setOnTouchListener(makeDragListener());
+        // Entire header bar is the drag area (drag_handle pill is just visual)
+        View headerBar = floatingView.findViewById(R.id.header_bar);
+        if (headerBar != null) {
+            headerBar.setOnTouchListener(makeDragListener());
         }
 
         // Resize grip (bottom-right ⤡) → resize window
@@ -585,6 +585,8 @@ public class FloatingWidgetService extends Service
                     Toast.makeText(ctx, "Clip locked — open app to view",
                             Toast.LENGTH_SHORT).show();
                 } else {
+                    // Smart Clips copies must not appear in clipboard history
+                    ClipboardHistoryService.suppressNextClip();
                     ClipboardHistoryService.copyToClipboard(ctx, clip.content);
                     Toast.makeText(ctx, "Copied!", Toast.LENGTH_SHORT).show();
                 }

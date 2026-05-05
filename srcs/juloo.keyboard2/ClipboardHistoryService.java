@@ -55,6 +55,14 @@ public final class ClipboardHistoryService
   static ClipboardHistoryService _service = null;
   static ClipboardPasteCallback _paste_callback = null;
 
+  /** Set to true before writing to clipboard from Smart Clips to stop that
+      write from being recorded into clipboard history. */
+  public static volatile boolean _suppress_next_clip = false;
+
+  public static void suppressNextClip() {
+    _suppress_next_clip = true;
+  }
+
   ClipboardManager _cm;
   List<HistoryEntry> _history;
   OnClipboardHistoryChange _listener = null;
@@ -75,6 +83,11 @@ public final class ClipboardHistoryService
 
   public synchronized void add_current_clip()
   {
+    // If a smart-clip copy just happened, skip recording it in history
+    if (_suppress_next_clip) {
+      _suppress_next_clip = false;
+      return;
+    }
     if (_cm.hasPrimaryClip())
     {
       ClipData cd = _cm.getPrimaryClip();

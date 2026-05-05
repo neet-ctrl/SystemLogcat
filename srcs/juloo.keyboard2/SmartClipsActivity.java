@@ -1113,6 +1113,8 @@ public class SmartClipsActivity extends Activity
     // ── Misc helpers ──────────────────────────────────────────────────────────
 
     private void copyToClipboard(String text) {
+        // Suppress history recording — Smart Clips copies must not pollute clipboard history
+        juloo.keyboard2.ClipboardHistoryService.suppressNextClip();
         android.content.ClipboardManager cm =
                 (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
         if (cm != null)
