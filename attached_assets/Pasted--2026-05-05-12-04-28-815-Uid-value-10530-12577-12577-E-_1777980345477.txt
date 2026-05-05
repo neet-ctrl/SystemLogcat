@@ -1,0 +1,59 @@
+[2026-05-05 12:04:28.815 Uid(value=10530):12577:12577 E/AndroidRuntime]
+FATAL EXCEPTION: main
+Process: juloo.keyboard2.debug, PID: 12577
+java.lang.NullPointerException: Attempt to read from field 'boolean juloo.keyboard2.Config.clipboard_history_enabled' on a null object reference in method 'void juloo.keyboard2.ClipboardHistoryService.add_clip_with_metadata(java.lang.String, java.lang.String, java.lang.String)'
+	at juloo.keyboard2.ClipboardHistoryService.add_clip_with_metadata(ClipboardHistoryService.java:258)
+	at juloo.keyboard2.ClipboardHistoryService.add_clip(ClipboardHistoryService.java:254)
+	at juloo.keyboard2.ClipboardHistoryService.add_current_clip(ClipboardHistoryService.java:85)
+	at juloo.keyboard2.ClipboardHistoryService$SystemListener.onPrimaryClipChanged(ClipboardHistoryService.java:72)
+	at android.content.ClipboardManager.reportPrimaryClipChanged(ClipboardManager.java:411)
+	at android.content.ClipboardManager$1.lambda$dispatchPrimaryClipChanged$0(ClipboardManager.java:103)
+	at android.content.ClipboardManager$1.$r8$lambda$ZBnZ9kLEDHJ9Wf9KWTWi217Hd24(Unknown Source:0)
+	at android.content.ClipboardManager$1$$ExternalSyntheticLambda0.run(D8$$SyntheticClass:0)
+	at android.os.Handler.handleCallback(Handler.java:959)
+	at android.os.Handler.dispatchMessage(Handler.java:100)
+	at android.os.Looper.loopOnce(Looper.java:311)
+	at android.os.Looper.loop(Looper.java:408)
+	at android.app.ActivityThread.main(ActivityThread.java:9119)
+	at java.lang.reflect.Method.invoke(Native Method)
+	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:627)
+	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:970)
+
+[2026-05-05 12:26:40.660 Uid(value=10530):4155:4155 E/AndroidRuntime]
+FATAL EXCEPTION: main
+Process: juloo.keyboard2.debug, PID: 4155
+java.lang.NullPointerException: Attempt to read from field 'boolean juloo.keyboard2.Config.clipboard_history_enabled' on a null object reference in method 'void juloo.keyboard2.ClipboardHistoryService.add_clip_with_metadata(java.lang.String, java.lang.String, java.lang.String)'
+	at juloo.keyboard2.ClipboardHistoryService.add_clip_with_metadata(ClipboardHistoryService.java:258)
+	at juloo.keyboard2.ClipboardHistoryService.add_clip(ClipboardHistoryService.java:254)
+	at juloo.keyboard2.ClipboardHistoryService.add_current_clip(ClipboardHistoryService.java:85)
+	at juloo.keyboard2.ClipboardHistoryService$SystemListener.onPrimaryClipChanged(ClipboardHistoryService.java:72)
+	at android.content.ClipboardManager.reportPrimaryClipChanged(ClipboardManager.java:411)
+	at android.content.ClipboardManager$1.lambda$dispatchPrimaryClipChanged$0(ClipboardManager.java:103)
+	at android.content.ClipboardManager$1.$r8$lambda$ZBnZ9kLEDHJ9Wf9KWTWi217Hd24(Unknown Source:0)
+	at android.content.ClipboardManager$1$$ExternalSyntheticLambda0.run(D8$$SyntheticClass:0)
+	at android.os.Handler.handleCallback(Handler.java:959)
+	at android.os.Handler.dispatchMessage(Handler.java:100)
+	at android.os.Looper.loopOnce(Looper.java:311)
+	at android.os.Looper.loop(Looper.java:408)
+	at android.app.ActivityThread.main(ActivityThread.java:9119)
+	at java.lang.reflect.Method.invoke(Native Method)
+	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:627)
+	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:970)
+
+[2026-05-05 16:52:41.734 Uid(value=10532):13226:13226 E/RippleDrawable]
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+[2026-05-05 16:52:41.745 Uid(value=10532):13226:13226 E/RippleDrawable]
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+[2026-05-05 16:52:41.762 Uid(value=10532):13226:13226 E/RippleDrawable]
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+[2026-05-05 16:52:41.777 Uid(value=10532):13226:13226 E/RippleDrawable]
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+[2026-05-05 16:52:41.794 Uid(value=10532):13226:13226 E/RippleDrawable]
+The RippleDrawable.STYLE_PATTERNED animation is not supported for a non-hardware accelerated Canvas. Skipping animation.
+
+[2026-05-05 16:53:18.980 Uid(value=10532):16764:16798 E/SBE]
+this page is abnormal implementation

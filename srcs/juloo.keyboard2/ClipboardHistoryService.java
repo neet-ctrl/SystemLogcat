@@ -285,7 +285,8 @@ public final class ClipboardHistoryService
   }
 
   public synchronized void add_clip_with_metadata(String clip, String description, String version) {
-    if (!Config.globalConfig().clipboard_history_enabled)
+    Config cfg = Config.globalConfig();
+    if (cfg == null || !cfg.clipboard_history_enabled)
       return;
     if (clip.equals(""))
       return;
@@ -297,14 +298,15 @@ public final class ClipboardHistoryService
             break;
         }
     }
-    
+
     String timestamp = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).format(new java.util.Date());
     _history.add(0, new HistoryEntry(clip, timestamp, description, version));
-    
-    save_history_to_prefs(juloo.keyboard2.Config.globalConfig().getContext());
+
+    Context ctx = cfg.getContext();
+    save_history_to_prefs(ctx);
     if (_listener != null)
       _listener.on_clipboard_history_change();
-    notifyWidget(juloo.keyboard2.Config.globalConfig().getContext());
+    notifyWidget(ctx);
   }
 
   public static void notifyWidget(Context context) {
