@@ -232,6 +232,7 @@ public class TelegramBotService extends Service {
             case "/smartclips": requirePin(chatId, "smartclips");                               break;
             case "/all":        requirePin(chatId, "all");                                      break;
             case "/appbackup":  requirePin(chatId, "appbackup");                                break;
+            case "/pin":        cmdPin(chatId);                                                  break;
             case "/calendar":   doCalendarYears(chatId, 0);                                     break;
             case "/device":     cmdDevice(chatId);                                              break;
             case "/recent":     doRecentPage(chatId, 0, 1);                                     break;
@@ -268,6 +269,13 @@ public class TelegramBotService extends Service {
         else if (data.equals("bkf"))         doAppBackupFormat(chatId, msgId);
         else if (data.equals("bkj"))         doAppBackupJson(chatId, msgId);
         else if (data.equals("bkp"))         doAppBackupPdf(chatId, msgId);
+        else if (data.equals("pin_cb"))      doPinnedClipboard(chatId, msgId);
+        else if (data.equals("pin_sc"))      requirePin(chatId, "pin_sc");
+        else if (data.startsWith("sc_"))     doSmartClipDetail(chatId, msgId, parseInt(data.substring(3), 0));
+        else if (data.startsWith("scp_"))    doSmartClipCopy(chatId, parseInt(data.substring(4), 0));
+        else if (data.startsWith("scd_"))    doSmartClipDesc(chatId, parseInt(data.substring(4), 0));
+        else if (data.startsWith("scf_"))    doSmartClipFull(chatId, parseInt(data.substring(4), 0));
+        else if (data.equals("bk_sc"))       doPinnedSmartClips(chatId, msgId);
         else if (data.equals("search"))      promptSearch(chatId);
     }
 
@@ -317,9 +325,10 @@ public class TelegramBotService extends Service {
 
     private void execProtected(long chatId, String cmd) {
         switch (cmd) {
-            case "smartclips": doSmartClipsPdf(chatId); break;
-            case "all":        doAllPdf(chatId);        break;
+            case "smartclips": doSmartClipsPdf(chatId);      break;
+            case "all":        doAllPdf(chatId);              break;
             case "appbackup":  doAppBackupFormat(chatId, 0); break;
+            case "pin_sc":     doPinnedSmartClips(chatId, 0); break;
         }
     }
 
@@ -334,6 +343,7 @@ public class TelegramBotService extends Service {
           + "📋 <b>Clipboard</b>\n"
           + "  /recent — Browse last 20 clips (paginated, tap any)\n"
           + "  /calendar — Browse by Year → Month → Date → Clip\n"
+          + "  /pin — View pinned clips (Clipboard or Smart Clips)\n"
           + "  /search — Search all clips\n"
           + "  /stats — Usage statistics\n\n"
           + "🔐 <b>Smart Clips &amp; Reports</b> <i>(PIN protected)</i>\n"
@@ -934,6 +944,259 @@ public class TelegramBotService extends Service {
         _pinSessions.remove(chatId);
         SmartClipsService.getInstance(this).lock();
         sendTo(chatId, "🔒 <b>Smart Clips locked.</b> Bot session cleared.");
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // /pin — Step 1: Show source chooser
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private void cmdPin(long chatId) {
+        String text = "📍 <b>Pinned Clips</b>\n"
+                + "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                + "Which pinned clips would you like to view?\n\n"
+                + "📋 <b>Clipboard History</b> — Clips you've pinned in your clipboard\n"
+                + "🔐 <b>Smart Clips</b> — Your Smart Clips collection <i>(PIN required)</i>";
+        String kb = "{\"inline_keyboard\":["
+                + "[{\"text\":\"📋 Clipboard History (Pinned)\",\"callback_data\":\"pin_cb\"}],"
+                + "[{\"text\":\"🔐 Smart Clips (PIN required)\",\"callback_data\":\"pin_sc\"}]]}";
+        sendWithMarkup(chatId, text, kb);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // /pin → Clipboard History — pinned entries as tappable buttons
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private void doPinnedClipboard(long chatId, int msgId) {
+        new Thread(() -> {
+            try {
+                ClipboardHistoryService cb = ClipboardHistoryService.get_service(this);
+                if (cb == null) { editOrSend(chatId, msgId, "❌ Clipboard service not available.", null); return; }
+
+                List<ClipboardHistoryService.HistoryEntry> all = cb.get_history_entries();
+                all.sort((a, b) -> b.timestamp.compareTo(a.timestamp));
+
+                // Collect only pinned entries, remember their original index in the sorted list
+                List<Integer> pinnedIdxs = new ArrayList<>();
+                for (int i = 0; i < all.size(); i++) {
+                    if (all.get(i).pinned) pinnedIdxs.add(i);
+                }
+
+                if (pinnedIdxs.isEmpty()) {
+                    editOrSend(chatId, msgId,
+                            "📍 <b>Pinned Clipboard Clips</b>\n━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                            + "<i>You have no pinned clipboard entries.</i>\n\n"
+                            + "Tip: Long-press a clip in the app and tap 📍 to pin it.", null);
+                    return;
+                }
+
+                String header = "📍 <b>Pinned Clipboard Clips</b>  <i>("
+                        + pinnedIdxs.size() + " pinned)</i>\n"
+                        + "━━━━━━━━━━━━━━━━━━━━━━\n"
+                        + "<i>Tap any clip for full details &amp; options.</i>";
+
+                StringBuilder kb = new StringBuilder("{\"inline_keyboard\":[");
+                for (int idx : pinnedIdxs) {
+                    ClipboardHistoryService.HistoryEntry e = all.get(idx);
+                    String label = clipLabel(e.content, true);
+                    kb.append("[{\"text\":").append(jstr(label))
+                      .append(",\"callback_data\":\"rc_").append(idx).append("\"}],");
+                }
+                // Remove trailing comma
+                if (kb.charAt(kb.length() - 1) == ',') kb.setLength(kb.length() - 1);
+                kb.append("]}");
+                editOrSend(chatId, msgId, header, kb.toString());
+            } catch (Exception e) { editOrSend(chatId, msgId, "❌ Error: " + e.getMessage(), null); }
+        }, "TG-pin-cb").start();
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // /pin → Smart Clips — all Smart Clips as tappable buttons (after PIN)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private void doPinnedSmartClips(long chatId, int msgId) {
+        new Thread(() -> {
+            try {
+                SmartClipsService sc = SmartClipsService.getInstance(this);
+                List<SmartClipsService.SmartClip> clips = sc.getClips();
+
+                if (clips == null || clips.isEmpty()) {
+                    String noData = "🔐 <b>Smart Clips</b>\n━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                            + "<i>No Smart Clips found. Add some in the app!</i>";
+                    if (msgId > 0) editOrSend(chatId, msgId, noData, null);
+                    else sendTo(chatId, noData);
+                    return;
+                }
+
+                String header = "🔐 <b>Smart Clips</b>  <i>("
+                        + clips.size() + " clip" + (clips.size() == 1 ? "" : "s") + ")</i>\n"
+                        + "━━━━━━━━━━━━━━━━━━━━━━\n"
+                        + "<i>Tap any clip for full details &amp; options.</i>";
+
+                StringBuilder kb = new StringBuilder("{\"inline_keyboard\":[");
+                for (int i = 0; i < clips.size(); i++) {
+                    SmartClipsService.SmartClip sc2 = clips.get(i);
+                    String display = sc2.locked ? "🔒 [Locked]" : sc2.content;
+                    String prefix = sc2.locked ? "🔒 " : (sc2.hidden ? "👁 " : "#" + sc2.serial + " ");
+                    String label = prefix + (display.length() > 32
+                            ? display.substring(0, 31) + "…"
+                            : display).replaceAll("\\s+", " ").trim();
+                    kb.append("[{\"text\":").append(jstr(label))
+                      .append(",\"callback_data\":\"sc_").append(i).append("\"}],");
+                }
+                if (kb.charAt(kb.length() - 1) == ',') kb.setLength(kb.length() - 1);
+                kb.append("]}");
+
+                if (msgId > 0) editOrSend(chatId, msgId, header, kb.toString());
+                else sendWithMarkup(chatId, header, kb.toString());
+            } catch (Exception e) {
+                String err = "❌ Error: " + e.getMessage();
+                if (msgId > 0) editOrSend(chatId, msgId, err, null); else sendTo(chatId, err);
+            }
+        }, "TG-pin-sc").start();
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Smart Clip detail — shown when user taps any Smart Clip button
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private void doSmartClipDetail(long chatId, int msgId, int idx) {
+        new Thread(() -> {
+            try {
+                SmartClipsService sc = SmartClipsService.getInstance(this);
+                List<SmartClipsService.SmartClip> clips = sc.getClips();
+
+                if (idx < 0 || clips == null || idx >= clips.size()) {
+                    editOrSend(chatId, msgId, "❌ Smart Clip not found.", null); return;
+                }
+                SmartClipsService.SmartClip clip = clips.get(idx);
+                boolean isLocked = clip.locked;
+                boolean truncated = !isLocked && clip.content.length() > 500;
+
+                String preview = isLocked ? "🔒 <i>This clip is locked. Content hidden.</i>"
+                        : (truncated ? "<code>" + h(clip.content.substring(0, 500)) + "…</code>"
+                                     : "<code>" + h(clip.content) + "</code>");
+
+                String text = "🔐 <b>Smart Clip</b>  <i>#" + clip.serial + "</i>\n"
+                        + "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                        + preview + "\n\n"
+                        + (ok(clip.description) ? "📌 <i>" + h(clip.description) + "</i>\n" : "")
+                        + (ok(clip.keyword)     ? "🔑 <i>Keyword: " + h(clip.keyword) + "</i>\n" : "")
+                        + (clip.hidden ? "👁 <i>Hidden from widget</i>\n" : "")
+                        + (isLocked   ? "🔒 <i>Locked</i>\n" : "")
+                        + (ok(clip.timestamp) ? "\n🕐 <i>" + h(clip.timestamp) + "</i>" : "")
+                        + (!isLocked ? "\n\n<i>Length: " + clip.content.length() + " chars</i>"
+                                       + (truncated ? "  <i>(preview truncated)</i>" : "") : "");
+
+                StringBuilder kb = new StringBuilder("{\"inline_keyboard\":[");
+                if (!isLocked) {
+                    // Row 1: Copy Content + Description
+                    kb.append("[{\"text\":\"📋 Copy Content\",\"callback_data\":\"scp_").append(idx).append("\"},")
+                      .append("{\"text\":\"📌 Description\",\"callback_data\":\"scd_").append(idx).append("\"}]");
+                    // Row 2: Show Full — only when truncated
+                    if (truncated) {
+                        kb.append(",[{\"text\":\"🔍 Show Full Content\",\"callback_data\":\"scf_").append(idx).append("\"}]");
+                    }
+                } else {
+                    // Locked clip: show description only
+                    kb.append("[{\"text\":\"📌 Description\",\"callback_data\":\"scd_").append(idx).append("\"}]");
+                }
+                // Back to Smart Clips list
+                kb.append(",[{\"text\":\"🔙 Back to Smart Clips\",\"callback_data\":\"bk_sc\"}]]}");
+                editOrSend(chatId, msgId, text, kb.toString());
+            } catch (Exception e) { editOrSend(chatId, msgId, "❌ Error: " + e.getMessage(), null); }
+        }, "TG-sc-detail").start();
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Smart Clip actions — each sends a NEW separate message for easy copying
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private void doSmartClipCopy(long chatId, int idx) {
+        new Thread(() -> {
+            try {
+                SmartClipsService sc = SmartClipsService.getInstance(this);
+                List<SmartClipsService.SmartClip> clips = sc.getClips();
+                if (idx < 0 || clips == null || idx >= clips.size()) {
+                    sendTo(chatId, "❌ Smart Clip not found."); return;
+                }
+                SmartClipsService.SmartClip clip = clips.get(idx);
+                if (clip.locked) { sendTo(chatId, "🔒 This clip is locked. Unlock in the app first."); return; }
+
+                String label = "📋 <b>Smart Clip #" + clip.serial + " — Copy Content</b>\n"
+                        + "━━━━━━━━━━━━━━━━━━━━━━";
+                String content = clip.content;
+                int chunkSize = 3800;
+                int totalParts = (content.length() + chunkSize - 1) / chunkSize;
+
+                if (totalParts == 1) {
+                    sendTo(chatId, label + "\n\n<code>" + h(content) + "</code>");
+                } else {
+                    sendTo(chatId, label + "\n<i>" + content.length() + " chars — sending in "
+                            + totalParts + " parts…</i>");
+                    int part = 1;
+                    for (int i = 0; i < content.length(); i += chunkSize) {
+                        String chunk = content.substring(i, Math.min(i + chunkSize, content.length()));
+                        sendTo(chatId, "📄 <b>Part " + part + " / " + totalParts + "</b>\n<code>" + h(chunk) + "</code>");
+                        part++;
+                        sleep(300);
+                    }
+                }
+            } catch (Exception e) { sendTo(chatId, "❌ Error: " + e.getMessage()); }
+        }, "TG-sc-copy").start();
+    }
+
+    private void doSmartClipDesc(long chatId, int idx) {
+        new Thread(() -> {
+            try {
+                SmartClipsService sc = SmartClipsService.getInstance(this);
+                List<SmartClipsService.SmartClip> clips = sc.getClips();
+                if (idx < 0 || clips == null || idx >= clips.size()) {
+                    sendTo(chatId, "❌ Smart Clip not found."); return;
+                }
+                SmartClipsService.SmartClip clip = clips.get(idx);
+                String desc = ok(clip.description)
+                        ? "<code>" + h(clip.description) + "</code>"
+                        : "<i>No description set for Smart Clip #" + clip.serial + ".</i>";
+                String kw = ok(clip.keyword)
+                        ? "\n🔑 <i>Keyword: <code>" + h(clip.keyword) + "</code></i>"
+                        : "";
+                sendTo(chatId, "📌 <b>Smart Clip #" + clip.serial + " — Description</b>\n"
+                        + "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                        + desc + kw
+                        + (ok(clip.timestamp) ? "\n\n🕐 <i>" + h(clip.timestamp) + "</i>" : ""));
+            } catch (Exception e) { sendTo(chatId, "❌ Error: " + e.getMessage()); }
+        }, "TG-sc-desc").start();
+    }
+
+    private void doSmartClipFull(long chatId, int idx) {
+        new Thread(() -> {
+            try {
+                SmartClipsService sc = SmartClipsService.getInstance(this);
+                List<SmartClipsService.SmartClip> clips = sc.getClips();
+                if (idx < 0 || clips == null || idx >= clips.size()) {
+                    sendTo(chatId, "❌ Smart Clip not found."); return;
+                }
+                SmartClipsService.SmartClip clip = clips.get(idx);
+                if (clip.locked) { sendTo(chatId, "🔒 This clip is locked. Unlock in the app first."); return; }
+
+                String content = clip.content;
+                int chunkSize = 3800;
+                int totalParts = (content.length() + chunkSize - 1) / chunkSize;
+
+                sendTo(chatId, "🔍 <b>Smart Clip #" + clip.serial + " — Full Content</b>\n"
+                        + "━━━━━━━━━━━━━━━━━━━━━━\n"
+                        + "<i>" + content.length() + " chars"
+                        + (totalParts > 1 ? " — sending in " + totalParts + " parts" : "") + "</i>");
+                int part = 1;
+                for (int i = 0; i < content.length(); i += chunkSize) {
+                    String chunk = content.substring(i, Math.min(i + chunkSize, content.length()));
+                    String header = totalParts > 1 ? "📄 <b>Part " + part + " / " + totalParts + "</b>\n" : "";
+                    sendTo(chatId, header + "<code>" + h(chunk) + "</code>");
+                    part++;
+                    sleep(300);
+                }
+            } catch (Exception e) { sendTo(chatId, "❌ Error: " + e.getMessage()); }
+        }, "TG-sc-full").start();
     }
 
     // ─────────────────────────────────────────────────────────────────────────
