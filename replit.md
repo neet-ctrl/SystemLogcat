@@ -67,6 +67,9 @@ Opened from the ⊕ icon button in the `LauncherActivity` header.
 - 🔐 Smart Clips — Auto-lock timer, show-serial badge toggle, widget clip limit
 - 📋 Clipboard — History size limit
 - ⚙ Behaviour — Haptic feedback toggle
+- ✈ Telegram Bot — token, chatId, enable toggle, auto-forward
+- 📁 File Cloud Backup — enable/disable, status, monitored folders list, start/stop
+- 🔑 Permissions — notifications, overlay, battery optimization, manufacturer auto-start, storage/media, Shizuku
 - ℹ About — App name, description, GitHub link
 
 ---
@@ -154,6 +157,9 @@ Background service polling Telegram Bot API. Enabled **by default** (KEY_ENABLED
 | `/device` | Device info |
 | `/status` | Bot + app status |
 | `/lock` | Lock Smart Clips session |
+| `/watchdog` | Uptime, all service health & persistence layer status |
+| `/files` | Last 10 backed-up files with name/size/timestamp |
+| `/filestats` | Upload queue stats: done / pending / failed / total bytes |
 
 ### Clip Detail View
 When any clip is tapped (from /recent or /calendar), detail view shows:
@@ -175,6 +181,33 @@ PIN-protected. On tap shows format selector:
 `cy` cal years, `cyy_Y` cal year, `cym_Y_M` cal month, `cyd_Y_M_D` cal date,
 `cc_Y_M_D_I` cal clip, `cpc_/dec_` copy/desc cal clip, `bk_*` back navigation,
 `bkf/bkj/bkp` backup format/json/pdf
+
+---
+
+## File Cloud Backup System
+
+Fully automated background service that monitors every file-producing folder and instantly uploads new files to Telegram as documents with rich metadata captions.
+
+### Files
+| File | Purpose |
+|------|---------|
+| `FileBackupService.java` | Foreground service: ContentObserver (MediaStore images/video/audio/downloads) + FileObserver on 26 dirs; upload consumer thread; scheduleRestart in onDestroy |
+| `FileUploadQueue.java` | SQLite-backed upload queue; MD5 deduplication; status PENDING/UPLOADING/DONE/FAILED; MAX_RETRIES=3; 49 MB size cap; `formatSize()`/`guessMime()` helpers |
+| `FileScanWorker.java` | WorkManager 15-min periodic scan calling `FileBackupService.scanAllDirs()` |
+
+### How it works
+1. On start (`TelegramBotService.onStartCommand`, `BootReceiver`, app settings toggle) → `FileBackupService.startIfEnabled(ctx)`
+2. Service registers ContentObservers on MediaStore + FileObservers on 26 directories (DCIM, Screenshots, WhatsApp all media types, Telegram, Download, Bluetooth, Instagram, Facebook, Twitter, Snapchat, ScreenRecorder…)
+3. New file detected → `FileUploadQueue.enqueue()` (MD5 dedup) → consumer thread → `sendDocument()` to Telegram with HTML caption (tag, filename, size, MIME, timestamp, device)
+4. Files >49 MB → text notification only (Telegram limit)
+5. WorkManager `FileScanWorker` runs every 15 min as fallback catch-up scan
+6. `scheduleRestart` on `onDestroy` → 5s AlarmManager restart
+
+### Prefs
+`file_backup_prefs` / `backup_enabled` (default `true`)
+
+### Bot commands
+`/files` → last 10 uploaded · `/filestats` → queue stats · `/watchdog` → full health report
 
 ---
 

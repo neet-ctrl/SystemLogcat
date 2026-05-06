@@ -70,6 +70,10 @@ public class AppSettingsActivity extends Activity {
         root.addView(sectionLabel("✈  Telegram Bot"));
         root.addView(buildTelegramSection());
 
+        // ── File Backup Section ─────────────────────────────────
+        root.addView(sectionLabel("📁  File Cloud Backup"));
+        root.addView(buildFileBackupSection());
+
         // ── Permissions Section ─────────────────────────────────
         root.addView(sectionLabel("🔑  Permissions"));
         root.addView(buildPermissionsSection());
@@ -782,6 +786,106 @@ public class AppSettingsActivity extends Activity {
         return card;
     }
 
+    // ── File Backup Section ───────────────────────────────────────────────────
+
+    private View buildFileBackupSection() {
+        LinearLayout card = makeCard();
+
+        // Enable / disable toggle
+        LinearLayout topRow = new LinearLayout(this);
+        topRow.setOrientation(LinearLayout.HORIZONTAL);
+        topRow.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout topText = new LinearLayout(this);
+        topText.setOrientation(LinearLayout.VERTICAL);
+        topText.setLayoutParams(new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        TextView topLabel = new TextView(this);
+        topLabel.setText("Enable File Cloud Backup");
+        topLabel.setTextColor(C.textPrimary);
+        topLabel.setTextSize(14);
+        topLabel.setTypeface(Typeface.DEFAULT_BOLD);
+        TextView topSub = new TextView(this);
+        topSub.setText("Instantly uploads every new photo, video, WhatsApp file, download & more to your Telegram cloud. On by default.");
+        topSub.setTextColor(C.textSecondary);
+        topSub.setTextSize(11);
+        topText.addView(topLabel);
+        topText.addView(topSub);
+        topRow.addView(topText);
+
+        android.content.SharedPreferences fbPrefs =
+                getSharedPreferences(FileBackupService.PREFS, MODE_PRIVATE);
+        Switch sw = new Switch(this);
+        sw.setChecked(fbPrefs.getBoolean(FileBackupService.KEY_ENABLED, true));
+        sw.setOnCheckedChangeListener((v, on) -> {
+            fbPrefs.edit().putBoolean(FileBackupService.KEY_ENABLED, on).apply();
+            if (on) FileBackupService.startIfEnabled(this);
+            else    FileBackupService.stopService(this);
+            recreate();
+        });
+        topRow.addView(sw);
+        card.addView(topRow);
+
+        card.addView(makeDivider());
+
+        // Status line
+        boolean fbRunning = FileBackupService.isRunning();
+        long pending = FileUploadQueue.get(this).countPending();
+        long done    = FileUploadQueue.get(this).countDone();
+
+        TextView statusTv = new TextView(this);
+        String statusText = fbRunning
+            ? "🟢 Running · " + done + " uploaded · " + pending + " pending"
+            : "🔴 Stopped";
+        statusTv.setText("Status: " + statusText);
+        statusTv.setTextColor(fbRunning ? C.green : C.textSecondary);
+        statusTv.setTextSize(12);
+        card.addView(statusTv);
+
+        card.addView(makeDivider());
+
+        // Monitored folders info
+        TextView dirsLabel = new TextView(this);
+        dirsLabel.setText("Monitored Folders");
+        dirsLabel.setTextColor(C.textPrimary);
+        dirsLabel.setTextSize(12);
+        dirsLabel.setTypeface(Typeface.DEFAULT_BOLD);
+        LinearLayout.LayoutParams dlp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        dlp.setMargins(0, dp(4), 0, 0);
+        dirsLabel.setLayoutParams(dlp);
+        card.addView(dirsLabel);
+
+        TextView dirsList = new TextView(this);
+        dirsList.setText("Camera, Screenshots, DCIM, Pictures, Movies, WhatsApp Images/Video/Docs/Audio, Telegram, Download, Bluetooth, Instagram, Facebook, Twitter, Snapchat, Screen Recorder.");
+        dirsList.setTextColor(C.textSecondary);
+        dirsList.setTextSize(11);
+        card.addView(dirsList);
+
+        card.addView(makeDivider());
+
+        // Start / Stop button
+        Button ssBtn = new Button(this);
+        ssBtn.setText(fbRunning ? "⏹  Stop Backup Service" : "▶  Start Backup Service");
+        ssBtn.setTextSize(13);
+        ssBtn.setTextColor(0xFFFFFFFF);
+        android.graphics.drawable.GradientDrawable ssBg = new android.graphics.drawable.GradientDrawable();
+        ssBg.setColor(fbRunning ? 0xFFc0392b : C.primary);
+        ssBg.setCornerRadius(dp(8));
+        ssBtn.setBackground(ssBg);
+        LinearLayout.LayoutParams sslp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        sslp.setMargins(0, dp(8), 0, 0);
+        ssBtn.setLayoutParams(sslp);
+        ssBtn.setOnClickListener(v -> {
+            if (fbRunning) FileBackupService.stopService(this);
+            else           FileBackupService.startIfEnabled(this);
+            recreate();
+        });
+        card.addView(ssBtn);
+
+        return card;
+    }
+
     // ── About card ────────────────────────────────────────────────────────────
 
     private View buildAboutCard() {
@@ -958,7 +1062,39 @@ public class AppSettingsActivity extends Activity {
                 v -> openManufacturerAutoStart());
         card.addView(makeDivider());
 
-        // ── 10. Read System Logs (Shizuku) ────────────────────────────────────
+        // ── 10. Storage / Media Access (File Backup) ─────────────────────────
+        boolean hasStorage;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            hasStorage =
+                checkSelfPermission("android.permission.READ_MEDIA_IMAGES")  == PackageManager.PERMISSION_GRANTED
+             && checkSelfPermission("android.permission.READ_MEDIA_VIDEO")   == PackageManager.PERMISSION_GRANTED
+             && checkSelfPermission("android.permission.READ_MEDIA_AUDIO")   == PackageManager.PERMISSION_GRANTED;
+        } else {
+            hasStorage = Build.VERSION.SDK_INT < 23 ||
+                checkSelfPermission("android.permission.READ_EXTERNAL_STORAGE")
+                    == PackageManager.PERMISSION_GRANTED;
+        }
+        addPermRow(card,
+                "📁", "Storage / Media Access",
+                "Required for the File Cloud Backup feature — allows monitoring Camera, Screenshots, WhatsApp, Telegram, Download and all media folders.",
+                hasStorage,
+                hasStorage ? null : "Grant",
+                hasStorage ? null : v -> {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        requestPermissions(new String[]{
+                            "android.permission.READ_MEDIA_IMAGES",
+                            "android.permission.READ_MEDIA_VIDEO",
+                            "android.permission.READ_MEDIA_AUDIO"
+                        }, 2003);
+                    } else if (Build.VERSION.SDK_INT >= 23) {
+                        requestPermissions(new String[]{
+                            "android.permission.READ_EXTERNAL_STORAGE"
+                        }, 2003);
+                    }
+                });
+        card.addView(makeDivider());
+
+        // ── 11. Read System Logs (Shizuku) ────────────────────────────────────
         addPermRow(card,
                 "📋", "Read System Logs",
                 "Captures device-wide Logcat for the System Console feature.\nRequires Shizuku — install it, start its service, then authorize this app inside Shizuku.",
