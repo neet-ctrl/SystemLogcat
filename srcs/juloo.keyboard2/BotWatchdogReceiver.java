@@ -15,10 +15,18 @@ public class BotWatchdogReceiver extends BroadcastReceiver {
 
     @Override
     public void onReceive(Context ctx, Intent intent) {
+        Context app = ctx.getApplicationContext();
+        // Record heartbeat — this is what crash-recovery uses to detect the gap
+        FileUploadQueue.recordAliveTime(app);
+        // Restart bot if dead
         if (!TelegramBotService.isRunning()) {
-            TelegramBotService.startIfEnabled(ctx.getApplicationContext());
+            TelegramBotService.startIfEnabled(app);
         }
-        schedule(ctx.getApplicationContext());
+        // Restart file backup service if dead
+        if (!FileBackupService.isRunning()) {
+            FileBackupService.startIfEnabled(app);
+        }
+        schedule(app);
     }
 
     public static void schedule(Context ctx) {

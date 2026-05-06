@@ -154,10 +154,14 @@ public class FileBackupService extends Service {
         FileUploadQueue.get(this).resetStuck();
         if (!_running) {
             _running = true;
+            // ── CRASH RECOVERY: scan for any files that arrived while we were dead ──
+            new Thread(() -> recoverMissedFiles(this), "FB-Recovery").start();
             registerObservers();
             startConsumer();
             FileScanWorker.enqueue(this);
         }
+        // Record we are alive right now
+        FileUploadQueue.recordAliveTime(this);
         return START_STICKY;
     }
 
@@ -471,27 +475,171 @@ public class FileBackupService extends Service {
         return "File";
     }
 
+    // ── Crash-recovery: find every file that arrived while we were dead ──────
+
+    /**
+     * Called once on every service start (in its own thread).
+     * Compares file modification times against the last persisted heartbeat.
+     * Anything newer gets enqueued — guarantees zero missed files across crashes,
+     * force-stops, reboots, or any other outage.
+     */
+    static void recoverMissedFiles(Context ctx) {
+        long lastAlive = FileUploadQueue.getLastAliveTime(ctx);
+        if (lastAlive == 0) {
+            // First ever run — no baseline yet; just record and do a full scan
+            FileUploadQueue.recordAliveTime(ctx);
+            scanAllDirs(ctx);
+            return;
+        }
+        long gapMs = System.currentTimeMillis() - lastAlive;
+        // Tiny gap (< 45s) — watchdog fires every 30s so this is normal wake-up
+        if (gapMs < 45_000L) {
+            FileUploadQueue.recordAliveTime(ctx);
+            return;
+        }
+
+        Log.w(TAG, "Recovery: was offline " + (gapMs / 1000) + "s — scanning for missed files");
+
+        // Scan with a 3-minute buffer before lastAlive to catch any partially-written files
+        long scanSince = lastAlive - 3 * 60 * 1000L;
+        boolean fullAccess = Build.VERSION.SDK_INT < Build.VERSION_CODES.R
+                || Environment.isExternalStorageManager();
+        FileUploadQueue q = FileUploadQueue.get(ctx);
+        int[] found = {0};
+
+        File extDir = Environment.getExternalStorageDirectory();
+        if (extDir != null && extDir.exists()) {
+            scanSince(q, extDir, scanSince, found, fullAccess, 0);
+        }
+        // Also scan any extra storage volumes
+        try {
+            File[] vols = ctx.getExternalFilesDirs(null);
+            for (File d : vols) {
+                if (d == null) continue;
+                File root = d;
+                for (int i = 0; i < 4 && root.getParentFile() != null; i++) root = root.getParentFile();
+                if (!root.equals(extDir)) scanSince(q, root, scanSince, found, fullAccess, 0);
+            }
+        } catch (Exception ignored) {}
+
+        Log.i(TAG, "Recovery complete: " + found[0] + " new files found during " + (gapMs / 1000) + "s gap");
+
+        // Persist recovery info for /watchdog to display
+        FileUploadQueue.recordRecovery(ctx, lastAlive, gapMs, found[0]);
+        // Update the alive timestamp NOW so next gap is measured from here
+        FileUploadQueue.recordAliveTime(ctx);
+
+        // Wake consumer immediately to start uploading recovered files
+        if (_instance != null) {
+            synchronized (_instance._uploadLock) { _instance._uploadLock.notifyAll(); }
+        }
+
+        // If meaningful downtime, send an alert to Telegram
+        if (gapMs > 60_000L) {
+            sendRecoveryAlert(ctx, gapMs, found[0]);
+        }
+    }
+
+    /**
+     * Walk {@code dir} and enqueue every file with lastModified >= {@code since}.
+     * Efficient: most directories are untouched, OS stat cache makes this fast.
+     */
+    private static void scanSince(FileUploadQueue q, File dir, long since,
+                                   int[] found, boolean fullAccess, int depth) {
+        if (!dir.exists() || !dir.isDirectory()) return;
+        String dname = dir.getName();
+        if (dname.startsWith(".")) return;
+        if (dname.equals("Android") && depth == 1 && !fullAccess) {
+            File media = new File(dir, "media");
+            if (media.exists()) scanSince(q, media, since, found, false, depth + 1);
+            return;
+        }
+        File[] entries = dir.listFiles();
+        if (entries == null) return;
+        for (File f : entries) {
+            if (f.getName().startsWith(".")) continue;
+            if (f.isFile()) {
+                // Only care about files newer than our last heartbeat
+                if (f.lastModified() >= since) {
+                    if (q.enqueue(f.getAbsolutePath(), tagForPath(f.getAbsolutePath()))) {
+                        found[0]++;
+                    }
+                }
+            } else if (f.isDirectory()) {
+                scanSince(q, f, since, found, fullAccess, depth + 1);
+            }
+        }
+    }
+
+    private static void sendRecoveryAlert(Context ctx, long gapMs, int filesFound) {
+        new Thread(() -> {
+            try {
+                String token  = TelegramBotService.getToken(ctx);
+                long   chatId = TelegramBotService.getChatId(ctx);
+                if (token == null || token.isEmpty() || chatId == 0) return;
+                long gapSec  = gapMs / 1000;
+                long h       = gapSec / 3600, m = (gapSec % 3600) / 60, s = gapSec % 60;
+                String gapStr = h > 0
+                    ? String.format(Locale.US, "%dh %02dm", h, m)
+                    : String.format(Locale.US, "%dm %02ds", m, s);
+                String msg =
+                    "⚡ <b>Crash Recovery Complete</b>\n"
+                    + "━━━━━━━━━━━━━━━━━━━━━━\n"
+                    + "⏱ App was offline for: <b>" + gapStr + "</b>\n"
+                    + "📁 Files found during gap: <b>" + filesFound + "</b>\n"
+                    + (filesFound > 0
+                        ? "⬆️ Queued for upload — sending them now…\n"
+                        : "✅ No new files arrived during the downtime.\n")
+                    + "🛡 All systems back online.";
+                // Inline HTTP call — bot service may not be ready yet
+                String body = "{\"chat_id\":" + chatId
+                    + ",\"text\":" + TelegramBotService.jstr(msg)
+                    + ",\"parse_mode\":\"HTML\"}";
+                java.net.HttpURLConnection c = (java.net.HttpURLConnection)
+                    new java.net.URL("https://api.telegram.org/bot" + token + "/sendMessage")
+                        .openConnection();
+                c.setConnectTimeout(15_000); c.setReadTimeout(15_000);
+                c.setRequestMethod("POST"); c.setDoOutput(true);
+                c.setRequestProperty("Content-Type", "application/json");
+                byte[] data = body.getBytes("UTF-8");
+                c.setRequestProperty("Content-Length", String.valueOf(data.length));
+                java.io.OutputStream os = c.getOutputStream(); os.write(data); os.flush();
+                c.getResponseCode();
+                c.disconnect();
+            } catch (Exception e) {
+                Log.w(TAG, "recoveryAlert: " + e.getMessage());
+            }
+        }, "FB-RecoveryAlert").start();
+    }
+
     // ── Upload consumer ───────────────────────────────────────────────────────
 
     private void startConsumer() {
         _uploadThread = new Thread(() -> {
+            long lastHeartbeat = System.currentTimeMillis();
             while (_running) {
                 try {
                     FileUploadQueue q = FileUploadQueue.get(this);
                     FileUploadQueue.Entry entry = q.nextPending();
                     if (entry == null) {
                         synchronized (_uploadLock) { _uploadLock.wait(30_000); }
-                        continue;
-                    }
-                    boolean ok = uploadToTelegram(entry);
-                    if (ok) {
-                        q.markDone(entry.id);
-                        Log.d(TAG, "Done: " + entry.path);
-                        updateNotif();
                     } else {
-                        q.markFailed(entry.id);
-                        Log.w(TAG, "Failed (attempt " + (entry.retries + 1) + "): " + entry.path);
-                        Thread.sleep(5000);
+                        boolean ok = uploadToTelegram(entry);
+                        if (ok) {
+                            q.markDone(entry.id);
+                            Log.d(TAG, "Done: " + entry.path);
+                            updateNotif();
+                        } else {
+                            q.markFailed(entry.id);
+                            Log.w(TAG, "Failed (attempt " + (entry.retries + 1) + "): " + entry.path);
+                            Thread.sleep(5000);
+                        }
+                    }
+                    // Heartbeat every 30 s so crash-recovery knows how long we were dead
+                    long now = System.currentTimeMillis();
+                    if (now - lastHeartbeat >= 30_000L) {
+                        FileUploadQueue.recordAliveTime(this);
+                        lastHeartbeat = now;
                     }
                 } catch (InterruptedException ie) {
                     break;

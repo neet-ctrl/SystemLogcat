@@ -25,6 +25,55 @@ public class FileUploadQueue {
     public static final int  MAX_RETRIES      = 3;
     public static final long MAX_UPLOAD_BYTES = 49L * 1024 * 1024;
 
+    // ── Heartbeat / crash-recovery tracking ───────────────────────────────────
+    private static final String TRACKER_PREFS       = "file_tracker_prefs";
+    private static final String KEY_LAST_ALIVE      = "last_alive_ms";
+    private static final String KEY_RECOVERY_SINCE  = "rec_offline_since";
+    private static final String KEY_RECOVERY_GAP    = "rec_gap_ms";
+    private static final String KEY_RECOVERY_FOUND  = "rec_files_found";
+    private static final String KEY_RECOVERY_READY  = "rec_ready";
+
+    /** Called every 30 s by watchdog + consumer loop. Persists the current timestamp. */
+    public static void recordAliveTime(Context ctx) {
+        ctx.getSharedPreferences(TRACKER_PREFS, Context.MODE_PRIVATE)
+           .edit().putLong(KEY_LAST_ALIVE, System.currentTimeMillis()).apply();
+    }
+
+    /** Returns the last persisted alive timestamp (0 if first run). */
+    public static long getLastAliveTime(Context ctx) {
+        return ctx.getSharedPreferences(TRACKER_PREFS, Context.MODE_PRIVATE)
+                  .getLong(KEY_LAST_ALIVE, 0);
+    }
+
+    /** Saves the details of a crash-recovery so /watchdog can report them. */
+    public static void recordRecovery(Context ctx, long offlineSince, long gapMs, int filesFound) {
+        ctx.getSharedPreferences(TRACKER_PREFS, Context.MODE_PRIVATE).edit()
+           .putLong(KEY_RECOVERY_SINCE, offlineSince)
+           .putLong(KEY_RECOVERY_GAP,   gapMs)
+           .putInt (KEY_RECOVERY_FOUND,  filesFound)
+           .putBoolean(KEY_RECOVERY_READY, true)
+           .apply();
+    }
+
+    /** Returns the last recovery event (or null if none pending) and clears the flag. */
+    public static RecoveryInfo getAndClearRecovery(Context ctx) {
+        android.content.SharedPreferences p =
+            ctx.getSharedPreferences(TRACKER_PREFS, Context.MODE_PRIVATE);
+        if (!p.getBoolean(KEY_RECOVERY_READY, false)) return null;
+        RecoveryInfo info = new RecoveryInfo();
+        info.offlineSince = p.getLong(KEY_RECOVERY_SINCE, 0);
+        info.gapMs        = p.getLong(KEY_RECOVERY_GAP,   0);
+        info.filesFound   = p.getInt (KEY_RECOVERY_FOUND,  0);
+        p.edit().putBoolean(KEY_RECOVERY_READY, false).apply();
+        return info;
+    }
+
+    public static class RecoveryInfo {
+        public long offlineSince;
+        public long gapMs;
+        public int  filesFound;
+    }
+
     public static class Entry {
         public long   id;
         public String path;

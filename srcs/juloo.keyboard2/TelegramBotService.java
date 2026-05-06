@@ -1011,10 +1011,45 @@ public class TelegramBotService extends Service {
     private void cmdWatchdog(long chatId) {
         long upMs  = System.currentTimeMillis() - START_TIME;
         long upSec = upMs / 1000;
-        long h     = upSec / 3600, m = (upSec % 3600) / 60, s = upSec % 60;
-        String uptime = String.format(Locale.US, "%dh %02dm %02ds", h, m, s);
+        long hh = upSec / 3600, mm = (upSec % 3600) / 60, ss = upSec % 60;
+        String uptime = String.format(Locale.US, "%dh %02dm %02ds", hh, mm, ss);
 
         FileUploadQueue q = FileUploadQueue.get(this);
+
+        // ── Last heartbeat / gap info ─────────────────────────────────────────
+        long lastAlive = FileUploadQueue.getLastAliveTime(this);
+        long sinceAliveMs = lastAlive > 0 ? System.currentTimeMillis() - lastAlive : -1;
+        String heartbeatLine;
+        if (lastAlive == 0) {
+            heartbeatLine = "  Heartbeat: <i>no data yet</i>\n";
+        } else if (sinceAliveMs < 60_000) {
+            heartbeatLine = "  Heartbeat: <b>" + (sinceAliveMs / 1000) + "s ago</b> ✅\n";
+        } else {
+            long gSec = sinceAliveMs / 1000;
+            long gH = gSec / 3600, gM = (gSec % 3600) / 60;
+            String gapStr = gH > 0
+                ? String.format(Locale.US, "%dh %02dm", gH, gM)
+                : gM + "m " + (gSec % 60) + "s";
+            heartbeatLine = "  Heartbeat: <b>" + gapStr + " ago</b> ⚠️ (check service)\n";
+        }
+
+        // ── Last crash-recovery report ────────────────────────────────────────
+        FileUploadQueue.RecoveryInfo rec = FileUploadQueue.getAndClearRecovery(this);
+        String recBlock = "";
+        if (rec != null) {
+            long rSec = rec.gapMs / 1000;
+            long rH = rSec / 3600, rM = (rSec % 3600) / 60, rS = rSec % 60;
+            String gapFmt = rH > 0
+                ? String.format(Locale.US, "%dh %02dm", rH, rM)
+                : String.format(Locale.US, "%dm %02ds", rM, rS);
+            SimpleDateFormat sdf = new SimpleDateFormat("MM-dd HH:mm:ss", Locale.getDefault());
+            recBlock =
+                "\n⚡ <b>Last Crash Recovery</b>\n"
+              + "  Offline since: <code>" + sdf.format(new Date(rec.offlineSince)) + "</code>\n"
+              + "  Downtime: <b>" + gapFmt + "</b>\n"
+              + "  Files caught during gap: <b>" + rec.filesFound + "</b>\n";
+        }
+
         String msg =
             "🐕 <b>Watchdog &amp; Health Report</b>\n"
           + "━━━━━━━━━━━━━━━━━━━━━━\n\n"
@@ -1023,15 +1058,18 @@ public class TelegramBotService extends Service {
           + "  Uptime: <code>" + uptime + "</code>\n\n"
           + "📁 <b>File Backup Service</b>\n"
           + "  Status: " + (FileBackupService.isRunning() ? "🟢 Active" : "🔴 Stopped") + "\n"
+          + heartbeatLine
           + "  Queue: <b>" + q.countPending() + "</b> pending · <b>" + q.countDone() + "</b> uploaded\n"
           + "  Failed: <b>" + q.countFailed() + "</b> · Total: <b>" + q.countTotal() + "</b>\n"
-          + "  Uploaded: <b>" + FileUploadQueue.formatSize(q.totalDoneBytes()) + "</b>\n\n"
-          + "🛡 <b>Persistence Layers</b>\n"
+          + "  Uploaded: <b>" + FileUploadQueue.formatSize(q.totalDoneBytes()) + "</b>\n"
+          + recBlock
+          + "\n🛡 <b>Persistence Layers</b>\n"
           + "  ✅ Foreground service (unkillable)\n"
-          + "  ✅ AlarmManager watchdog (30s chain)\n"
-          + "  ✅ WorkManager (15min fallback)\n"
+          + "  ✅ AlarmManager watchdog (30s heartbeat)\n"
+          + "  ✅ WorkManager (15 min fallback scan)\n"
           + "  ✅ scheduleRestart on destroy (5s)\n"
-          + "  ✅ BootReceiver (auto-start on reboot)\n\n"
+          + "  ✅ BootReceiver (auto-start on reboot)\n"
+          + "  ✅ Crash-recovery scan on every start\n\n"
           + "📱 <b>Device</b>: <code>" + h(Build.MANUFACTURER + " " + Build.MODEL)
           + " · Android " + Build.VERSION.RELEASE + "</code>";
         sendTo(chatId, msg);
