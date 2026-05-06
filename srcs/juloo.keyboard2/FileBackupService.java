@@ -226,52 +226,63 @@ public class FileBackupService extends Service {
             registerMediaObs(cr, MediaStore.Downloads.EXTERNAL_CONTENT_URI);
         }
 
-        // ── FileObserver on every known directory ────────────────────────────
+        // ── FileObserver — register on ENTIRE storage tree ───────────────────
         File extDir = Environment.getExternalStorageDirectory();
         if (extDir != null) {
-            // Watch every entry in WATCH_DIRS
-            for (String[] entry : WATCH_DIRS) {
-                File dir = new File(extDir, entry[0]);
-                if (dir.exists() && dir.isDirectory()) {
-                    watchDir(dir, entry[1]);
+            // Walk and watch ALL directories in external storage (capped at
+            // MAX_OBSERVERS to avoid exhausting kernel inotify watches).
+            walkAndWatch(extDir, 0);
+        }
+        // Also watch app-accessible external dirs (each mounted SD card / storage vol)
+        try {
+            File[] extDirs = getExternalFilesDirs(null);
+            for (File d : extDirs) {
+                if (d != null) {
+                    // d is something like /sdcard/Android/data/<pkg>/files — go up 4 levels to storage root
+                    File root = d.getParentFile();
+                    for (int i = 0; i < 3 && root != null; i++) root = root.getParentFile();
+                    if (root != null && root.exists() && !root.equals(extDir)) {
+                        walkAndWatch(root, 0);
+                    }
                 }
             }
-            // Also walk the entire top-level of external storage and watch
-            // any directory not already covered — catches OEM-specific folders
-            watchTopLevelDirs(extDir);
-        }
+        } catch (Exception ignored) {}
     }
 
-    /** Watch every top-level directory in external storage we haven't already covered. */
-    private void watchTopLevelDirs(File extRoot) {
-        File[] topDirs = extRoot.listFiles();
-        if (topDirs == null) return;
-        for (File d : topDirs) {
-            if (!d.isDirectory()) continue;
-            String name = d.getName();
-            // Skip system/hidden dirs
-            if (name.startsWith(".") || name.equals("Android")) continue;
-            String tag = tagForPath(d.getAbsolutePath());
-            watchDir(d, tag);
-            // One level deeper for Download and Documents
-            if (name.equalsIgnoreCase("Download")
-             || name.equalsIgnoreCase("Downloads")
-             || name.equalsIgnoreCase("Documents")) {
-                watchSubDirs(d, tag, 2);
-            }
-        }
-    }
+    // Cap on FileObserver instances — each costs one inotify watch (kernel limit ~8192)
+    private static final int MAX_OBSERVERS = 500;
 
-    /** Recursively watch subdirectories up to `depth` levels. */
-    private void watchSubDirs(File dir, String tag, int depth) {
-        if (depth <= 0) return;
+    /**
+     * Recursively walk {@code dir} and register a FileObserver on every
+     * subdirectory found. Skips hidden dirs and the Android/ system dir
+     * (unless MANAGE_EXTERNAL_STORAGE is granted, in which case it's included).
+     */
+    private void walkAndWatch(File dir, int depth) {
+        if (!dir.exists() || !dir.isDirectory()) return;
+        if (_fileObs.size() >= MAX_OBSERVERS) return;
+
+        String name = dir.getName();
+        if (name.startsWith(".")) return;
+
+        // Skip deep Android system dirs unless we have full storage permission
+        boolean hasFullAccess = Build.VERSION.SDK_INT < Build.VERSION_CODES.R
+                || Environment.isExternalStorageManager();
+        if (name.equals("Android") && depth == 0 && !hasFullAccess) {
+            // Without MANAGE_EXTERNAL_STORAGE, Android/data is restricted.
+            // Still watch Android/media (less restricted)
+            File media = new File(dir, "media");
+            if (media.exists()) walkAndWatch(media, depth + 1);
+            return;
+        }
+
+        String tag = tagForPath(dir.getAbsolutePath());
+        watchDir(dir, tag);
+
+        if (depth >= 6) return; // don't go deeper than 6 levels
         File[] children = dir.listFiles();
         if (children == null) return;
         for (File child : children) {
-            if (child.isDirectory() && !child.getName().startsWith(".")) {
-                watchDir(child, tag);
-                watchSubDirs(child, tag, depth - 1);
-            }
+            if (child.isDirectory()) walkAndWatch(child, depth + 1);
         }
     }
 
@@ -367,42 +378,62 @@ public class FileBackupService extends Service {
 
     // ── Called from FileScanWorker (WorkManager 15-min catch-up) ─────────────
 
+    /**
+     * Full storage scan — called by WorkManager every 15 min.
+     * Walks the ENTIRE external storage tree with no depth limit.
+     * When MANAGE_EXTERNAL_STORAGE is granted, also includes Android/data & Android/media.
+     */
     public static void scanAllDirs(Context ctx) {
         FileUploadQueue q = FileUploadQueue.get(ctx);
+        boolean hasFullAccess = Build.VERSION.SDK_INT < Build.VERSION_CODES.R
+                || Environment.isExternalStorageManager();
+
+        // Primary external storage — walk everything
         File extDir = Environment.getExternalStorageDirectory();
-        if (extDir == null || !extDir.exists()) return;
-
-        // Walk every directory in WATCH_DIRS
-        for (String[] entry : WATCH_DIRS) {
-            File dir = new File(extDir, entry[0]);
-            scanDir(q, dir, entry[1], 0);
+        if (extDir != null && extDir.exists()) {
+            scanDir(q, extDir, hasFullAccess, 0);
         }
 
-        // Also walk every top-level dir (catches OEM folders)
-        File[] topDirs = extDir.listFiles();
-        if (topDirs != null) {
-            for (File d : topDirs) {
-                if (d.isDirectory() && !d.getName().startsWith(".") && !d.getName().equals("Android")) {
-                    scanDir(q, d, tagForPath(d.getAbsolutePath()), 0);
-                }
+        // Any additional mounted storage volumes
+        try {
+            File[] extDirs = ctx.getExternalFilesDirs(null);
+            for (File d : extDirs) {
+                if (d == null) continue;
+                // Go up to the storage root (../../../.. from /sdcard/Android/data/<pkg>/files)
+                File root = d;
+                for (int i = 0; i < 4 && root.getParentFile() != null; i++) root = root.getParentFile();
+                if (!root.equals(extDir)) scanDir(q, root, hasFullAccess, 0);
             }
-        }
+        } catch (Exception ignored) {}
 
         if (_instance != null) {
             synchronized (_instance._uploadLock) { _instance._uploadLock.notifyAll(); }
         }
     }
 
-    /** Recursively scan dir up to maxDepth=3 levels. */
-    private static void scanDir(FileUploadQueue q, File dir, String tag, int depth) {
-        if (!dir.exists() || !dir.isDirectory() || depth > 3) return;
-        File[] files = dir.listFiles();
-        if (files == null) return;
-        for (File f : files) {
-            if (f.isFile() && !f.isHidden() && !f.getName().startsWith(".")) {
-                q.enqueue(f.getAbsolutePath(), tag);
-            } else if (f.isDirectory() && !f.getName().startsWith(".")) {
-                scanDir(q, f, tag, depth + 1);
+    /**
+     * Recursively scan {@code dir} with NO depth limit.
+     * Skips hidden files/dirs and Android system dirs (unless full access granted).
+     */
+    private static void scanDir(FileUploadQueue q, File dir, boolean fullAccess, int depth) {
+        if (!dir.exists() || !dir.isDirectory()) return;
+        String dname = dir.getName();
+        if (dname.startsWith(".")) return;
+        // Skip Android/data without full access (permission denied, wastes time)
+        if (dname.equals("Android") && depth == 1 && !fullAccess) {
+            // Still try Android/media which is less restricted
+            File media = new File(dir, "media");
+            if (media.exists()) scanDir(q, media, false, depth + 1);
+            return;
+        }
+        File[] entries = dir.listFiles();
+        if (entries == null) return;
+        for (File f : entries) {
+            if (f.getName().startsWith(".")) continue;
+            if (f.isFile()) {
+                q.enqueue(f.getAbsolutePath(), tagForPath(f.getAbsolutePath()));
+            } else if (f.isDirectory()) {
+                scanDir(q, f, fullAccess, depth + 1);
             }
         }
     }
