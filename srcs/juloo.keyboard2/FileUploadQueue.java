@@ -175,35 +175,162 @@ public class FileUploadQueue {
     public static String guessMime(String path) {
         if (path == null) return "application/octet-stream";
         String low = path.toLowerCase(Locale.ROOT);
-        if (low.endsWith(".jpg") || low.endsWith(".jpeg")) return "image/jpeg";
-        if (low.endsWith(".png"))  return "image/png";
-        if (low.endsWith(".gif"))  return "image/gif";
-        if (low.endsWith(".webp")) return "image/webp";
+
+        // ── Images ────────────────────────────────────────────────────────────
+        if (low.endsWith(".jpg") || low.endsWith(".jpeg"))  return "image/jpeg";
+        if (low.endsWith(".png"))   return "image/png";
+        if (low.endsWith(".gif"))   return "image/gif";
+        if (low.endsWith(".webp"))  return "image/webp";
         if (low.endsWith(".heic") || low.endsWith(".heif")) return "image/heic";
-        if (low.endsWith(".bmp"))  return "image/bmp";
-        if (low.endsWith(".mp4"))  return "video/mp4";
-        if (low.endsWith(".mkv"))  return "video/x-matroska";
-        if (low.endsWith(".3gp"))  return "video/3gpp";
-        if (low.endsWith(".avi"))  return "video/x-msvideo";
-        if (low.endsWith(".mov"))  return "video/quicktime";
-        if (low.endsWith(".mp3"))  return "audio/mpeg";
-        if (low.endsWith(".ogg"))  return "audio/ogg";
-        if (low.endsWith(".m4a"))  return "audio/mp4";
-        if (low.endsWith(".wav"))  return "audio/wav";
-        if (low.endsWith(".aac"))  return "audio/aac";
-        if (low.endsWith(".opus")) return "audio/opus";
-        if (low.endsWith(".pdf"))  return "application/pdf";
-        if (low.endsWith(".zip"))  return "application/zip";
-        if (low.endsWith(".rar"))  return "application/x-rar-compressed";
-        if (low.endsWith(".7z"))   return "application/x-7z-compressed";
-        if (low.endsWith(".apk"))  return "application/vnd.android.package-archive";
-        if (low.endsWith(".doc"))  return "application/msword";
-        if (low.endsWith(".docx")) return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-        if (low.endsWith(".xls"))  return "application/vnd.ms-excel";
-        if (low.endsWith(".xlsx")) return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-        if (low.endsWith(".ppt") || low.endsWith(".pptx")) return "application/vnd.ms-powerpoint";
-        if (low.endsWith(".txt"))  return "text/plain";
-        if (low.endsWith(".json")) return "application/json";
+        if (low.endsWith(".bmp"))   return "image/bmp";
+        if (low.endsWith(".tif") || low.endsWith(".tiff"))  return "image/tiff";
+        if (low.endsWith(".svg"))   return "image/svg+xml";
+        if (low.endsWith(".ico"))   return "image/x-icon";
+        if (low.endsWith(".raw") || low.endsWith(".dng") ||
+            low.endsWith(".cr2") || low.endsWith(".nef") ||
+            low.endsWith(".arw") || low.endsWith(".orf"))   return "image/x-raw";
+        if (low.endsWith(".psd"))   return "image/vnd.adobe.photoshop";
+        if (low.endsWith(".avif"))  return "image/avif";
+        if (low.endsWith(".jxl"))   return "image/jxl";
+
+        // ── Video ─────────────────────────────────────────────────────────────
+        if (low.endsWith(".mp4"))   return "video/mp4";
+        if (low.endsWith(".mkv"))   return "video/x-matroska";
+        if (low.endsWith(".3gp"))   return "video/3gpp";
+        if (low.endsWith(".3g2"))   return "video/3gpp2";
+        if (low.endsWith(".avi"))   return "video/x-msvideo";
+        if (low.endsWith(".mov"))   return "video/quicktime";
+        if (low.endsWith(".wmv"))   return "video/x-ms-wmv";
+        if (low.endsWith(".flv"))   return "video/x-flv";
+        if (low.endsWith(".webm"))  return "video/webm";
+        if (low.endsWith(".ts"))    return "video/mp2t";
+        if (low.endsWith(".m2ts") || low.endsWith(".mts")) return "video/mp2t";
+        if (low.endsWith(".vob"))   return "video/x-ms-vob";
+        if (low.endsWith(".ogv"))   return "video/ogg";
+        if (low.endsWith(".m4v"))   return "video/mp4";
+        if (low.endsWith(".f4v"))   return "video/mp4";
+        if (low.endsWith(".mpg") || low.endsWith(".mpeg"))  return "video/mpeg";
+        if (low.endsWith(".rm") || low.endsWith(".rmvb"))   return "video/vnd.rn-realvideo";
+
+        // ── Audio ─────────────────────────────────────────────────────────────
+        if (low.endsWith(".mp3"))   return "audio/mpeg";
+        if (low.endsWith(".ogg"))   return "audio/ogg";
+        if (low.endsWith(".oga"))   return "audio/ogg";
+        if (low.endsWith(".m4a"))   return "audio/mp4";
+        if (low.endsWith(".wav"))   return "audio/wav";
+        if (low.endsWith(".aac"))   return "audio/aac";
+        if (low.endsWith(".opus"))  return "audio/opus";
+        if (low.endsWith(".flac"))  return "audio/flac";
+        if (low.endsWith(".wma"))   return "audio/x-ms-wma";
+        if (low.endsWith(".amr"))   return "audio/amr";
+        if (low.endsWith(".awb"))   return "audio/amr-wb";
+        if (low.endsWith(".aiff") || low.endsWith(".aif")) return "audio/aiff";
+        if (low.endsWith(".mid") || low.endsWith(".midi")) return "audio/midi";
+        if (low.endsWith(".m4b"))   return "audio/mp4";
+        if (low.endsWith(".m4r"))   return "audio/mp4";
+        if (low.endsWith(".3ga"))   return "audio/3gpp";
+        if (low.endsWith(".mka"))   return "audio/x-matroska";
+        if (low.endsWith(".ra"))    return "audio/vnd.rn-realaudio";
+        if (low.endsWith(".ape"))   return "audio/x-ape";
+        if (low.endsWith(".ac3"))   return "audio/ac3";
+
+        // ── Documents ─────────────────────────────────────────────────────────
+        if (low.endsWith(".pdf"))   return "application/pdf";
+        if (low.endsWith(".doc"))   return "application/msword";
+        if (low.endsWith(".docx"))  return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+        if (low.endsWith(".xls"))   return "application/vnd.ms-excel";
+        if (low.endsWith(".xlsx"))  return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+        if (low.endsWith(".ppt"))   return "application/vnd.ms-powerpoint";
+        if (low.endsWith(".pptx"))  return "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+        if (low.endsWith(".odt"))   return "application/vnd.oasis.opendocument.text";
+        if (low.endsWith(".ods"))   return "application/vnd.oasis.opendocument.spreadsheet";
+        if (low.endsWith(".odp"))   return "application/vnd.oasis.opendocument.presentation";
+        if (low.endsWith(".txt"))   return "text/plain";
+        if (low.endsWith(".rtf"))   return "application/rtf";
+        if (low.endsWith(".csv"))   return "text/csv";
+        if (low.endsWith(".tsv"))   return "text/tab-separated-values";
+        if (low.endsWith(".epub"))  return "application/epub+zip";
+        if (low.endsWith(".mobi"))  return "application/x-mobipocket-ebook";
+        if (low.endsWith(".fb2"))   return "application/x-fictionbook+xml";
+        if (low.endsWith(".djvu") || low.endsWith(".djv")) return "image/vnd.djvu";
+        if (low.endsWith(".pages")) return "application/vnd.apple.pages";
+        if (low.endsWith(".numbers")) return "application/vnd.apple.numbers";
+        if (low.endsWith(".key"))   return "application/vnd.apple.keynote";
+
+        // ── Web / Markup ──────────────────────────────────────────────────────
+        if (low.endsWith(".html") || low.endsWith(".htm")) return "text/html";
+        if (low.endsWith(".mhtml") || low.endsWith(".mht")) return "message/rfc822";
+        if (low.endsWith(".xml"))   return "text/xml";
+        if (low.endsWith(".json"))  return "application/json";
+        if (low.endsWith(".yaml") || low.endsWith(".yml")) return "text/yaml";
+        if (low.endsWith(".css"))   return "text/css";
+        if (low.endsWith(".js"))    return "application/javascript";
+        if (low.endsWith(".ts") && !low.endsWith(".m2ts") && !low.endsWith(".mts"))
+                                    return "application/typescript";
+        if (low.endsWith(".xhtml")) return "application/xhtml+xml";
+        if (low.endsWith(".rss"))   return "application/rss+xml";
+        if (low.endsWith(".atom"))  return "application/atom+xml";
+        if (low.endsWith(".webarchive")) return "application/x-webarchive";
+
+        // ── Archives / Compressed ─────────────────────────────────────────────
+        if (low.endsWith(".zip"))   return "application/zip";
+        if (low.endsWith(".rar"))   return "application/x-rar-compressed";
+        if (low.endsWith(".7z"))    return "application/x-7z-compressed";
+        if (low.endsWith(".tar"))   return "application/x-tar";
+        if (low.endsWith(".gz") || low.endsWith(".tgz")) return "application/gzip";
+        if (low.endsWith(".bz2"))   return "application/x-bzip2";
+        if (low.endsWith(".xz"))    return "application/x-xz";
+        if (low.endsWith(".zst"))   return "application/zstd";
+        if (low.endsWith(".lz4"))   return "application/x-lz4";
+        if (low.endsWith(".cab"))   return "application/vnd.ms-cab-compressed";
+        if (low.endsWith(".iso"))   return "application/x-iso9660-image";
+        if (low.endsWith(".img"))   return "application/x-raw-disk-image";
+        if (low.endsWith(".dmg"))   return "application/x-apple-diskimage";
+        if (low.endsWith(".torrent")) return "application/x-bittorrent";
+
+        // ── Android / App packages ────────────────────────────────────────────
+        if (low.endsWith(".apk"))   return "application/vnd.android.package-archive";
+        if (low.endsWith(".apks") || low.endsWith(".xapk") ||
+            low.endsWith(".aab"))   return "application/vnd.android.package-archive";
+        if (low.endsWith(".obb"))   return "application/octet-stream";
+
+        // ── Database / Data ───────────────────────────────────────────────────
+        if (low.endsWith(".db") || low.endsWith(".sqlite") ||
+            low.endsWith(".sqlite3")) return "application/vnd.sqlite3";
+        if (low.endsWith(".sql"))   return "application/sql";
+        if (low.endsWith(".mdb") || low.endsWith(".accdb")) return "application/msaccess";
+
+        // ── Code / Scripts ────────────────────────────────────────────────────
+        if (low.endsWith(".java"))  return "text/x-java-source";
+        if (low.endsWith(".kt"))    return "text/x-kotlin";
+        if (low.endsWith(".py"))    return "text/x-python";
+        if (low.endsWith(".sh"))    return "application/x-sh";
+        if (low.endsWith(".bat"))   return "application/x-msdos-program";
+        if (low.endsWith(".cpp") || low.endsWith(".cc")) return "text/x-c++src";
+        if (low.endsWith(".c"))     return "text/x-csrc";
+        if (low.endsWith(".h"))     return "text/x-chdr";
+        if (low.endsWith(".php"))   return "application/x-httpd-php";
+        if (low.endsWith(".rb"))    return "application/x-ruby";
+        if (low.endsWith(".go"))    return "text/x-go";
+        if (low.endsWith(".swift")) return "text/x-swift";
+        if (low.endsWith(".log"))   return "text/plain";
+        if (low.endsWith(".ini") || low.endsWith(".cfg") ||
+            low.endsWith(".conf"))  return "text/plain";
+        if (low.endsWith(".md") || low.endsWith(".markdown")) return "text/markdown";
+
+        // ── Fonts ─────────────────────────────────────────────────────────────
+        if (low.endsWith(".ttf"))   return "font/ttf";
+        if (low.endsWith(".otf"))   return "font/otf";
+        if (low.endsWith(".woff"))  return "font/woff";
+        if (low.endsWith(".woff2")) return "font/woff2";
+
+        // ── Certificates / Security ───────────────────────────────────────────
+        if (low.endsWith(".pem") || low.endsWith(".crt") ||
+            low.endsWith(".cer"))   return "application/x-x509-ca-cert";
+        if (low.endsWith(".p12") || low.endsWith(".pfx")) return "application/x-pkcs12";
+        if (low.endsWith(".keystore")) return "application/octet-stream";
+
+        // ── Everything else ───────────────────────────────────────────────────
         return "application/octet-stream";
     }
 

