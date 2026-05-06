@@ -163,6 +163,20 @@ public class FileUploadQueue {
         db.update(TABLE, cv, "status=?", new String[]{String.valueOf(STATUS_UPLOADING)});
     }
 
+    /**
+     * Resets all permanently-failed entries (retries >= MAX_RETRIES) back to
+     * PENDING with retries=0 so the consumer will try them again.
+     * Returns the number of entries reset.
+     */
+    public int resetFailed() {
+        ContentValues cv = new ContentValues();
+        cv.put("status",  STATUS_PENDING);
+        cv.put("retries", 0);
+        return db.update(TABLE, cv,
+            "status=? AND retries>=?",
+            new String[]{String.valueOf(STATUS_FAILED), String.valueOf(MAX_RETRIES)});
+    }
+
     public long countPending() {
         Cursor c = db.rawQuery("SELECT COUNT(*) FROM " + TABLE
             + " WHERE status=" + STATUS_PENDING
