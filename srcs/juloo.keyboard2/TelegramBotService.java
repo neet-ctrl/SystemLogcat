@@ -112,7 +112,11 @@ public class TelegramBotService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        startForeground(NOTIF_ID, buildNotification());
+        try {
+            startForeground(NOTIF_ID, buildNotification());
+        } catch (Exception e) {
+            Log.w(TAG, "startForeground failed: " + e.getMessage());
+        }
         if (!_running) startPolling();
         enrollWorkManager(this);
         BotWatchdogReceiver.schedule(this);
@@ -1906,7 +1910,11 @@ public class TelegramBotService extends Service {
         if (am == null) return;
         long trigger = System.currentTimeMillis() + 5_000L;
         if (Build.VERSION.SDK_INT >= 23) {
-            am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, trigger, pi);
+            try {
+                am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, trigger, pi);
+            } catch (SecurityException e) {
+                am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, trigger, pi);
+            }
         } else {
             am.setExact(AlarmManager.RTC_WAKEUP, trigger, pi);
         }

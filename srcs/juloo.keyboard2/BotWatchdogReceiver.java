@@ -27,7 +27,12 @@ public class BotWatchdogReceiver extends BroadcastReceiver {
         PendingIntent pi = makePi(ctx);
         long trigger = System.currentTimeMillis() + INTERVAL;
         if (Build.VERSION.SDK_INT >= 23) {
-            am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, trigger, pi);
+            try {
+                am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, trigger, pi);
+            } catch (SecurityException e) {
+                // Exact alarm permission not granted; fall back to inexact
+                am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, trigger, pi);
+            }
         } else {
             am.setExact(AlarmManager.RTC_WAKEUP, trigger, pi);
         }

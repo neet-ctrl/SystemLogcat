@@ -98,7 +98,11 @@ public class FileBackupService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        startForeground(NOTIF_ID, buildNotif());
+        try {
+            startForeground(NOTIF_ID, buildNotif());
+        } catch (Exception e) {
+            Log.w(TAG, "startForeground failed: " + e.getMessage());
+        }
         FileUploadQueue.get(this).resetStuck();
         if (!_running) {
             _running = true;
@@ -149,7 +153,11 @@ public class FileBackupService extends Service {
         PendingIntent pi = PendingIntent.getService(this, 9879, i, f);
         long t = System.currentTimeMillis() + 5_000L;
         if (Build.VERSION.SDK_INT >= 23) {
-            am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, t, pi);
+            try {
+                am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, t, pi);
+            } catch (SecurityException e) {
+                am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, t, pi);
+            }
         } else {
             am.setExact(AlarmManager.RTC_WAKEUP, t, pi);
         }
